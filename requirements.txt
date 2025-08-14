@@ -1,0 +1,16 @@
+--index-url https://download.pytorch.org/whl/cu118
+
+docling
+faiss-cpu
+gradio
+langchain-text-splitters
+langdetect
+numpy
+openai
+pillow
+pydicom
+sentence-transformers
+torch
+torchvision
+torchaudio
+transformers
