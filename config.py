@@ -1,7 +1,11 @@
-from pydantic import BaseModel
-from typing   import Any, List, Optional, Required
+import json
 
-from .base_constants import *
+
+from pydantic import BaseModel
+from typing   import Any, Dict, List, Optional, Required
+
+
+from .constants import *
 
 
 class ModelConfig(BaseModel):
@@ -41,6 +45,7 @@ class StorageDBConfig(BaseModel):
 
 class ToolConfig(BaseModel):
 	type : str = Required
+	args : Optional[Dict[str, Any]]
 
 
 class OptionsConfig(BaseModel):
@@ -52,6 +57,8 @@ class OptionsConfig(BaseModel):
 	enable_session_summaries         : bool = DEFAULT_ENABLE_SESSION_SUMMARIES
 	search_previous_sessions_history : bool = DEFAULT_SEARCH_PREVIOUS_SESSIONS_HISTORY
 	num_history_sessions             : int  = DEFAULT_NUM_HISTORY_SESSIONS
+	show_tool_calls                  : bool = DEFAULT_SHOW_TOOL_CALLS
+	reasoning                        : bool = DEFAULT_REASONING
 
 
 class AgentBackendConfig(BaseModel):
@@ -73,3 +80,18 @@ class AgentConfig(BaseModel):
 	storage      : Optional[StorageDBConfig]
 	tools        : Optional[List[ToolConfig]]
 	data         : Optional[Any]
+
+
+def load_config(file_path: str) -> AgentConfig:
+	with open(file_path, "r") as f:
+		data = json.load(f)
+	return AgentConfig(**data)
+
+
+def validate_config(config: AgentConfig) -> bool:
+	# TODO: Implement validation logic for the AgentConfig
+	if config is None:
+		return False
+	if not config.version or not config.author or not config.name:
+		return False
+	return True
