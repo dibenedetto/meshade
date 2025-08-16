@@ -1,19 +1,17 @@
-from .agent  import Agent
-from .config import AgentConfig, validate_config
+from agent_base import AgentBase
+from agent_agno import AgentAgno
+from config     import AgentConfig, validate_config
 
 
-from .agno   import AgnoAgent
-
-
-def build_agent(config: AgentConfig) -> Agent:
+def build_agent(config: AgentConfig) -> AgentBase:
 	if not validate_config(config):
 		raise ValueError("Invalid agent configuration")
 
-	agent: Agent = None
+	agent: AgentBase = None
 
 	try:
 		if config.backend.type == "agno":
-			agent = AgnoAgent(config)
+			agent = AgentAgno(config)
 		else:
 			raise ValueError(f"Unsupported agent backend type: {config.backend.type}")
 

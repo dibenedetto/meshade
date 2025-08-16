@@ -13,7 +13,7 @@ from agno.vectordb.lancedb    import LanceDb
 from agno.vectordb.search     import SearchType
 
 
-from agent  import BaseAgent
+from agent_base  import AgentBase
 from config import AgentConfig, ModelConfig, OptionsConfig
 
 
@@ -22,7 +22,7 @@ def agno_validate_config(config: AgentConfig) -> bool:
 	return config is not None
 
 
-class AgnoAgent(BaseAgent):
+class AgentAgno(AgentBase):
 
 	def __init__(self, config: AgentConfig):
 		super().__init__(config)
@@ -61,22 +61,33 @@ class AgnoAgent(BaseAgent):
 
 		knowledge = None
 		if config.knowledge is not None:
-			if config.knowledge.vector_db.type == "lancedb":
-				knowledge_db   = LanceDb(
-					table_name  = config.knowledge.vector_db.table_name,
-					uri         = config.knowledge.vector_db.db_url,
-					search_type = get_search_type(config.knowledge.vector_db.search_type, True),
-				)
-			else:
-				raise ValueError("Invalid Agno knowledge db type")
-
-			if config.knowledge.type == "document":
-				knowledge = PDFUrlKnowledgeBase(
-					urls      = [],
-					vector_db = knowledge_db,
-				)
-			else:
-				raise ValueError("Invalid Agno knowledge db type")
+			config_knowledges = config.knowledge
+			if not isinstance(config_knowledges, list):
+				config_knowledges = [config_knowledges]
+			knowledges = []
+			for knowledge_config in config_knowledges:
+				if knowledge_config.vector_db.type == "lancedb":
+					knowledge_db   = LanceDb(
+						table_name  = knowledge_config.vector_db.table_name,
+						uri         = knowledge_config.vector_db.db_url,
+						search_type = get_search_type(knowledge_config.vector_db.search_type, True),
+					)
+				else:
+					raise ValueError("Invalid Agno knowledge db type")
+				if knowledge_config.type == "document":
+					knowledge_item = PDFUrlKnowledgeBase(
+						urls      = [],
+						vector_db = knowledge_db,
+					)
+				else:
+					raise ValueError("Invalid Agno knowledge db type")
+				if knowledge_item:
+					knowledges.append(knowledge_item)
+			knowledges_len = len(knowledges)
+			if knowledges_len == 1:
+				knowledge = knowledges[0]
+			elif knowledges_len > 1:
+				raise ValueError("Invalid Agno knowledge db handlers: multiple knowledge handlers are not supported right now")
 
 		memory = None
 		if config.memory is not None:
@@ -129,3 +140,7 @@ class AgnoAgent(BaseAgent):
 		)
 
 		self.d = agent
+
+
+	def query(self, message: str, stream: bool = False):
+		return self.d.print_response(message, stream=stream)

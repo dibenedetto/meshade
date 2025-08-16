@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing   import Any, Dict, List, Optional, Required
 
 
-from .constants import *
+from constants import *
 
 
 class ModelConfig(BaseModel):
@@ -59,6 +59,9 @@ class OptionsConfig(BaseModel):
 	num_history_sessions             : int  = DEFAULT_NUM_HISTORY_SESSIONS
 	show_tool_calls                  : bool = DEFAULT_SHOW_TOOL_CALLS
 	reasoning                        : bool = DEFAULT_REASONING
+	stream_intermediate_steps        : bool = DEFAULT_STREAM_INTERMEDIATE_STEPS
+	# structured_outputs               : Optional[Dict[str, Any]]
+	# expected_output                  : Optional[str]
 
 
 class AgentBackendConfig(BaseModel):
@@ -82,12 +85,6 @@ class AgentConfig(BaseModel):
 	data         : Optional[Any]
 
 
-def load_config(file_path: str) -> AgentConfig:
-	with open(file_path, "r") as f:
-		data = json.load(f)
-	return AgentConfig(**data)
-
-
 def validate_config(config: AgentConfig) -> bool:
 	# TODO: Implement validation logic for the AgentConfig
 	if config is None:
@@ -95,3 +92,9 @@ def validate_config(config: AgentConfig) -> bool:
 	if not config.version or not config.author or not config.name:
 		return False
 	return True
+
+
+def load_config(file_path: str) -> AgentConfig:
+	with open(file_path, "r") as f:
+		data = json.load(f)
+	return AgentConfig(**data)

@@ -30,6 +30,7 @@ DEFAULT_SEARCH_PREVIOUS_SESSIONS_HISTORY : bool = True
 DEFAULT_NUM_HISTORY_SESSIONS             : int  = 2
 DEFAULT_SHOW_TOOL_CALLS                  : bool = True
 DEFAULT_REASONING                        : bool = True
+DEFAULT_STREAM_INTERMEDIATE_STEPS        : bool = True
 
 DEFAULT_AGENT_BACKEND_TYPE               : str  = "agno"
 DEFAULT_AGENT_BACKEND_VERSION            : str  = ""

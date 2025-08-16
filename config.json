@@ -1,0 +1,70 @@
+{
+  "version"      : "1.0.0",
+  "author"       : "user",
+  "name"         : "MeShade Assistant",
+  "description"  : "MeShade AI Assistant Configuration",
+  "instructions" : [
+    "Be helpful and informative",
+    "Provide accurate and relevant information",
+    "Use markdown formatting when appropriate"
+  ],
+  "backend"   : {
+    "type"    : "agno",
+    "version" : ""
+  },
+  "model"  : {
+    "type" : "openai",
+    "id"   : "gpt-4"
+  },
+  "options"                            : {
+    "markdown"                         : true,
+    "search_knowledge"                 : true,
+    "enable_agentic_memory"            : true,
+    "add_history_to_messages"          : true,
+    "num_history_runs"                 : 3,
+    "enable_session_summaries"         : true,
+    "search_previous_sessions_history" : true,
+    "num_history_sessions"             : 2,
+    "show_tool_calls"                  : true,
+    "reasoning"                        : true
+  },
+  "knowledge"         : [
+    {
+      "type"          : "document",
+      "vector_db"     : {
+        "type"        : "lancedb",
+        "table_name"  : "knowledge",
+        "db_url"      : "storage/knowledge",
+        "search_type" : "hybrid"
+      },
+      "urls"          : []
+    }
+  ],
+  "memory"         : {
+    "db"           : {
+      "type"       : "sqlite",
+      "table_name" : "memory",
+      "db_url"     : "storage/memory"
+    },
+    "model"        : {
+      "type"       : "openai",
+      "id"         : "gpt-4"
+    }
+  },
+  "storage"      : {
+    "type"       : "sqlite",
+    "table_name" : "session",
+    "db_url"     : "storage/session"
+  },
+  "tools"    : [
+    {
+      "type" : "web_search",
+      "args" : null
+    },
+    {
+      "type" : "reasoning",
+      "args" : null
+    }
+  ],
+  "data" : null
+}

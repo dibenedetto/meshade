@@ -3,13 +3,16 @@
 docling
 faiss-cpu
 gradio
+lancedb
 langchain-text-splitters
 langdetect
 numpy
 openai
 pillow
 pydicom
+pypdf
 sentence-transformers
+tantivy
 torch
 torchvision
 torchaudio
