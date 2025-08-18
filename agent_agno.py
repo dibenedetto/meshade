@@ -1,16 +1,17 @@
 from typing import Any
 
 
-from agno.agent               import Agent
-from agno.knowledge.pdf_url   import PDFUrlKnowledgeBase
-from agno.memory.v2.db.sqlite import SqliteMemoryDb
-from agno.memory.v2.memory    import Memory
-from agno.models.openai       import OpenAIChat
-from agno.storage.sqlite      import SqliteStorage
-from agno.tools.duckduckgo    import DuckDuckGoTools
-from agno.tools.reasoning     import ReasoningTools
-from agno.vectordb.lancedb    import LanceDb
-from agno.vectordb.search     import SearchType
+from agno.agent                import Agent
+from agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
+from agno.memory.v2.db.sqlite  import SqliteMemoryDb
+from agno.memory.v2.memory     import Memory
+from agno.memory.v2.summarizer import SessionSummarizer
+from agno.models.openai        import OpenAIChat
+from agno.storage.sqlite       import SqliteStorage
+from agno.tools.duckduckgo     import DuckDuckGoTools
+from agno.tools.reasoning      import ReasoningTools
+from agno.vectordb.lancedb     import LanceDb
+from agno.vectordb.search      import SearchType
 
 
 from agent_base  import AgentBase
@@ -91,8 +92,6 @@ class AgentAgno(AgentBase):
 
 		memory = None
 		if config.memory is not None:
-			memory_model = get_model(config.memory.model, False)
-
 			if config.memory.db.type == "sqlite":
 				memory_db = SqliteMemoryDb(
 					table_name = config.memory.db.table_name,
@@ -101,9 +100,13 @@ class AgentAgno(AgentBase):
 			else:
 				raise ValueError("Invalid Agno memory db type")
 
+			memory_model     = get_model(config.memory.model     , False)
+			summarizer_model = get_model(config.memory.summarizer, False)
+
 			memory = Memory(
-				model = memory_model,
-				db    = memory_db,
+				model      = memory_model,
+				db         = memory_db,
+				summarizer = SessionSummarizer(model=summarizer_model)
 			)
 
 		storage = None

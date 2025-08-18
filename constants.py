@@ -29,6 +29,7 @@ DEFAULT_ENABLE_SESSION_SUMMARIES         : bool = True
 DEFAULT_SEARCH_PREVIOUS_SESSIONS_HISTORY : bool = True
 DEFAULT_NUM_HISTORY_SESSIONS             : int  = 2
 DEFAULT_SHOW_TOOL_CALLS                  : bool = True
+DEFAULT_TOOL_CALL_LIMIT                  : int  = 5
 DEFAULT_REASONING                        : bool = True
 DEFAULT_STREAM_INTERMEDIATE_STEPS        : bool = True
 

@@ -33,8 +33,9 @@ class MemoryDBConfig(BaseModel):
 
 
 class MemoryConfig(BaseModel):
-	db    : MemoryDBConfig = MemoryDBConfig()
-	model : Optional[ModelConfig]
+	db         : MemoryDBConfig = MemoryDBConfig()
+	model      : Optional[ModelConfig]
+	summarizer : Optional[ModelConfig]
 
 
 class StorageDBConfig(BaseModel):
@@ -58,9 +59,10 @@ class OptionsConfig(BaseModel):
 	search_previous_sessions_history : bool = DEFAULT_SEARCH_PREVIOUS_SESSIONS_HISTORY
 	num_history_sessions             : int  = DEFAULT_NUM_HISTORY_SESSIONS
 	show_tool_calls                  : bool = DEFAULT_SHOW_TOOL_CALLS
+	tool_call_limit                  : int  = DEFAULT_TOOL_CALL_LIMIT
 	reasoning                        : bool = DEFAULT_REASONING
 	stream_intermediate_steps        : bool = DEFAULT_STREAM_INTERMEDIATE_STEPS
-	# structured_outputs               : Optional[Dict[str, Any]]
+	# response_model                   : Optional[BaseModel]
 	# expected_output                  : Optional[str]
 
 

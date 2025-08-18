@@ -1,6 +1,6 @@
 {
   "version"      : "1.0.0",
-  "author"       : "user",
+  "author"       : "user@meshade.com",
   "name"         : "MeShade Assistant",
   "description"  : "MeShade AI Assistant Configuration",
   "instructions" : [
@@ -14,7 +14,7 @@
   },
   "model"  : {
     "type" : "openai",
-    "id"   : "gpt-4"
+    "id"   : "gpt-4o"
   },
   "options"                            : {
     "markdown"                         : true,
@@ -26,6 +26,7 @@
     "search_previous_sessions_history" : true,
     "num_history_sessions"             : 2,
     "show_tool_calls"                  : true,
+    "tool_call_limit"                  : 5,
     "reasoning"                        : true
   },
   "knowledge"         : [
@@ -48,7 +49,11 @@
     },
     "model"        : {
       "type"       : "openai",
-      "id"         : "gpt-4"
+      "id"         : "gpt-4o"
+    },
+    "summarizer"        : {
+      "type"       : "openai",
+      "id"         : "gpt-4o"
     }
   },
   "storage"      : {

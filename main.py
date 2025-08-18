@@ -1,10 +1,11 @@
-from build  import build_agent
-from config import load_config
+from agent_base import AgentBase
+from build      import build_agent
+from config     import AgentConfig, load_config
 
 
 def main():
-	config = load_config("config.json")
-	agent  = build_agent(config)
+	config : AgentConfig = load_config("config.json")
+	agent  : AgentBase   = build_agent(config)
 
 	agent.query("Research the latest developments in brain-computer interfaces")
 
