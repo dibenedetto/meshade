@@ -89,9 +89,7 @@ class AgentConfig(BaseModel):
 
 def validate_config(config: AgentConfig) -> bool:
 	# TODO: Implement validation logic for the AgentConfig
-	if config is None:
-		return False
-	if not config.version or not config.author or not config.name:
+	if config is None or not config.version or not config.author or not config.name:
 		return False
 	return True
 

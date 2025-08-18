@@ -1,7 +1,7 @@
 from config import AgentConfig, validate_config
 
 
-class AgentBase:
+class Agent:
 
 	def __init__(self, config: AgentConfig):
 		if not validate_config(config):

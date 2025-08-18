@@ -1,7 +1,7 @@
 from typing import Any
 
 
-from agno.agent                import Agent
+from agno.agent                import Agent as AgnoAgent
 from agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
 from agno.memory.v2.db.sqlite  import SqliteMemoryDb
 from agno.memory.v2.memory     import Memory
@@ -14,7 +14,7 @@ from agno.vectordb.lancedb     import LanceDb
 from agno.vectordb.search      import SearchType
 
 
-from agent_base  import AgentBase
+from agent  import Agent
 from config import AgentConfig, ModelConfig, OptionsConfig
 
 
@@ -23,7 +23,7 @@ def agno_validate_config(config: AgentConfig) -> bool:
 	return config is not None
 
 
-class AgentAgno(AgentBase):
+class AgentAgno(Agent):
 
 	def __init__(self, config: AgentConfig):
 		super().__init__(config)
@@ -133,7 +133,7 @@ class AgentAgno(AgentBase):
 			if not tools:
 				tools = None
 
-		agent = Agent(
+		agent = AgnoAgent(
 			model     = model,
 			knowledge = knowledge,
 			memory    = memory,
