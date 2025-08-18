@@ -1,7 +1,7 @@
 from typing import Any
 
-
 from agno.agent                import Agent as AgnoAgent
+from agno.app.agui.app         import AGUIApp
 from agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
 from agno.memory.v2.db.sqlite  import SqliteMemoryDb
 from agno.memory.v2.memory     import Memory
@@ -14,8 +14,9 @@ from agno.vectordb.lancedb     import LanceDb
 from agno.vectordb.search      import SearchType
 
 
-from agent  import Agent
-from config import AgentConfig, ModelConfig, OptionsConfig
+from agent     import Agent
+from config    import AgentConfig, ModelConfig, OptionsConfig
+from constants import DEFAULT_AGENT_PORT
 
 
 def agno_validate_config(config: AgentConfig) -> bool:
@@ -145,5 +146,17 @@ class AgentAgno(Agent):
 		self.d = agent
 
 
-	def query(self, message: str, stream: bool = False):
+	def query(self, message: str, stream: bool = False) -> Any:
 		return self.d.print_response(message, stream=stream)
+
+
+	def serve(self, port: int = DEFAULT_AGENT_PORT) -> None:
+		app_id = "agent_" + self.config.name.replace(" ", "_").lower()
+		gui = AGUIApp(
+			agent       = self,
+			name        = self.config.name,
+			description = self.config.description,
+			app_id      = app_id,
+		)
+		app = gui.get_app()
+		gui.serve(app="agent:app", port=port, reload=True)

@@ -35,3 +35,4 @@ DEFAULT_STREAM_INTERMEDIATE_STEPS        : bool = True
 
 DEFAULT_AGENT_BACKEND_TYPE               : str  = "agno"
 DEFAULT_AGENT_BACKEND_VERSION            : str  = ""
+DEFAULT_AGENT_PORT                       : int  = 8000

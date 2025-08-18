@@ -1,4 +1,8 @@
-from config import AgentConfig, validate_config
+from typing import Any
+
+
+from config    import AgentConfig, validate_config
+from constants import DEFAULT_AGENT_PORT
 
 
 class Agent:
@@ -15,5 +19,9 @@ class Agent:
 		return self.d is not None
 
 
-	def query(self, message: str, stream: bool = False):
+	def query(self, message: str, stream: bool = False) -> Any:
 		raise NotImplementedError("Subclasses must implement the query method.")
+
+
+	def serve(self, port: int = DEFAULT_AGENT_PORT):
+		raise NotImplementedError("Subclasses must implement the serve method.")
