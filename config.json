@@ -12,7 +12,7 @@
 			"version"      : "1.0.0",
 			"author"       : "user@meshade.com",
 			"name"         : "MeShade Assistant",
-			"description"  : "MeShade AI Assistant Configuration",
+			"description"  : "MeShade AI Assistant",
 			"instructions" : [
 				"Be helpful and informative",
 				"Provide accurate and relevant information",
@@ -41,14 +41,14 @@
 			},
 			"knowledge" : [
 				{
-				"type"          : "document",
-				"vector_db"     : {
-					"type"        : "lancedb",
-					"table_name"  : "knowledge",
-					"db_url"      : "storage/knowledge",
-					"search_type" : "hybrid"
-				},
-				"urls"          : []
+					"type"          : "document",
+					"vector_db"     : {
+						"type"        : "lancedb",
+						"table_name"  : "knowledge",
+						"db_url"      : "storage/knowledge",
+						"search_type" : "hybrid"
+					},
+					"urls"          : []
 				}
 			],
 			"memory" : {
