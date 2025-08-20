@@ -1,14 +1,13 @@
 from typing import Any
 
 
-from config    import AgentConfig, validate_config
-from constants import DEFAULT_AGENT_PORT
+from config import AgentConfig, validate_agent_config
 
 
 class Agent:
 
 	def __init__(self, config: AgentConfig):
-		if not validate_config(config):
+		if not validate_agent_config(config):
 			raise ValueError("Invalid agent configuration")
 
 		self.config = config
@@ -21,7 +20,3 @@ class Agent:
 
 	def query(self, message: str, stream: bool = False) -> Any:
 		raise NotImplementedError("Subclasses must implement the query method.")
-
-
-	def serve(self, port: int = DEFAULT_AGENT_PORT):
-		raise NotImplementedError("Subclasses must implement the serve method.")

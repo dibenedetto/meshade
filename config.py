@@ -87,14 +87,36 @@ class AgentConfig(BaseModel):
 	data         : Optional[Any]
 
 
-def validate_config(config: AgentConfig) -> bool:
-	# TODO: Implement validation logic for the AgentConfig
+class PlaygroundBackendConfig(BaseModel):
+	type    : str = DEFAULT_PLAYGROUND_BACKEND_TYPE
+	version : str = DEFAULT_PLAYGROUND_BACKEND_VERSION
+
+
+class PlaygroundConfig(BaseModel):
+	version     : str                     = Required
+	title       : str                     = Required
+	agents      : List[AgentConfig]       = Required
+	backend     : PlaygroundBackendConfig = PlaygroundBackendConfig()
+	port        : int                     = DEFAULT_PLAYGROUND_PORT
+	description : Optional[str]
+	data        : Optional[Any]
+
+
+def validate_agent_config(config: AgentConfig) -> bool:
+	# TODO: Implement validation logic
 	if config is None or not config.version or not config.author or not config.name:
 		return False
 	return True
 
 
-def load_config(file_path: str) -> AgentConfig:
+def validate_playground_config(config: PlaygroundConfig) -> bool:
+	# TODO: Implement validation logic
+	if config is None or not config.version or not config.title or not config.agents:
+		return False
+	return True
+
+
+def load_config(file_path: str) -> PlaygroundConfig:
 	with open(file_path, "r") as f:
 		data = json.load(f)
-	return AgentConfig(**data)
+	return PlaygroundConfig(**data)

@@ -1,15 +1,14 @@
-from agent  import Agent
-from config import AgentConfig
+from agent      import Agent
+from config     import AgentConfig, PlaygroundConfig
+from impl_agno  import AgnoAgent, AgnoPlayground
+from playground import Playground
 
 
-from impl_agno import AgentAgno
-
-
-def build(config: AgentConfig) -> Agent:
+def build_agent(config: AgentConfig) -> Agent:
 	agent: Agent = None
 	try:
 		if config.backend.type == "agno":
-			agent = AgentAgno(config)
+			agent = AgnoAgent(config)
 		else:
 			raise ValueError(f"Unsupported agent backend type: {config.backend.type}")
 
@@ -20,3 +19,20 @@ def build(config: AgentConfig) -> Agent:
 		raise ValueError("Invalid agent setup")
 
 	return agent
+
+
+def build_playground(config: PlaygroundConfig) -> Agent:
+	playground: Playground = None
+	try:
+		if config.backend.type == "agno":
+			playground = AgnoPlayground(config)
+		else:
+			raise ValueError(f"Unsupported playground backend type: {config.backend.type}")
+
+	except:
+		raise
+
+	if not playground or not playground.is_valid():
+		raise ValueError("Invalid playground setup")
+
+	return playground

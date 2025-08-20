@@ -32,7 +32,12 @@ DEFAULT_SHOW_TOOL_CALLS                  : bool = True
 DEFAULT_TOOL_CALL_LIMIT                  : int  = 5
 DEFAULT_REASONING                        : bool = True
 DEFAULT_STREAM_INTERMEDIATE_STEPS        : bool = True
+DEFAULT_MAX_WEB_SEARCH_RESULTS           : int  = 5
 
 DEFAULT_AGENT_BACKEND_TYPE               : str  = "agno"
 DEFAULT_AGENT_BACKEND_VERSION            : str  = ""
-DEFAULT_AGENT_PORT                       : int  = 8000
+
+DEFAULT_PLAYGROUND_BACKEND_TYPE          : str  = "agno"
+DEFAULT_PLAYGROUND_BACKEND_VERSION       : str  = ""
+
+DEFAULT_PLAYGROUND_PORT                  : int  = 7777

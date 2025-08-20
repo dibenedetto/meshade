@@ -1,12 +1,13 @@
 from typing import Any
 
-from agno.agent                import Agent as AgnoAgent
-from agno.app.agui.app         import AGUIApp
+
+from agno.agent                import Agent as BackendAgent
 from agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
 from agno.memory.v2.db.sqlite  import SqliteMemoryDb
 from agno.memory.v2.memory     import Memory
 from agno.memory.v2.summarizer import SessionSummarizer
 from agno.models.openai        import OpenAIChat
+from agno.playground           import Playground as BackendPlayground
 from agno.storage.sqlite       import SqliteStorage
 from agno.tools.duckduckgo     import DuckDuckGoTools
 from agno.tools.reasoning      import ReasoningTools
@@ -14,22 +15,23 @@ from agno.vectordb.lancedb     import LanceDb
 from agno.vectordb.search      import SearchType
 
 
-from agent     import Agent
-from config    import AgentConfig, ModelConfig, OptionsConfig
-from constants import DEFAULT_AGENT_PORT
+from agent      import Agent
+from config     import AgentConfig, ModelConfig, OptionsConfig, PlaygroundConfig
+from constants  import DEFAULT_PLAYGROUND_PORT, DEFAULT_MAX_WEB_SEARCH_RESULTS
+from playground import Playground
 
 
-def agno_validate_config(config: AgentConfig) -> bool:
+def agno_validate_agent_config(config: AgentConfig) -> bool:
 	# TODO: Implement validation logic for the Agno agent configuration
 	return config is not None
 
 
-class AgentAgno(Agent):
+class AgnoAgent(Agent):
 
 	def __init__(self, config: AgentConfig):
 		super().__init__(config)
 
-		if not agno_validate_config(config):
+		if not agno_validate_agent_config(config):
 			raise ValueError("Invalid Agno agent configuration")
 
 		def get_model(model_config: ModelConfig, do_raise: bool) -> Any:
@@ -126,7 +128,7 @@ class AgentAgno(Agent):
 			tool  = None
 			for tool_config in config.tools:
 				if tool_config.type == "web_search":
-					tool = DuckDuckGoTools()
+					tool = DuckDuckGoTools(fixed_max_results=tool_config.args.get("max_results", DEFAULT_MAX_WEB_SEARCH_RESULTS))
 				elif tool_config.type == "reasoning":
 					tool = ReasoningTools()
 				if tool is not None:
@@ -134,7 +136,7 @@ class AgentAgno(Agent):
 			if not tools:
 				tools = None
 
-		agent = AgnoAgent(
+		agent = BackendAgent(
 			model     = model,
 			knowledge = knowledge,
 			memory    = memory,
@@ -150,13 +152,41 @@ class AgentAgno(Agent):
 		return self.d.print_response(message, stream=stream)
 
 
-	def serve(self, port: int = DEFAULT_AGENT_PORT) -> None:
-		app_id = "agent_" + self.config.name.replace(" ", "_").lower()
-		gui = AGUIApp(
-			agent       = self,
-			name        = self.config.name,
-			description = self.config.description,
-			app_id      = app_id,
+def agno_validate_playground_config(config: PlaygroundConfig) -> bool:
+	# TODO: Implement validation logic for the Agno playground configuration
+	return config is not None
+
+
+class AgnoPlayground(Playground):
+
+	def __init__(self, config: PlaygroundConfig):
+		super().__init__(config)
+
+		if not agno_validate_playground_config(config):
+			raise ValueError("Invalid Agno playground configuration")
+
+		agno_agents = [AgnoAgent(cfg) for cfg in config.agents if cfg.backend.type == "agno"]
+		agents      = [agt.d for agt in agno_agents if agt.is_valid()]
+		app_id      = "playground_" + self.config.title.replace(" ", "_").lower()
+
+		playground = BackendPlayground(
+			app_id = app_id,
+			name   = self.config.title,
+			agents = agents,
 		)
-		app = gui.get_app()
-		gui.serve(app="agent:app", port=port, reload=True)
+
+		self.d = playground
+		self.agno_agents = agno_agents
+
+
+	def is_valid(self) -> bool:
+		return self.d is not None
+
+
+	def generate_app(self) -> Any:
+		app = self.d.get_app()
+		return app
+
+
+	def serve(self, app: str, port: int = DEFAULT_PLAYGROUND_PORT, reload: bool = False):
+		self.d.serve(app=app, port=port, reload=reload)
