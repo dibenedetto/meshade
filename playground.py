@@ -1,4 +1,4 @@
-from typing import Any
+from typing    import Any
 
 
 from config    import PlaygroundConfig, validate_playground_config

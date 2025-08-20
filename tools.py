@@ -1,3 +1,7 @@
+def null_tool():
+	return None
+
+
 # TODO
 
 # from agno.tools import tool

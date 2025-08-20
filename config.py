@@ -1,11 +1,11 @@
 import json
 
 
-from pydantic import BaseModel
-from typing   import Any, Dict, List, Optional, Required
+from   pydantic  import BaseModel
+from   typing    import Any, Dict, List, Optional, Required
 
 
-from constants import *
+from   constants import *
 
 
 class ModelConfig(BaseModel):
