@@ -23,5 +23,5 @@ class Playground:
 		raise NotImplementedError("Subclasses must implement the generate_app method.")
 
 
-	def serve(self, app: str, port: int = DEFAULT_PLAYGROUND_PORT, reload: bool = False):
+	def serve(self, app: str, port: int = DEFAULT_PLAYGROUND_PORT, reload: bool = False) -> None:
 		raise NotImplementedError("Subclasses must implement the serve method.")

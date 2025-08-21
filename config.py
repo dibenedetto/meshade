@@ -47,6 +47,7 @@ class StorageDBConfig(BaseModel):
 class ToolConfig(BaseModel):
 	type : str = Required
 	args : Optional[Dict[str, Any]]
+	ref  : Optional[str]
 
 
 class OptionsConfig(BaseModel):
@@ -73,9 +74,11 @@ class AgentBackendConfig(BaseModel):
 
 class AgentConfig(BaseModel):
 	version      : str                = Required
-	author       : str                = Required
 	name         : str                = Required
+	author       : str                = Required
 	backend      : AgentBackendConfig = AgentBackendConfig()
+	data         : Optional[Any]
+
 	model        : ModelConfig        = ModelConfig()
 	options      : OptionsConfig      = OptionsConfig()
 	description  : Optional[str]
@@ -84,7 +87,6 @@ class AgentConfig(BaseModel):
 	memory       : Optional[MemoryConfig]
 	storage      : Optional[StorageDBConfig]
 	tools        : Optional[List[ToolConfig]]
-	data         : Optional[Any]
 
 
 class PlaygroundBackendConfig(BaseModel):
@@ -94,29 +96,41 @@ class PlaygroundBackendConfig(BaseModel):
 
 class PlaygroundConfig(BaseModel):
 	version     : str                     = Required
-	title       : str                     = Required
-	agents      : List[AgentConfig]       = Required
+	name        : str                     = Required
+	author      : str                     = Required
 	backend     : PlaygroundBackendConfig = PlaygroundBackendConfig()
+	data        : Optional[Any]
+
+	agents      : List[AgentConfig]       = Required
 	port        : int                     = DEFAULT_PLAYGROUND_PORT
 	description : Optional[str]
-	data        : Optional[Any]
 
 
 def validate_agent_config(config: AgentConfig) -> bool:
 	# TODO: Implement validation logic
-	if config is None or not config.version or not config.author or not config.name:
+	if config is None or not config.version or not config.name or not config.author:
 		return False
 	return True
 
 
 def validate_playground_config(config: PlaygroundConfig) -> bool:
 	# TODO: Implement validation logic
-	if config is None or not config.version or not config.title or not config.agents:
+	if config is None or not config.version or not config.name or not config.agents:
 		return False
 	return True
 
 
-def load_config(file_path: str) -> PlaygroundConfig:
+def load_json(file_path: str) -> Any:
 	with open(file_path, "r") as f:
 		data = json.load(f)
+	return data
+
+
+def load_agent_config(file_path: str) -> AgentConfig:
+	data = load_json(file_path)
+	return AgentConfig(**data)
+
+
+def load_playground_config(file_path: str) -> PlaygroundConfig:
+	data = load_json(file_path)
 	return PlaygroundConfig(**data)

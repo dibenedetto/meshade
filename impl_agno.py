@@ -125,12 +125,17 @@ class AgnoAgent(Agent):
 		tools = None
 		if config.tools is not None:
 			tools = []
-			tool  = None
 			for tool_config in config.tools:
-				if tool_config.type == "web_search":
-					tool = DuckDuckGoTools(fixed_max_results=tool_config.args.get("max_results", DEFAULT_MAX_WEB_SEARCH_RESULTS))
-				elif tool_config.type == "reasoning":
-					tool = ReasoningTools()
+				tool  = None
+				if tool_config.ref:
+					# TODO: Implement tool reference handling
+					# For now, we will just skip it
+					pass
+				else:
+					if tool_config.type == "reasoning":
+						tool = ReasoningTools()
+					elif tool_config.type == "web_search":
+						tool = DuckDuckGoTools(fixed_max_results=tool_config.args.get("max_results", DEFAULT_MAX_WEB_SEARCH_RESULTS))
 				if tool is not None:
 					tools.append(tool)
 			if not tools:
@@ -167,16 +172,16 @@ class AgnoPlayground(Playground):
 
 		agno_agents = [AgnoAgent(cfg) for cfg in config.agents if cfg.backend.type == "agno"]
 		agents      = [agt.d for agt in agno_agents if agt.is_valid()]
-		app_id      = "playground_" + self.config.title.replace(" ", "_").lower()
+		app_id      = "playground_" + self.config.name.replace(" ", "_").lower()
 
 		playground = BackendPlayground(
 			app_id = app_id,
-			name   = self.config.title,
+			name   = self.config.name,
 			agents = agents,
 		)
 
-		self.d = playground
 		self.agno_agents = agno_agents
+		self.d           = playground
 
 
 	def is_valid(self) -> bool:
@@ -188,5 +193,5 @@ class AgnoPlayground(Playground):
 		return app
 
 
-	def serve(self, app: str, port: int = DEFAULT_PLAYGROUND_PORT, reload: bool = False):
+	def serve(self, app: str, port: int = DEFAULT_PLAYGROUND_PORT, reload: bool = False) -> None:
 		self.d.serve(app=app, port=port, reload=reload)

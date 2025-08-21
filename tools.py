@@ -1,4 +1,4 @@
-def null_tool():
+def dummy_tool():
 	return None
 
 

@@ -1,5 +1,7 @@
 # DEFAULT_KNOWLEDGE_DB_URL                 : str  = "postgresql+psycopg://ai:ai@localhost:5532/ai"
 
+DEFAULT_SEED                             : int  = 42
+
 DEFAULT_API_KEY                          : str  = None
 
 DEFAULT_MODEL_TYPE                       : str  = "openai"

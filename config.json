@@ -1,7 +1,9 @@
 {
 	"version"     : "1.0.0",
-	"title"       : "MeShade Playground",
-	"description" : "MeShade Playground for AI Assistants",
+	"name"        : "MeShade Playground",
+	"author"      : "user@meshade.com",
+	"data"        : null,
+	"description" : "MeShade AI Playground",
 	"port"        : 7777,
 	"backend" : {
 		"type"    : "agno",
@@ -10,8 +12,9 @@
 	"agents" : [
 		{
 			"version"      : "1.0.0",
-			"author"       : "user@meshade.com",
 			"name"         : "MeShade Assistant",
+			"author"       : "user@meshade.com",
+			"data"         : null,
 			"description"  : "MeShade AI Assistant",
 			"instructions" : [
 				"Be helpful and informative",
@@ -48,7 +51,7 @@
 						"db_url"      : "storage/knowledge",
 						"search_type" : "hybrid"
 					},
-					"urls"          : []
+					"urls" : []
 				}
 			],
 			"memory" : {
@@ -74,17 +77,17 @@
 			"tools" : [
 				{
 					"type" : "reasoning",
-					"args" : null
+					"args" : null,
+					"ref"  : null
 				},
 				{
 					"type" : "web_search",
 					"args" : {
 						"max_results" : 5
-					}
+					},
+					"ref"  : null
 				}
-			],
-			"data" : null
+			]
 		}
-	],
-	"data" : null
+	]
 }
