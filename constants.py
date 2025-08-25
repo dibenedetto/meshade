@@ -41,5 +41,5 @@ DEFAULT_AGENT_BACKEND_VERSION            : str  = ""
 
 DEFAULT_PLAYGROUND_BACKEND_TYPE          : str  = "agno"
 DEFAULT_PLAYGROUND_BACKEND_VERSION       : str  = ""
-
-DEFAULT_PLAYGROUND_PORT                  : int  = 7777
+DEFAULT_PLAYGROUND_PORT                  : int  = 8000
+DEFAULT_PLAYGROUND_AGUI_APP              : bool = True

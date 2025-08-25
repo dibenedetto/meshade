@@ -4,7 +4,8 @@
 	"author"      : "user@meshade.com",
 	"data"        : null,
 	"description" : "MeShade AI Playground",
-	"port"        : 7777,
+	"port"        : 8000,
+	"agui_app"    : true,
 	"backend" : {
 		"type"    : "agno",
 		"version" : ""
@@ -44,8 +45,8 @@
 			},
 			"knowledge" : [
 				{
-					"type"          : "document",
-					"vector_db"     : {
+					"type" : "document",
+					"db"   : {
 						"type"        : "lancedb",
 						"table_name"  : "knowledge",
 						"db_url"      : "storage/knowledge",
@@ -70,9 +71,11 @@
 				}
 			},
 			"storage" : {
-				"type"       : "sqlite",
-				"table_name" : "session",
-				"db_url"     : "storage/session"
+				"db" : {
+					"type"       : "sqlite",
+					"table_name" : "session",
+					"db_url"     : "storage/session"
+				}
 			},
 			"tools" : [
 				{

@@ -1,35 +1,16 @@
-# gradlab.ai
-# sandboxlab.ai
+from build  import build_playground
+from config import load_playground_config
+from utils  import module_prop_str, seed_everything
 
 
-from typing import Any
+seed_everything()
 
-
-app: Any = None
-
-
-def serve() -> None:
-	import os
-
-	from build      import build_playground
-	from config     import PlaygroundConfig, load_playground_config
-	from playground import Playground
-	from utils      import seed_everything
-
-	global app
-
-	seed_everything()
-
-	config     : PlaygroundConfig = load_playground_config("config.json")
-	playground : Playground       = build_playground(config)
-
-	app           = playground.generate_app()
-	module_name   = os.path.splitext(os.path.basename(__file__))[0]
-	property_name = "app"
-	app_str       = f"{module_name}:{property_name}"
-
-	playground.serve(app=app_str, port=config.port, reload=True)
+config     = load_playground_config("config.json")
+playground = build_playground(config)
+app        = playground.generate_app()
+# print(f"app routes: {[route.path for route in app.routes]}")
 
 
 if __name__ == "__main__":
-	serve()
+	app_str = module_prop_str(__file__, "app")
+	playground.serve(app=app_str, port=config.port, reload=True)

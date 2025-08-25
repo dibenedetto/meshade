@@ -21,9 +21,9 @@ class KnowledgeDBConfig(BaseModel):
 
 
 class KnowledgeBase(BaseModel):
-	type      : str = DEFAULT_KNOWLEDGE_BASE_TYPE
-	vector_db : KnowledgeDBConfig = KnowledgeDBConfig()
-	urls      : Optional[List[str]]
+	type : str = DEFAULT_KNOWLEDGE_BASE_TYPE
+	db   : KnowledgeDBConfig = KnowledgeDBConfig()
+	urls : Optional[List[str]]
 
 
 class MemoryDBConfig(BaseModel):
@@ -42,6 +42,10 @@ class StorageDBConfig(BaseModel):
 	type       : str = DEFAULT_STORAGE_DB_TYPE
 	table_name : str = DEFAULT_STORAGE_DB_TABLE_NAME
 	db_url     : str = DEFAULT_STORAGE_DB_URL
+
+
+class StorageConfig(BaseModel):
+	db : StorageDBConfig = StorageDBConfig()
 
 
 class ToolConfig(BaseModel):
@@ -85,7 +89,7 @@ class AgentConfig(BaseModel):
 	instructions : Optional[List[str]]
 	knowledge    : Optional[List[KnowledgeBase]]
 	memory       : Optional[MemoryConfig]
-	storage      : Optional[StorageDBConfig]
+	storage      : Optional[StorageConfig]
 	tools        : Optional[List[ToolConfig]]
 
 
@@ -101,6 +105,7 @@ class PlaygroundConfig(BaseModel):
 	backend     : PlaygroundBackendConfig = PlaygroundBackendConfig()
 	data        : Optional[Any]
 
+	agui_app    : bool                    = DEFAULT_PLAYGROUND_AGUI_APP
 	agents      : List[AgentConfig]       = Required
 	port        : int                     = DEFAULT_PLAYGROUND_PORT
 	description : Optional[str]

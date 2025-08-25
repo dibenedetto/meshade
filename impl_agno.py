@@ -2,6 +2,7 @@ from typing                    import Any
 
 
 from agno.agent                import Agent as BackendAgent
+from agno.app.agui.app         import AGUIApp
 from agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
 from agno.memory.v2.db.sqlite  import SqliteMemoryDb
 from agno.memory.v2.memory     import Memory
@@ -17,7 +18,7 @@ from agno.vectordb.search      import SearchType
 
 from agent                     import Agent
 from config                    import AgentConfig, ModelConfig, OptionsConfig, PlaygroundConfig
-from constants                 import DEFAULT_PLAYGROUND_PORT, DEFAULT_MAX_WEB_SEARCH_RESULTS
+from constants                 import DEFAULT_MAX_WEB_SEARCH_RESULTS, DEFAULT_PLAYGROUND_PORT
 from playground                import Playground
 
 
@@ -70,11 +71,11 @@ class AgnoAgent(Agent):
 				config_knowledges = [config_knowledges]
 			knowledges = []
 			for knowledge_config in config_knowledges:
-				if knowledge_config.vector_db.type == "lancedb":
+				if knowledge_config.db.type == "lancedb":
 					knowledge_db   = LanceDb(
-						table_name  = knowledge_config.vector_db.table_name,
-						uri         = knowledge_config.vector_db.db_url,
-						search_type = get_search_type(knowledge_config.vector_db.search_type, True),
+						table_name  = knowledge_config.db.table_name,
+						uri         = knowledge_config.db.db_url,
+						search_type = get_search_type(knowledge_config.db.search_type, True),
 					)
 				else:
 					raise ValueError("Invalid Agno knowledge db type")
@@ -114,13 +115,13 @@ class AgnoAgent(Agent):
 
 		storage = None
 		if config.storage is not None:
-			if config.storage.type == "sqlite":
+			if config.storage.db.type == "sqlite":
 				storage = SqliteStorage(
-					table_name = config.memory.db.table_name,
-					db_file    = config.memory.db.db_url,
+					table_name = config.storage.db.table_name,
+					db_file    = config.storage.db.db_url,
 				)
 			else:
-				raise ValueError("Invalid Agno memory db type")
+				raise ValueError("Invalid Agno storage db type")
 
 		tools = None
 		if config.tools is not None:
@@ -170,15 +171,29 @@ class AgnoPlayground(Playground):
 		if not agno_validate_playground_config(config):
 			raise ValueError("Invalid Agno playground configuration")
 
-		agno_agents = [AgnoAgent(cfg) for cfg in config.agents if cfg.backend.type == "agno"]
-		agents      = [agt.d for agt in agno_agents if agt.is_valid()]
-		app_id      = "playground_" + self.config.name.replace(" ", "_").lower()
+		agno_configs = [cfg for cfg in config.agents if cfg.backend.type == "agno"]
+		if not agno_configs:
+			raise ValueError("No valid Agno agent configurations found in the playground configuration")
 
-		playground = BackendPlayground(
-			app_id = app_id,
-			name   = self.config.name,
-			agents = agents,
-		)
+		app_id      = "playground_" + self.config.name.replace(" ", "_").lower()
+		agno_agents = None
+		playground  = None
+
+		if config.agui_app:
+			agno_agents = [AgnoAgent(agno_configs[0])]
+			playground  = AGUIApp(
+				app_id = app_id,
+				name   = self.config.name,
+				agent  = agno_agents[0].d,
+			)
+		else:
+			agno_agents = [AgnoAgent(cfg) for cfg in agno_configs]
+			agents      = [agt.d for agt in agno_agents if agt.is_valid()]
+			playground  = BackendPlayground(
+				app_id = app_id,
+				name   = self.config.name,
+				agents = agents,
+			)
 
 		self.agno_agents = agno_agents
 		self.d           = playground
@@ -193,5 +208,5 @@ class AgnoPlayground(Playground):
 		return app
 
 
-	def serve(self, app: str, port: int = DEFAULT_PLAYGROUND_PORT, reload: bool = False) -> None:
+	def serve(self, app: str, port: int = DEFAULT_PLAYGROUND_PORT, reload: bool = True) -> None:
 		self.d.serve(app=app, port=port, reload=reload)
