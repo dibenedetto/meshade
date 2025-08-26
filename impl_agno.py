@@ -18,7 +18,7 @@ from agno.vectordb.search      import SearchType
 
 from agent                     import Agent
 from config                    import AgentConfig, ModelConfig, OptionsConfig, PlaygroundConfig
-from constants                 import DEFAULT_MAX_WEB_SEARCH_RESULTS, DEFAULT_PLAYGROUND_PORT
+from constants                 import DEFAULT_MAX_WEB_SEARCH_RESULTS, DEFAULT_KNOWLEDGE_TYPE, DEFAULT_MEMORY_TYPE, DEFAULT_STORAGE_TYPE, DEFAULT_PLAYGROUND_PORT
 from playground                import Playground
 
 
@@ -71,38 +71,40 @@ class AgnoAgent(Agent):
 				config_knowledges = [config_knowledges]
 			knowledges = []
 			for knowledge_config in config_knowledges:
-				if knowledge_config.db.type == "lancedb":
-					knowledge_db   = LanceDb(
-						table_name  = knowledge_config.db.table_name,
-						uri         = knowledge_config.db.db_url,
-						search_type = get_search_type(knowledge_config.db.search_type, True),
-					)
-				else:
-					raise ValueError("Invalid Agno knowledge db type")
-				if knowledge_config.type == "document":
+				if knowledge_config.type == DEFAULT_KNOWLEDGE_TYPE:
+					if knowledge_config.db.type == "lancedb":
+						knowledge_db   = LanceDb(
+							table_name  = knowledge_config.db.table_name,
+							uri         = knowledge_config.db.db_url,
+							search_type = get_search_type(knowledge_config.db.search_type, True),
+						)
+					else:
+						raise ValueError("Invalid Agno knowledge db type")
 					knowledge_item = PDFUrlKnowledgeBase(
-						urls      = [],
-						vector_db = knowledge_db,
+						urls = [],
+						db   = knowledge_db,
 					)
 				else:
-					raise ValueError("Invalid Agno knowledge db type")
-				if knowledge_item:
-					knowledges.append(knowledge_item)
+					raise ValueError("Invalid Agno knowledge type")
+				knowledges.append(knowledge_item)
 			knowledges_len = len(knowledges)
 			if knowledges_len == 1:
 				knowledge = knowledges[0]
 			elif knowledges_len > 1:
-				raise ValueError("Invalid Agno knowledge db handlers: multiple knowledge handlers are not supported right now")
+				raise ValueError("Invalid Agno knowledge handlers: multiple knowledge handlers are not supported right now")
 
 		memory = None
 		if config.memory is not None:
-			if config.memory.db.type == "sqlite":
-				memory_db = SqliteMemoryDb(
-					table_name = config.memory.db.table_name,
-					db_file    = config.memory.db.db_url,
-				)
+			if config.memory.type == DEFAULT_MEMORY_TYPE:
+				if config.memory.db.type == "sqlite":
+					memory_db = SqliteMemoryDb(
+						table_name = config.memory.db.table_name,
+						db_file    = config.memory.db.db_url,
+					)
+				else:
+					raise ValueError("Invalid Agno memory db type")
 			else:
-				raise ValueError("Invalid Agno memory db type")
+				raise ValueError("Invalid Agno memory type")
 
 			memory_model     = get_model(config.memory.model     , False)
 			summarizer_model = get_model(config.memory.summarizer, False)
@@ -115,13 +117,16 @@ class AgnoAgent(Agent):
 
 		storage = None
 		if config.storage is not None:
-			if config.storage.db.type == "sqlite":
-				storage = SqliteStorage(
-					table_name = config.storage.db.table_name,
-					db_file    = config.storage.db.db_url,
-				)
+			if config.memory.type == DEFAULT_STORAGE_TYPE:
+				if config.storage.db.type == "sqlite":
+					storage = SqliteStorage(
+						table_name = config.storage.db.table_name,
+						db_file    = config.storage.db.db_url,
+					)
+				else:
+					raise ValueError("Invalid Agno storage db type")
 			else:
-				raise ValueError("Invalid Agno storage db type")
+				raise ValueError("Invalid Agno storage type")
 
 		tools = None
 		if config.tools is not None:
@@ -136,7 +141,8 @@ class AgnoAgent(Agent):
 					if tool_config.type == "reasoning":
 						tool = ReasoningTools()
 					elif tool_config.type == "web_search":
-						tool = DuckDuckGoTools(fixed_max_results=tool_config.args.get("max_results", DEFAULT_MAX_WEB_SEARCH_RESULTS))
+						max_results = tool_config.args.get("max_results", DEFAULT_MAX_WEB_SEARCH_RESULTS)
+						tool = DuckDuckGoTools(fixed_max_results=max_results)
 				if tool is not None:
 					tools.append(tool)
 			if not tools:

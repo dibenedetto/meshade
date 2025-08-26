@@ -1,11 +1,9 @@
-from agent      import Agent
-from config     import AgentConfig, PlaygroundConfig
-from impl_agno  import AgnoAgent, AgnoPlayground
-from playground import Playground
+from config    import PlatformConfig
+from impl_agno import AgnoAgent, AgnoPlayground
 
 
-def build_agent(config: AgentConfig) -> Agent:
-	obj: Agent = None
+def build(config: PlatformConfig) -> Agent:
+	obj = None
 	try:
 		if config.backend.type == "agno":
 			obj = AgnoAgent(config)
