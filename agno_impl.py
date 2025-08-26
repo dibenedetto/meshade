@@ -34,9 +34,6 @@ from numel import (
 )
 
 
-app = None
-
-
 def agno_validate_config(config: AppConfig) -> bool:
 	# TODO: Implement validation logic for the Agno app configuration
 	return config is not None
@@ -69,7 +66,9 @@ class AgnoAppImpl(AppImpl):
 
 		def get_options(options_config: OptionsConfig, do_raise: bool) -> Any:
 			if options_config:
-				return dict(options_config)
+				options = dict(options_config)
+				del options["data"]
+				return options
 			if do_raise:
 				raise ValueError(f"Unsupported Agno agent options")
 			return None
@@ -121,8 +120,6 @@ class AgnoAppImpl(AppImpl):
 			storages[agent_config.storage] += 1
 			storage_config = self.config.storages[agent_config.storage]
 			storage_dbs[storage_config.db] += 1
-			if storage_config.model is not None:
-				models[storage_config.model] += 1
 
 		for i, (enabled, item_config) in enumerate(zip(models, self.config.models)):
 			if not enabled:
@@ -136,7 +133,7 @@ class AgnoAppImpl(AppImpl):
 			item = get_model(item_config, True)
 			embeddings[i] = item
 
-		for i, (enabled, item_config) in enumerate(zip(embeddings, self.config.options)):
+		for i, (enabled, item_config) in enumerate(zip(options, self.config.options)):
 			if not enabled:
 				continue
 			item = get_options(item_config, True)
@@ -154,7 +151,6 @@ class AgnoAppImpl(AppImpl):
 			else:
 				raise ValueError("Invalid Agno knowledge db type")
 			knowledge_dbs[i] = item
-
 
 		for i, (enabled, item_config) in enumerate(zip(knowledges, self.config.knowledges)):
 			if not enabled:
@@ -272,22 +268,21 @@ class AgnoAppImpl(AppImpl):
 		return self.d is not None
 
 
-	def serve(self) -> None:
-		global app
-
-		app_id = "platform_agno_" + self.config.name.replace(" ", "_").lower()
-
+	def generate_app(self) -> Any:
+		app_id   = "platform_agno_" + self.config.name.replace(" ", "_").lower()
 		agui_app = AGUIApp(
 			agent       = self.d,
 			name        = self.config.name,
 			app_id      = app_id,
 			description = self.config.description,
 		)
+		app = agui_app.get_app()
+		self.agui_app = agui_app
+		return app
 
-		app     = agui_app.get_app()
-		app_str = module_prop_str(__file__, "app")
 
-		agui_app.serve(app=app_str, port=self.config.port, reload=self.config.reload)
+	def launch(self, app: str) -> None:
+		self.agui_app.serve(app=app, port=self.config.port, reload=self.config.reload)
 
 
 App.register("agno", "", AgnoAppImpl)

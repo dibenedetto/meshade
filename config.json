@@ -45,7 +45,7 @@
 			},
 			"knowledge" : [
 				{
-					"type" : "document",
+					"type" : "knowledge",
 					"db"   : {
 						"type"        : "lancedb",
 						"table_name"  : "knowledge",

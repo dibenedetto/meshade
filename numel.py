@@ -319,6 +319,12 @@ def unroll_config(config: AppConfig) -> AppConfig:
 				item.db = len(config_copy.knowledge_dbs) - 1
 			if not isinstance(item.db, int) or item.db >= len(config_copy.knowledge_dbs):
 				raise ValueError("Invalid agent knowledge db")
+			if item.model is not None:
+				if isinstance(item.model, ModelConfig):
+					config_copy.models.append(item.model)
+					item.model = len(config_copy.models) - 1
+				if not isinstance(item.model, int) or item.model >= len(config_copy.models):
+					raise ValueError("Invalid agent knowledge model")
 			agent_knowledge.append(knowledge)
 		agent.knowledge = agent_knowledge
 		if not agent.knowledge:
@@ -340,6 +346,18 @@ def unroll_config(config: AppConfig) -> AppConfig:
 				item.db = len(config_copy.memory_dbs) - 1
 			if not isinstance(item.db, int) or item.db >= len(config_copy.memory_dbs):
 				raise ValueError("Invalid agent memory db")
+			if item.model is not None:
+				if isinstance(item.model, ModelConfig):
+					config_copy.models.append(item.model)
+					item.model = len(config_copy.models) - 1
+				if not isinstance(item.model, int) or item.model >= len(config_copy.models):
+					raise ValueError("Invalid agent memory model")
+			if item.summarizer is not None:
+				if isinstance(item.summarizer, ModelConfig):
+					config_copy.models.append(item.summarizer)
+					item.summarizer = len(config_copy.models) - 1
+				if not isinstance(item.summarizer, int) or item.summarizer >= len(config_copy.models):
+					raise ValueError("Invalid agent memory summarizer")
 
 		if agent.storage is not None:
 			if isinstance(agent.storage, StorageConfig):
@@ -424,7 +442,11 @@ class AppImpl:
 		raise NotImplementedError("Subclasses must implement the is_valid method.")
 
 
-	def launch(self) -> None:
+	def generate_app(self) -> Any:
+		raise NotImplementedError("Subclasses must implement the generate_app method.")
+
+
+	def launch(self, app: str) -> None:
 		raise NotImplementedError("Subclasses must implement the launch method.")
 
 
@@ -453,5 +475,9 @@ class App:
 		return self.d.is_valid()
 
 
-	def launch(self) -> None:
-		self.d.launch()
+	def generate_app(self) -> Any:
+		return self.d.generate_app()
+
+
+	def launch(self, app: str) -> None:
+		self.d.launch(app)
