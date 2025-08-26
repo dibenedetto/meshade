@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>AG-UI Client - Using Bundled Library</title>
+	<style>
+		body {
+			font-family: system-ui, -apple-system, sans-serif;
+			max-width: 800px;
+			margin: 0 auto;
+			padding: 20px;
+			line-height: 1.6;
+			background: #f8f9fa;
+		}
+
+		.container {
+			background: white;
+			border-radius: 8px;
+			padding: 20px;
+			box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+		}
+
+		.chat-container {
+			height: 400px;
+			border: 1px solid #ddd;
+			border-radius: 6px;
+			overflow-y: auto;
+			padding: 15px;
+			background: #fafafa;
+			margin-bottom: 15px;
+		}
+
+		.message {
+			margin: 10px 0;
+			padding: 8px 12px;
+			border-radius: 8px;
+			max-width: 80%;
+		}
+
+		.message.user {
+			background: #007bff;
+			color: white;
+			margin-left: auto;
+		}
+
+		.message.agent {
+			background: #28a745;
+			color: white;
+		}
+
+		.message.system {
+			background: #6c757d;
+			color: white;
+			font-size: 0.9em;
+		}
+
+		.input-group {
+			display: flex;
+			gap: 10px;
+		}
+
+		#messageInput {
+			flex: 1;
+			padding: 10px;
+			border: 1px solid #ddd;
+			border-radius: 6px;
+			font-size: 16px;
+		}
+
+		button {
+			padding: 10px 20px;
+			background: #007bff;
+			color: white;
+			border: none;
+			border-radius: 6px;
+			cursor: pointer;
+			font-size: 16px;
+		}
+
+		button:hover {
+			background: #0056b3;
+		}
+
+		button:disabled {
+			background: #6c757d;
+			cursor: not-allowed;
+		}
+
+		.status {
+			margin: 10px 0;
+			padding: 8px;
+			border-radius: 4px;
+			font-size: 0.9em;
+		}
+
+		.status.connected { background: #d4edda; color: #155724; }
+		.status.connecting { background: #fff3cd; color: #856404; }
+		.status.disconnected { background: #f8d7da; color: #721c24; }
+
+		.config {
+			margin-bottom: 20px;
+			padding: 15px;
+			background: #e9ecef;
+			border-radius: 6px;
+		}
+
+		.config input {
+			width: 100%;
+			padding: 8px;
+			border: 1px solid #ccc;
+			border-radius: 4px;
+			margin: 5px 0;
+		}
+
+		.loading {
+			display: none;
+			color: #6c757d;
+			font-style: italic;
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<h1>AG-UI Client - Using @ag-ui/client Bundle</h1>
+
+		<div class="config">
+			<label for="serverUrl">Agent Server URL:</label>
+			<input type="url" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
+			<label for="sessionId">Session ID:</label>
+			<input type="text" id="sessionId" value="" placeholder="Optional session ID">
+		</div>
+
+		<div id="status" class="status disconnected">Not connected</div>
+
+		<div id="chatContainer" class="chat-container"></div>
+
+		<div class="input-group">
+			<input type="text" id="messageInput" placeholder="Type your message..." disabled>
+			<button id="sendButton" onclick="sendMessage()" disabled>Send</button>
+			<button id="connectButton" onclick="toggleConnection()">Connect</button>
+		</div>
+
+		<div id="loading" class="loading">Loading AG-UI client...</div>
+	</div>
+
+	<!-- Include the bundled AG-UI client -->
+	<script src="dist/agui-client.bundle.js"></script>
+
+	<script>
+		class AGUIClientAgent extends AGUI.HttpAgent
+		{
+			constructor(options, subscriber) {
+				super(options);
+
+				if (subscriber) {
+					super.subscribe(subscriber);
+				}
+			}
+
+			async sendMessage(message) {
+				const messageId   = "test-msg";
+				const userMessage = {
+					id      : messageId,
+					role    : "user",
+					content : message,
+				};
+				this.setMessages([userMessage]);
+				return await this.runAgent({});
+			}
+		};
+
+		let aguiClient = null;
+		let isConnected = false;
+
+		// DOM elements
+		const chatContainer = document.getElementById('chatContainer');
+		const messageInput = document.getElementById('messageInput');
+		const sendButton = document.getElementById('sendButton');
+		const connectButton = document.getElementById('connectButton');
+		const statusDiv = document.getElementById('status');
+		const serverUrlInput = document.getElementById('serverUrl');
+		const sessionIdInput = document.getElementById('sessionId');
+		const loadingDiv = document.getElementById('loading');
+
+		// Check if AG-UI client is loaded
+		function checkAGUILoaded() {
+			if (typeof AGUI !== 'undefined' && AGUI.HttpAgent) {
+				loadingDiv.style.display = 'none';
+				addMessage('system', 'AG-UI client loaded successfully');
+			} else {
+				loadingDiv.style.display = 'block';
+				loadingDiv.textContent = 'Failed to load AG-UI client. Make sure agui-client.bundle.js is built and available.';
+				addMessage('system', 'Error: AG-UI client not found. Please build the bundle first.');
+			}
+		}
+
+		function connect() {
+			const serverUrl = serverUrlInput.value.trim();
+			const sessionId = sessionIdInput.value.trim();
+
+			if (!serverUrl) {
+				addMessage('system', 'Please enter a valid server URL');
+				return;
+			}
+
+			if (typeof AGUI === 'undefined' || !AGUI.HttpAgent) {
+				addMessage('system', 'AG-UI client not loaded. Please build the bundle first.');
+				return;
+			}
+
+			updateStatus('connecting', 'Connecting...');
+
+			try {
+				endpoint = '/agui' // Specify the agno endpoint
+				url = `${serverUrl}${endpoint}`
+				// Initialize AG-UI HttpAgent
+				// aguiClient = new AGUI.HttpAgent({
+				aguiClient = new AGUIClientAgent({
+					url: url,
+					headers: {
+						'Access-Control-Allow-Origin': '*',
+					},
+				}, {
+					onRunInitialized          (params) { handleAGUIEvent(params.event); },
+					onRunFailed               (params) { handleAGUIEvent(params.event); },
+					onRunFinalized            (params) { handleAGUIEvent(params.event); },
+					onEvent                   (params) { ; },
+					onRunStartedEvent         (params) { handleAGUIEvent(params.event); },
+					onRunFinishedEvent        (params) { handleAGUIEvent(params.event); },
+					onRunErrorEvent           (params) { handleAGUIEvent(params.event); },
+					onStepStartedEvent        (params) { handleAGUIEvent(params.event); },
+					onStepFinishedEvent       (params) { handleAGUIEvent(params.event); },
+					onTextMessageStartEvent   (params) { handleAGUIEvent(params.event); },
+					onTextMessageContentEvent (params) { handleAGUIEvent(params.event); },
+					onTextMessageEndEvent     (params) { handleAGUIEvent(params.event); },
+					onToolCallStartEvent      (params) { handleAGUIEvent(params.event); },
+					onToolCallArgsEvent       (params) { handleAGUIEvent(params.event); },
+					onToolCallEndEvent        (params) { handleAGUIEvent(params.event); },
+					onToolCallResultEvent     (params) { handleAGUIEvent(params.event); },
+					onStateSnapshotEvent      (params) { handleAGUIEvent(params.event); },
+					onStateDeltaEvent         (params) { handleAGUIEvent(params.event); },
+					onMessagesSnapshotEvent   (params) { handleAGUIEvent(params.event); },
+					onRawEvent                (params) { handleAGUIEvent(params.event); },
+					onCustomEvent             (params) { handleAGUIEvent(params.event); },
+					onMessagesChanged         (params) { handleAGUIEvent(params.event); },
+					onStateChanged            (params) { handleAGUIEvent(params.event); },
+					onNewMessage              (params) { handleAGUIEvent(params.event); },
+					onNewToolCall             (params) { handleAGUIEvent(params.event); },
+				});
+
+				console.log(AGUI.EventType.TEXT_MESSAGE_CONTENT)
+
+				isConnected = true;
+				updateStatus('connected', 'AG-UI client ready');
+				enableInput(true);
+				connectButton.textContent = 'Disconnect';
+				addMessage('system', `AG-UI client initialized for ${url}`);
+
+			} catch (error) {
+				console.error('Failed to initialize AG-UI client:', error);
+				addMessage('system', `Connection failed: ${error.message}`);
+				updateStatus('disconnected', 'Connection failed');
+			}
+		}
+
+		function disconnect() {
+			if (aguiClient) {
+				// aguiClient.disconnect();
+				aguiClient = null;
+			}
+
+			isConnected = false;
+			updateStatus('disconnected', 'Disconnected');
+			enableInput(false);
+			connectButton.textContent = 'Connect';
+			addMessage('system', 'Disconnected from agent');
+		}
+
+		function handleAGUIEvent(event) {
+			console.log('AG-UI Event:', event);
+
+			if (!event) return;
+
+			// Handle different AG-UI event types
+			switch (event.type) {
+				case AGUI.EventType.TEXT_MESSAGE_CONTENT:
+				case AGUI.EventType.TEXT_MESSAGE_CHUNK:
+					const content = event.delta || 'No content';
+					addMessage('agent', content);
+					break;
+
+				case AGUI.EventType.TEXT_MESSAGE_START:
+					addMessage('system', '🤖 Agent is responding...');
+					break;
+
+				case AGUI.EventType.TEXT_MESSAGE_END:
+					addMessage('system', '✅ Response complete');
+					break;
+
+				case AGUI.EventType.RUN_STARTED:
+					addMessage('system', '🚀 Agent run started');
+					break;
+
+				case AGUI.EventType.RUN_FINISHED:
+					addMessage('system', '🏁 Agent run finished');
+					break;
+
+				case AGUI.EventType.RUN_ERROR:
+					addMessage('system', `❌ Error: ${event.error || 'Unknown error'}`);
+					break;
+
+				case AGUI.EventType.TOOL_CALL_START:
+					addMessage('system', `🔧 Tool call: ${event.tool_name || 'unknown'}`);
+					break;
+
+				case AGUI.EventType.TOOL_CALL_RESULT:
+					addMessage('system', `✅ Tool result received`);
+					break;
+
+				default:
+					// Handle other AG-UI event types
+					addMessage('system', `Event: ${event.type}`);
+					console.log('Unhandled event:', event);
+			}
+		}
+
+		async function sendMessage() {
+			const message = messageInput.value.trim();
+			if (!message || !isConnected || !aguiClient) return;
+
+			addMessage('user', message);
+			messageInput.value = '';
+			sendButton.disabled = true;
+			sendButton.textContent = 'Sending...';
+
+			try {
+				// const sessionId = sessionIdInput.value.trim() || `session_${Date.now()}`;
+
+				// // Create RunAgentInput
+				// const input = {
+				// 	messages: [{
+				// 		role: 'user',
+				// 		content: message
+				// 	}],
+				// 	session_id: sessionId,
+				// 	stream: true
+				// };
+
+				// // Use the HttpAgent to run the request
+				// const response = await aguiClient.run(input);
+
+				// // Handle the streaming response
+				// if (response && response.body) {
+				// 	const reader = response.body.getReader();
+
+				// 	try {
+				// 		// Parse the SSE stream
+				// 		for await (const event of AGUI.parseSSEStream(reader)) {
+				// 			handleAGUIEvent(event);
+				// 		}
+				// 	} catch (streamError) {
+				// 		console.error('Stream parsing error:', streamError);
+				// 		addMessage('system', `Stream error: ${streamError.message}`);
+				// 	}
+				// } else {
+				// 	addMessage('system', 'No response received from agent');
+				// }
+
+				await aguiClient.sendMessage(message);
+			} catch (error) {
+				console.error('Failed to send message:', error);
+				addMessage('system', `Failed to send message: ${error.message}`);
+			} finally {
+				sendButton.disabled = false;
+				sendButton.textContent = 'Send';
+			}
+		}
+
+		function addMessage(role, content) {
+			const messageDiv = document.createElement('div');
+			messageDiv.className = `message ${role}`;
+			messageDiv.textContent = content;
+
+			chatContainer.appendChild(messageDiv);
+			chatContainer.scrollTop = chatContainer.scrollHeight;
+		}
+
+		function updateStatus(type, message) {
+			statusDiv.className = `status ${type}`;
+			statusDiv.textContent = message;
+		}
+
+		function enableInput(enabled) {
+			messageInput.disabled = !enabled;
+			sendButton.disabled = !enabled;
+		}
+
+		function toggleConnection() {
+			if (isConnected) {
+				disconnect();
+			} else {
+				connect();
+			}
+		}
+
+		// Event listeners
+		messageInput.addEventListener('keypress', (e) => {
+			if (e.key === 'Enter' && !e.shiftKey) {
+				e.preventDefault();
+				sendMessage();
+			}
+		});
+
+		// Initialize when page loads
+		document.addEventListener('DOMContentLoaded', () => {
+			checkAGUILoaded();
+		});
+	</script>
+</body>
+</html>
