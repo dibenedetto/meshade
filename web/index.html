@@ -195,6 +195,10 @@
 		const loadingDiv = document.getElementById('loading');
 		const systemMsgButton = document.getElementById('systemMessage');
 
+		function clearChat() {
+			chatContainer.innerHTML = '';
+		}
+
 		function changeSystemVisibility() {
 			const divs    = document.getElementsByClassName('message system');
 			const display = this.checked ? 'block' : 'none';
@@ -234,6 +238,8 @@
 			updateStatus('connecting', 'Connecting...');
 
 			try {
+				clearChat();
+
 				endpoint = '/agui' // Specify the agno endpoint
 				url = `${serverUrl}${endpoint}`
 				// Initialize AG-UI HttpAgent
@@ -271,14 +277,12 @@
 					onNewToolCall             (params) { handleAGUIEvent(params.event); },
 				});
 
-				console.log(AGUI.EventType.TEXT_MESSAGE_CONTENT)
-
 				isConnected = true;
 				updateStatus('connected', 'AG-UI client ready');
 				enableInput(true);
 				connectButton.textContent = 'Disconnect';
 				addMessage('system', `✅ AG-UI client initialized for ${url}`);
-				addMessage('agent', 'Hi! I am Numel, a helpful AI playground. Ask me anything you want.');
+				addMessage('agent', 'Hi, I am Numel, a helpful AI playground. Ask me anything you want 🙂');
 
 			} catch (error) {
 				console.error('Failed to initialize AG-UI client:', error);
@@ -298,6 +302,7 @@
 			enableInput(false);
 			connectButton.textContent = 'Connect';
 			addMessage('system', 'ℹ️ Disconnected from agent');
+			addMessage('agent', 'See you soon 👋');
 		}
 
 		function handleAGUIEvent(event) {
