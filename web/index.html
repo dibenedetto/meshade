@@ -193,11 +193,11 @@
 		function checkAGUILoaded() {
 			if (typeof AGUI !== 'undefined' && AGUI.HttpAgent) {
 				loadingDiv.style.display = 'none';
-				addMessage('system', 'AG-UI client loaded successfully');
+				addMessage('system', '✅ AG-UI client loaded successfully');
 			} else {
 				loadingDiv.style.display = 'block';
-				loadingDiv.textContent = 'Failed to load AG-UI client. Make sure agui-client.bundle.js is built and available.';
-				addMessage('system', 'Error: AG-UI client not found. Please build the bundle first.');
+				loadingDiv.textContent = '❌ Failed to load AG-UI client. Make sure agui-client.bundle.js is built and available.';
+				addMessage('system', '❌ Error: AG-UI client not found. Please build the bundle first.');
 			}
 		}
 
@@ -206,12 +206,12 @@
 			const sessionId = sessionIdInput.value.trim();
 
 			if (!serverUrl) {
-				addMessage('system', 'Please enter a valid server URL');
+				addMessage('system', '⚠️ Please enter a valid server URL');
 				return;
 			}
 
 			if (typeof AGUI === 'undefined' || !AGUI.HttpAgent) {
-				addMessage('system', 'AG-UI client not loaded. Please build the bundle first.');
+				addMessage('system', '⚠️ AG-UI client not loaded. Please build the bundle first.');
 				return;
 			}
 
@@ -261,11 +261,11 @@
 				updateStatus('connected', 'AG-UI client ready');
 				enableInput(true);
 				connectButton.textContent = 'Disconnect';
-				addMessage('system', `AG-UI client initialized for ${url}`);
+				addMessage('system', `✅ AG-UI client initialized for ${url}`);
 
 			} catch (error) {
 				console.error('Failed to initialize AG-UI client:', error);
-				addMessage('system', `Connection failed: ${error.message}`);
+				addMessage('system', `❌ Connection failed: ${error.message}`);
 				updateStatus('disconnected', 'Connection failed');
 			}
 		}
@@ -280,7 +280,7 @@
 			updateStatus('disconnected', 'Disconnected');
 			enableInput(false);
 			connectButton.textContent = 'Connect';
-			addMessage('system', 'Disconnected from agent');
+			addMessage('system', 'ℹ️ Disconnected from agent');
 		}
 
 		function handleAGUIEvent(event) {
@@ -334,7 +334,7 @@
 
 				default:
 					// Handle other AG-UI event types
-					addMessage('system', `Event: ${event.type}`);
+					addMessage('system', `ℹ️ Event: ${event.type}`);
 					console.log('Unhandled event:', event);
 			}
 		}
@@ -384,7 +384,7 @@
 				await aguiClient.sendMessage(message);
 			} catch (error) {
 				console.error('Failed to send message:', error);
-				addMessage('system', `Failed to send message: ${error.message}`);
+				addMessage('system', `❌ Failed to send message: ${error.message}`);
 			} finally {
 				sendButton.disabled = false;
 				sendButton.textContent = 'Send';
