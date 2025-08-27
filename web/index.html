@@ -3,7 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>AG-UI Client - Using Bundled Library</title>
+	<title>Numel AI Playground</title>
 	<style>
 		body {
 			font-family: system-ui, -apple-system, sans-serif;
@@ -122,13 +122,15 @@
 </head>
 <body>
 	<div class="container">
-		<h1>AG-UI Client - Using @ag-ui/client Bundle</h1>
+		<h1>Numel AI Playground</h1>
 
 		<div class="config">
 			<label for="serverUrl">Agent Server URL:</label>
-			<input type="url" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
+			<input type="url" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000" />
 			<label for="sessionId">Session ID:</label>
-			<input type="text" id="sessionId" value="" placeholder="Optional session ID">
+			<input type="text" id="sessionId" value="" placeholder="Optional session ID" />
+			<label for="systemMessage"> Show System Messages:</label>
+			<input type="checkbox" id="systemMessage" value="true" />
 		</div>
 
 		<div id="status" class="status disconnected">Not connected</div>
@@ -170,8 +172,11 @@
 			}
 		};
 
-		let aguiClient = null;
+		let aguiClient  = null;
 		let isConnected = false;
+
+		let messagePrevRole    = null;
+		let messagePrevElement = null;
 
 		// DOM elements
 		const chatContainer = document.getElementById('chatContainer');
@@ -182,6 +187,7 @@
 		const serverUrlInput = document.getElementById('serverUrl');
 		const sessionIdInput = document.getElementById('sessionId');
 		const loadingDiv = document.getElementById('loading');
+		const systemMsgButton = document.getElementById('systemMessage');
 
 		// Check if AG-UI client is loaded
 		function checkAGUILoaded() {
@@ -291,19 +297,27 @@
 					break;
 
 				case AGUI.EventType.TEXT_MESSAGE_START:
-					addMessage('system', '🤖 Agent is responding...');
+					if (systemMsgButton.checked) {
+						addMessage('system', '🤖 Agent is responding...');
+					}
 					break;
 
 				case AGUI.EventType.TEXT_MESSAGE_END:
-					addMessage('system', '✅ Response complete');
+					if (systemMsgButton.checked) {
+						addMessage('system', '✅ Response complete');
+					}
 					break;
 
 				case AGUI.EventType.RUN_STARTED:
-					addMessage('system', '🚀 Agent run started');
+					if (systemMsgButton.checked) {
+						addMessage('system', '🚀 Agent run started');
+					}
 					break;
 
 				case AGUI.EventType.RUN_FINISHED:
-					addMessage('system', '🏁 Agent run finished');
+					if (systemMsgButton.checked) {
+						addMessage('system', '🏁 Agent run finished');
+					}
 					break;
 
 				case AGUI.EventType.RUN_ERROR:
@@ -378,11 +392,20 @@
 		}
 
 		function addMessage(role, content) {
-			const messageDiv = document.createElement('div');
-			messageDiv.className = `message ${role}`;
-			messageDiv.textContent = content;
-
-			chatContainer.appendChild(messageDiv);
+			if (messagePrevRole != role) {
+				const messageDiv = document.createElement('div');
+				messageDiv.className = `message ${role}`;
+				// messageDiv.textContent = content;
+				messageDiv.innerHTML = content;
+				chatContainer.appendChild(messageDiv);
+				messagePrevRole    = role;
+				messagePrevElement = messageDiv;
+			} else {
+				if (role == 'system') {
+					content = `<br/>${content}`;
+				}
+				messagePrevElement.innerHTML += content;
+			}
 			chatContainer.scrollTop = chatContainer.scrollHeight;
 		}
 
