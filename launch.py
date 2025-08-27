@@ -6,7 +6,7 @@ from numel import App, AppConfig, load_config, module_prop_str, seed_everything
 
 
 parser = argparse.ArgumentParser(description="App configuration")
-parser .add_argument("--config_path", type=str, default="config.json", help="Path to configuration file")
+parser .add_argument("--config_path", type=str, default="config2.json", help="Path to configuration file")
 args   = parser.parse_args()
 
 config = load_config(args.config_path) or AppConfig()

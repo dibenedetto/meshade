@@ -55,6 +55,12 @@
 			font-size: 0.9em;
 		}
 
+		.message.system-error {
+			background: #6c757d;
+			color: white;
+			font-size: 0.9em;
+		}
+
 		.input-group {
 			display: flex;
 			gap: 10px;
@@ -189,6 +195,16 @@
 		const loadingDiv = document.getElementById('loading');
 		const systemMsgButton = document.getElementById('systemMessage');
 
+		function changeSystemVisibility() {
+			const divs    = document.getElementsByClassName('message system');
+			const display = this.checked ? 'block' : 'none';
+			for (let dv of divs) {
+				dv.style.display = display;
+			}
+		}
+
+		systemMsgButton.addEventListener('change', changeSystemVisibility);
+
 		// Check if AG-UI client is loaded
 		function checkAGUILoaded() {
 			if (typeof AGUI !== 'undefined' && AGUI.HttpAgent) {
@@ -197,7 +213,7 @@
 			} else {
 				loadingDiv.style.display = 'block';
 				loadingDiv.textContent = '❌ Failed to load AG-UI client. Make sure agui-client.bundle.js is built and available.';
-				addMessage('system', '❌ Error: AG-UI client not found. Please build the bundle first.');
+				addMessage('system-error', '❌ Error: AG-UI client not found. Please build the bundle first.');
 			}
 		}
 
@@ -262,10 +278,11 @@
 				enableInput(true);
 				connectButton.textContent = 'Disconnect';
 				addMessage('system', `✅ AG-UI client initialized for ${url}`);
+				addMessage('agent', 'Hi! I am Numel, a helpful AI playground. Ask me anything you want.');
 
 			} catch (error) {
 				console.error('Failed to initialize AG-UI client:', error);
-				addMessage('system', `❌ Connection failed: ${error.message}`);
+				addMessage('system-error', `❌ Connection failed: ${error.message}`);
 				updateStatus('disconnected', 'Connection failed');
 			}
 		}
@@ -297,31 +314,23 @@
 					break;
 
 				case AGUI.EventType.TEXT_MESSAGE_START:
-					if (systemMsgButton.checked) {
-						addMessage('system', '🤖 Agent is responding...');
-					}
+					addMessage('system', '🤖 Agent is responding...');
 					break;
 
 				case AGUI.EventType.TEXT_MESSAGE_END:
-					if (systemMsgButton.checked) {
-						addMessage('system', '✅ Response complete');
-					}
+					addMessage('system', '✅ Response complete');
 					break;
 
 				case AGUI.EventType.RUN_STARTED:
-					if (systemMsgButton.checked) {
-						addMessage('system', '🚀 Agent run started');
-					}
+					addMessage('system', '🚀 Agent run started');
 					break;
 
 				case AGUI.EventType.RUN_FINISHED:
-					if (systemMsgButton.checked) {
-						addMessage('system', '🏁 Agent run finished');
-					}
+					addMessage('system', '🏁 Agent run finished');
 					break;
 
 				case AGUI.EventType.RUN_ERROR:
-					addMessage('system', `❌ Error: ${event.error || 'Unknown error'}`);
+					addMessage('system-error', `❌ Error: ${event.error || 'Unknown error'}`);
 					break;
 
 				case AGUI.EventType.TOOL_CALL_START:
@@ -384,7 +393,7 @@
 				await aguiClient.sendMessage(message);
 			} catch (error) {
 				console.error('Failed to send message:', error);
-				addMessage('system', `❌ Failed to send message: ${error.message}`);
+				addMessage('system-error', `❌ Failed to send message: ${error.message}`);
 			} finally {
 				sendButton.disabled = false;
 				sendButton.textContent = 'Send';
@@ -395,7 +404,10 @@
 			if (messagePrevRole != role) {
 				const messageDiv = document.createElement('div');
 				messageDiv.className = `message ${role}`;
-				// messageDiv.textContent = content;
+				if (role == 'system') {
+					const display = systemMsgButton.checked ? 'block' : 'none';
+					messageDiv.style.display = display;
+				}
 				messageDiv.innerHTML = content;
 				chatContainer.appendChild(messageDiv);
 				messagePrevRole    = role;
@@ -439,6 +451,10 @@
 		document.addEventListener('DOMContentLoaded', () => {
 			checkAGUILoaded();
 		});
+
+		window.onload = () => {
+			changeSystemVisibility.call(systemMsgButton);
+		};
 	</script>
 </body>
 </html>

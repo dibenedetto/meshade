@@ -192,7 +192,6 @@ class AppConfig(BaseModel):
 	agents        : Optional[List[AgentConfig]] = None
 	seed          : Optional[int] = None
 	data          : Optional[Any] = None
-	agui_app      : Optional[bool] = None  # Added field from JSON
 
 
 def validate_config(config: AppConfig) -> bool:
