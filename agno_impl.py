@@ -10,6 +10,7 @@ from agno.memory.v2.memory     import Memory
 from agno.memory.v2.summarizer import SessionSummarizer
 from agno.models.openai        import OpenAIChat
 from agno.storage.sqlite       import SqliteStorage
+from agno.tools                import tool
 from agno.tools.duckduckgo     import DuckDuckGoTools
 from agno.tools.reasoning      import ReasoningTools
 from agno.vectordb.lancedb     import LanceDb
@@ -30,9 +31,32 @@ from numel import (
 	DEFAULT_STORAGE_TYPE,
 	DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS,
 	compatible_backends,
-	module_prop_str,
 )
 
+import asyncio
+
+
+@tool
+async def start_webcam_stream(duration_seconds: int = 10, interval_seconds: int = 2):
+	"""
+	Start webcam streaming that captures frames periodically.
+	
+	Args:
+		duration_seconds: How long to stream (default 30s)
+		interval_seconds: Interval between captures (default 5s)
+	"""
+	# results = []
+	for i in range(duration_seconds // interval_seconds):
+		# Simulate analysis (you could call vision models here)
+		timestamp = i * interval_seconds
+		item = f"Frame {i+1} at {timestamp}s: Webcam active, frame captured"
+		yield item
+
+		# Wait for next interval
+		await asyncio.sleep(interval_seconds)
+	
+	# return f"Webcam stream completed. Captured {len(results)} frames: " + "; ".join(results)
+	yield "-- done --"
 
 def agno_validate_config(config: AppConfig) -> bool:
 	# TODO: Implement validation logic for the Agno app configuration
@@ -225,6 +249,10 @@ class AgnoAppImpl(AppImpl):
 				elif tool_config.type == "web_search":
 					max_results = tool_config.args.get("max_results", DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS)
 					tool = DuckDuckGoTools(fixed_max_results=max_results)
+				elif tool_config.type == "webcam":
+					tool = start_webcam_stream
+				else:
+					pass
 			if tool is not None:
 				tools.append(tool)
 		if not tools:
@@ -259,6 +287,7 @@ class AgnoAppImpl(AppImpl):
 			storage   = storage,
 			tools     = tools,
 			**opts,
+			stream=True,
 		)
 
 		self.d = agent

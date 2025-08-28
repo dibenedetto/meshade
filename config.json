@@ -129,6 +129,14 @@
 						"max_results" : 5
 					},
 					"ref"  : null
+				},
+				{
+					"type" : "webcam",
+					"args" : {
+						"duration_seconds" : 60,
+						"interval_seconds" : 3
+					},
+					"ref"  : null
 				}
 			]
 		}
