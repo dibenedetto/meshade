@@ -214,7 +214,6 @@
 		let messagePrevRole    = null;
 		let messagePrevElement = null;
 
-		// DOM elements
 		const chatContainer   = document.getElementById("chatContainer");
 		const messageInput    = document.getElementById("messageInput");
 		const sendButton      = document.getElementById("sendButton");
@@ -242,7 +241,6 @@
 			}
 		}
 
-		// Check if AG-UI client is loaded
 		function checkAGUILoaded() {
 			if (typeof AGUI !== "undefined" && AGUI.HttpAgent) {
 				loadingDiv.style.display = "none";
@@ -288,31 +286,7 @@
 
 				aguiApp = await NumelApp.create(serverUrl, userId, sessionId,
 				{
-					onRunInitialized          (params) { handleAGUIEvent(params.event); },
-					onRunFailed               (params) { handleAGUIEvent(params.event); },
-					onRunFinalized            (params) { handleAGUIEvent(params.event); },
-					onEvent                   (params) { ; },
-					onRunStartedEvent         (params) { handleAGUIEvent(params.event); },
-					onRunFinishedEvent        (params) { handleAGUIEvent(params.event); },
-					onRunErrorEvent           (params) { handleAGUIEvent(params.event); },
-					onStepStartedEvent        (params) { handleAGUIEvent(params.event); },
-					onStepFinishedEvent       (params) { handleAGUIEvent(params.event); },
-					onTextMessageStartEvent   (params) { handleAGUIEvent(params.event); },
-					onTextMessageContentEvent (params) { handleAGUIEvent(params.event); },
-					onTextMessageEndEvent     (params) { handleAGUIEvent(params.event); },
-					onToolCallStartEvent      (params) { handleAGUIEvent(params.event); },
-					onToolCallArgsEvent       (params) { handleAGUIEvent(params.event); },
-					onToolCallEndEvent        (params) { handleAGUIEvent(params.event); },
-					onToolCallResultEvent     (params) { handleAGUIEvent(params.event); },
-					onStateSnapshotEvent      (params) { handleAGUIEvent(params.event); },
-					onStateDeltaEvent         (params) { handleAGUIEvent(params.event); },
-					onMessagesSnapshotEvent   (params) { handleAGUIEvent(params.event); },
-					onRawEvent                (params) { handleAGUIEvent(params.event); },
-					onCustomEvent             (params) { handleAGUIEvent(params.event); },
-					onMessagesChanged         (params) { handleAGUIEvent(params.event); },
-					onStateChanged            (params) { handleAGUIEvent(params.event); },
-					onNewMessage              (params) { handleAGUIEvent(params.event); },
-					onNewToolCall             (params) { handleAGUIEvent(params.event); },
+					onEvent(params) { handleAGUIEvent(params.event); },
 				});
 
 				agentPrevIndex = -1;
@@ -354,7 +328,6 @@
 
 			if (!event) return;
 
-			// Handle different AG-UI event types
 			switch (event.type) {
 				case AGUI.EventType.TEXT_MESSAGE_CONTENT:
 				case AGUI.EventType.TEXT_MESSAGE_CHUNK:
@@ -391,7 +364,6 @@
 					break;
 
 				default:
-					// Handle other AG-UI event types
 					addMessage("system", `ℹ️ Event: ${event.type}`);
 					console.log("Unhandled event:", event);
 			}
@@ -500,7 +472,6 @@
 
 		appAgentSelect.disabled  = true;
 
-		// Event listeners
 		serverUrlInput.addEventListener("change", (e) => {
 			appAgentSelect.disabled  = true;
 			appAgentSelect.innerHTML = "<option value='-1'> - None - </option>";
@@ -519,7 +490,6 @@
 			}
 		});
 
-		// Initialize when page loads
 		document.addEventListener("DOMContentLoaded", () => {
 			checkAGUILoaded();
 		});
