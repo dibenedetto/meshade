@@ -25,19 +25,13 @@ for module_name in impl_modules:
 	except Exception as e:
 		print(f"Error importing module '{module_name}': {e}")
 
+for i, agent in enumerate(config.agents):
+	agent.port = config.port + i + 1
+
 app = App(config)
 
-agents_registry = []
-for i, agent in enumerate(app.agents):
-	agent_config = app.config.agents[agent.agent_index]
-	reg = {
-		"name" : agent_config.name,
-		"port" : app.config.port + agent.port_offset,
-	}
-	agents_registry.append(reg)
-
 app_status = {
-	"agents" : agents_registry,
+	"config" : app.config,
 }
 
 status_app = FastAPI(title="Status")
@@ -57,15 +51,18 @@ async def get_status():
 
 
 async def run_servers():
-	status_config = uvicorn.Config(status_app, host="0.0.0.0", port=app.config.port)
+	localhost = "0.0.0.0"
+
+	status_config = uvicorn.Config(status_app, host=localhost, port=app.config.port)
 	status_server = uvicorn.Server(status_config)
 	servers       = [status_server]
 
-	for agent, reg in zip(app.agents, app_status["agents"]):
-		agent_app  = agent.generate_app()
-		app_config = uvicorn.Config(agent_app, host="0.0.0.0", port=reg["port"])
-		app_server = uvicorn.Server(app_config)
-		servers.append(app_server)
+	for agent in app.agents:
+		agent_app    = agent.generate_app()
+		agent_port   = app.config.agents[agent.agent_index].port
+		agent_config = uvicorn.Config(agent_app, host=localhost, port=agent_port)
+		agent_server = uvicorn.Server(agent_config)
+		servers.append(agent_server)
 
 	await asyncio.gather(*[server.serve() for server in servers])
 

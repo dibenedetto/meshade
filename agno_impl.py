@@ -19,7 +19,7 @@ from   agno.vectordb.search      import SearchType
 from   numel                     import (
 	App,
 	AppConfig,
-	AppImpl,
+	AgentApp,
 	ModelConfig,
 	OptionsConfig,
 	DEFAULT_KNOWLEDGE_DB_TYPE,
@@ -38,7 +38,7 @@ def agno_validate_config(config: AppConfig) -> bool:
 	return config is not None
 
 
-class AgnoAppImpl(AppImpl):
+class AgnoAgentApp(AgentApp):
 
 	def __init__(self, config: AppConfig, agent_index: int, port_offset: int):
 		super().__init__(config, agent_index, port_offset)
@@ -206,28 +206,29 @@ class AgnoAppImpl(AppImpl):
 				raise ValueError("Invalid Agno storage type")
 			storages[i] = item
 
-		tools = []
-		for tool_config in agent_config.tools:
-			tool = None
-			if tool_config.ref:
-				# TODO: Implement tool reference handling
-				# For now, we will just skip it
-				pass
-			else:
-				if tool_config.type == "reasoning":
-					tool = ReasoningTools()
-				elif tool_config.type == "web_search":
-					max_results = tool_config.args.get("max_results", DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS)
-					tool = DuckDuckGoTools(fixed_max_results=max_results)
-				# elif tool_config.type == "webcam":
-				# 	tool = start_webcam_stream
-				else:
+		tools = None
+		if agent_config.tools is not None:
+			tools = []
+			for tool_config in agent_config.tools:
+				tool = None
+				if tool_config.ref:
+					# TODO: Implement tool reference handling
+					# For now, we will just skip it
 					pass
-			if tool is not None:
-				tools.append(tool)
-		if not tools:
-			tools = None
-
+				else:
+					if tool_config.type == "reasoning":
+						tool = ReasoningTools()
+					elif tool_config.type == "web_search":
+						max_results = tool_config.args.get("max_results", DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS)
+						tool = DuckDuckGoTools(fixed_max_results=max_results)
+					# elif tool_config.type == "webcam":
+					# 	tool = start_webcam_stream
+					else:
+						pass
+				if tool is not None:
+					tools.append(tool)
+			if not tools:
+				tools = None
 
 		model = models  [agent_config.model  ]
 		opts  = options [agent_config.options]
@@ -284,4 +285,4 @@ class AgnoAppImpl(AppImpl):
 		self.agui_app.serve(app=app, port=self.config.port + self.port_offset, reload=self.config.reload)
 
 
-App.register("agno", "", AgnoAppImpl)
+App.register("agno", "", AgnoAgentApp)

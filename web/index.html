@@ -16,7 +16,7 @@
 
 		.container {
 			background: white;
-			border-radius: 8px;
+			border-radius: 6px;
 			padding: 20px;
 			box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 		}
@@ -61,6 +61,12 @@
 			font-size: 0.9em;
 		}
 
+		.message.ui {
+			background: #6c757d;
+			color: white;
+			font-size: 0.9em;
+		}
+
 		.input-group {
 			display: flex;
 			gap: 10px;
@@ -94,10 +100,11 @@
 		}
 
 		.status {
-			margin: 15px 0;
-			padding: 8px;
+			margin: 5px 0;
+			padding: 5px;
 			border-radius: 4px;
 			font-size: 0.9em;
+			border: 1px solid #ddd;
 		}
 
 		.status.connected { background: #d4edda; color: #155724; }
@@ -109,6 +116,7 @@
 			padding: 10px;
 			background: #e9ecef;
 			border-radius: 6px;
+			border: 1px solid #ddd;
 		}
 
 		.config input {
@@ -125,49 +133,50 @@
 			font-style: italic;
 		}
 
-		.input-row {
-			display: flex;
-			align-items: center; /* vertically align label and input */
-			gap: 0.5em; /* space between label and input */
+		.footer {
+			padding: 30px;
+			text-align: center;
+		}
+
+		.centered {
+			text-align: center;
 		}
 	</style>
 </head>
 <body>
 	<div class="container">
-		<h1>Numel AI Playground</h1>
+		<h1 class="centered">Numel AI Playground</h1>
 
 		<div class="config">
 			<table>
 				<tr>
-					<td><label for="serverUrl">Agent Server URL:</label></td>
+					<td><label for="serverUrl">URL:</label></td>
 					<td><input type="url" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000" /></td>
 				</tr>
 				<tr>
-					<td><label for="agents">Agents:</label></td>
-					<td>
-						<button id="appStatusButton" onclick="getAppStatus()">&#x21bb;</button>
-						&nbsp;&nbsp;
-						<select id="appAgentSelect"><option value="-1"> - None - </option></select>
-					</td>
+					<td><label for="userId">User ID:</label></td>
+					<td><input type="text" id="userId" value="" placeholder="Optional User ID" /></td>
 				</tr>
 				<tr>
 					<td><label for="sessionId">Session ID:</label></td>
 					<td><input type="text" id="sessionId" value="" placeholder="Optional Session ID" /></td>
 				</tr>
 				<tr>
-					<td><label for="userId">User ID:</label></td>
-					<td><input type="text" id="userId" value="" placeholder="Optional User ID" /></td>
+					<td><label for="status">Status:</label></td>
+					<td><div id="status" class="status disconnected">Not connected</div></td>
 				</tr>
 			</table>
 		</div>
 
-		<div id="status" class="status disconnected">Not connected</div>
-
 		<div class="config">
 			<table>
 				<tr>
-					<td><label for="systemMessage">Show System Messages:</label></td>
-					<td><input type="checkbox" id="systemMessage" value="true" /></td>
+					<td><label for="agents">Agent:</label></td>
+					<td><select id="appAgentSelect"><option value="-1"> - None - </option></select></td>
+				</tr>
+				<tr>
+					<td><label for="debugMessage">Debug:</label></td>
+					<td><input type="checkbox" id="debugMessage" value="true" /></td>
 				</tr>
 			</table>
 		</div>
@@ -178,136 +187,26 @@
 			<input type="text" id="messageInput" placeholder="Type your message..." disabled>
 			<button id="sendButton" onclick="sendMessage()" disabled>Send</button>
 			<button id="connectButton" onclick="toggleConnection()">Connect</button>
+			<button id="clearChatContent" onclick="clearChat()">&#xe020;</button>
 		</div>
 
 		<div id="loading" class="loading">Loading AG-UI client...</div>
 	</div>
 
+	<div class="footer">
+		&copy; 2025 - Marco Di Benedetto
+	</div>
+
 	<!-- Include the bundled AG-UI client -->
 	<script src="dist/agui-client.bundle.js"></script>
+	<script src="./numel.js"></script>
 
 	<script>
-		class NumelApp {
-			static _randomId() {
-				const rmax = 1000000000.0;
-				const id   = Math.floor(Math.random() * rmax);
-				return id;
-			}
-
-			static _defaultStatus() {
-				const status = {
-					"agents" : [],
-				};
-				return status;
-			}
-
-			static async fetchStatus(url) {
-				if (false)
-				{
-					return {
-						"agents": [
-							{
-								"name": "Gre Vis",
-								"port": 8001,
-							},
-						],
-					};
-				}
-				const statusUrl = `${url}/status`;
-				const status    = await fetch(statusUrl, {
-					headers: {
-						"Access-Control-Allow-Origin": "*",
-					},
-				}).then(response => {
-					if (!response.ok) {
-						throw new Error(`HTTP error - status: ${response.status}`);
-					}
-					return response.json();
-				})
-				.catch(error => {
-					console.error("Error fetching status:", error);
-					return NumelApp._defaultStatus();
-				});
-				return status;
-			}
-
-			constructor(url, subscriber) {
-				this.url        = url;
-				this.subscriber = subscriber;
-				this.status     = NumelApp._defaultStatus();
-				this.agent      = null;
-				this.agentIndex = -1;
-			}
-
-			clear() {
-				this.disconnect();
-				this.status     = NumelApp._defaultStatus();
-				this.agent      = null;
-				this.agentIndex = -1;
-			}
-
-			async updateStatus() {
-				this.status = await NumelApp.fetchStatus(this.url);
-				return this.status;
-			}
-
-			connect(index) {
-				this.disconnect();
-				const agents = this.status["agents"] ?? null;
-				if (!agents || (index < 0) || (index >= agents.length)) {
-					return false;
-				}
-				const info    = agents[index];
-				const baseUrl = this.url.substr(0, this.url.lastIndexOf(":"));
-				const port    = info["port"] + index;
-				const url     = `${baseUrl}:${port}/agui`;
-				const agent   = new AGUI.HttpAgent({
-					name    : info["name"],
-					url     : url,
-					// headers : {
-					// 	"Access-Control-Allow-Origin": "*",
-					// },
-				});
-				if (this.subscriber) {
-					agent.subscribe(this.subscriber);
-				}
-				this.agent    = agent
-				this.agentIdx = index;
-				return true;
-			}
-
-			disconnect() {
-				if (!this.isConnected()) {
-					return false;
-				}
-				this.agent    = null;
-				this.agentIdx = -1;
-				return true;
-			}
-
-			isConnected() {
-				return (this.agent != null);
-			}
-
-			agentIndex() {
-				return this.agentIdx;
-			}
-
-			async send(message) {
-				const messageId   = `numel-message-${NumelApp._randomId()}`;
-				const userMessage = {
-					id      : messageId,
-					role    : "user",
-					content : message,
-				};
-				this.agent.setMessages([userMessage]);
-				return await this.agent.runAgent({});
-			}
-		};
-
 		let aguiApp     = null;
 		let isConnected = false;
-		let agentIndex  = -1;
+
+		let agentPrevIndex     = -1;
+		let agentCurrIndex     = -1;
 
 		let messagePrevRole    = null;
 		let messagePrevElement = null;
@@ -322,8 +221,7 @@
 		const sessionIdInput  = document.getElementById("sessionId");
 		const userIdInput     = document.getElementById("userId");
 		const loadingDiv      = document.getElementById("loading");
-		const systemMsgButton = document.getElementById("systemMessage");
-		const appStatusButton = document.getElementById("appStatusButton");
+		const systemMsgButton = document.getElementById("debugMessage");
 		const appAgentSelect  = document.getElementById("appAgentSelect");
 
 		function clearChat() {
@@ -356,30 +254,30 @@
 			serverUrlInput  .disabled = !enable;
 			sessionIdInput  .disabled = !enable;
 			userIdInput     .disabled = !enable;
-			appStatusButton .disabled = !enable;
 			appAgentSelect  .disabled = !enable;
 		}
 
 		async function connect() {
-			const serverUrl = serverUrlInput.value.trim();
-			const sessionId = sessionIdInput.value.trim();
+			if (typeof AGUI === "undefined" || !AGUI.HttpAgent) {
+				addMessage("system", "⚠️ AG-UI client not loaded. Please build the bundle first.");
+				return;
+			}
 
+			const serverUrl = serverUrlInput .value.trim();
 			if (!serverUrl) {
 				addMessage("system", "⚠️ Please enter a valid server URL");
 				return;
 			}
 
-			if (typeof AGUI === "undefined" || !AGUI.HttpAgent) {
-				addMessage("system", "⚠️ AG-UI client not loaded. Please build the bundle first.");
-				return;
-			}
+			const userId    = userIdInput    .value.trim();
+			const sessionId = sessionIdInput .value.trim();
 
 			enableAppInput(false);
 
 			updateStatus("connecting", "Connecting...");
 
 			try {
-				aguiApp = new NumelApp(serverUrl,
+				aguiApp = await NumelApp.create(serverUrl, userId, sessionId,
 				{
 					onRunInitialized          (params) { handleAGUIEvent(params.event); },
 					onRunFailed               (params) { handleAGUIEvent(params.event); },
@@ -408,8 +306,9 @@
 					onNewToolCall             (params) { handleAGUIEvent(params.event); },
 				});
 
-				await aguiApp.updateStatus();
-				aguiApp.connect(agentIndex);
+				await getAppStatus();
+				agentPrevIndex = -1;
+				agentCurrIndex = 0;
 
 				isConnected = true;
 
@@ -418,7 +317,7 @@
 				enableInput(true);
 				connectButton.textContent = "Disconnect";
 				addMessage("system", `✅ AG-UI client initialized for ${serverUrl}`);
-				addMessage("agent", "Hi, I am Numel, a helpful AI playground. Ask me anything you want 🙂");
+				addMessage("agent", "Hi, I am Numel, an AI playground. Ask me anything you want 🙂");
 			} catch (error) {
 				console.error("Failed to initialize AG-UI client:", error);
 				addMessage("system-error", `❌ Connection failed: ${error.message}<br/>`);
@@ -429,7 +328,7 @@
 
 		function disconnect() {
 			if (aguiApp) {
-				// aguiApp.disconnect();
+				aguiApp.disconnect();
 				aguiApp = null;
 			}
 
@@ -494,13 +393,19 @@
 			const message = messageInput.value.trim();
 			if (!message || !isConnected || !aguiApp) return;
 
+			if (agentPrevIndex != agentCurrIndex) {
+				agentPrevIndex = agentCurrIndex;
+				agentName      = aguiApp.status["config"]["agents"][agentPrevIndex]["name"];
+				addMessage("ui", `🤖 Talking to Agent "${agentName}" (index ${agentPrevIndex})`);
+			}
+
 			addMessage("user", message);
 			messageInput.value = "";
 			sendButton.disabled = true;
 			sendButton.textContent = "Sending...";
 
 			try {
-				await aguiApp.send(message);
+				await aguiApp.send(message, agentPrevIndex);
 			} catch (error) {
 				console.error("Failed to send message:", error);
 				addMessage("system-error", `❌ Failed to send message: ${error.message}`);
@@ -537,9 +442,8 @@
 		}
 
 		function enableInput(enabled) {
-			systemMsgButton .disabled = !enabled;
-			messageInput    .disabled = !enabled;
-			sendButton      .disabled = !enabled;
+			messageInput .disabled = !enabled;
+			sendButton   .disabled = !enabled;
 		}
 
 		function toggleConnection() {
@@ -551,21 +455,23 @@
 		}
 
 		async function getAppStatus() {
+			sendEnabled = !sendButton.disabled;
 			enableInput    (false);
 			enableAppInput (false);
 
 			const serverUrl = serverUrlInput.value.trim();
-			const status    = await NumelApp.fetchStatus(serverUrl);
-			const agents    = status["agents"];
+			const status    = await NumelApp.getStatus(serverUrl);
+			const agents    = status["config"]["agents"];
 			let   content   = "";
+
 			if (agents.length == 0) {
-				agentIndex = -1;
-				content    = "<option value='-1'> - None - </option>";
+				agentCurrIndex = -1;
+				content        = "<option value='-1'> - None - </option>";
 			}
 			else {
-				agentIndex = 0;
+				agentCurrIndex = 0;
 				for (let i=0; i<agents.length; ++i) {
-					let selected = (i == agentIndex) ? " selected" : "";
+					const selected = (i == agentCurrIndex) ? " selected" : "";
 					content += `<option value="${i}"${selected}>${agents[i]["name"]}</option>`;
 				}
 			}
@@ -573,8 +479,10 @@
 			enableInput    (true);
 			enableAppInput (true);
 
-			appAgentSelect.innerHTML = content;
-			appAgentSelect.disabled  = false;
+			appAgentSelect .innerHTML = content;
+			appAgentSelect .disabled  = false;
+			connectButton  .disabled  = false;
+			sendButton     .disabled  = !sendEnabled;
 		}
 
 		appAgentSelect.disabled  = true;
@@ -586,7 +494,7 @@
 		});
 
 		appAgentSelect.addEventListener("change", (e) => {
-			agentIndex = this.value;
+			agentCurrIndex = parseInt(e.target.value);
 		});
 
 		systemMsgButton.addEventListener("change", changeSystemVisibility);

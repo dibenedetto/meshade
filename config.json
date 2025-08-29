@@ -129,16 +129,22 @@
 						"max_results" : 5
 					},
 					"ref"  : null
-				},
-				{
-					"type" : "webcam",
-					"args" : {
-						"duration_seconds" : 60,
-						"interval_seconds" : 3
-					},
-					"ref"  : null
 				}
 			]
+		},
+		{
+			"version" : "1.0.0",
+			"name"    : "Arrogant Assistant",
+			"author"  : "arrogant@meshade.com",
+			"data"    : null,
+
+			"description"  : "Arrogant AI Assistant",
+			"instructions" : [
+				"Be arrogant in your answers"
+			],
+
+			"backend" : 0,
+			"model"   : 0
 		}
 	]
 }

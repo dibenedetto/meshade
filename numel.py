@@ -162,6 +162,7 @@ class AgentConfig(BaseModel):
 	version      : Optional[str]                               = None
 	name         : Optional[str]                               = None
 	author       : Optional[str]                               = None
+	port         : Optional[int]                               = None
 	description  : Optional[str]                               = None
 	instructions : Optional[List[str]]                         = None
 	knowledge    : Optional[List[Union[KnowledgeConfig, int]]] = None
@@ -271,6 +272,8 @@ def unroll_config(config: AppConfig) -> AppConfig:
 		raise ValueError("Invalid app backend")
 
 	for agent in config_copy.agents:
+		agent.port = None
+
 		if agent.backend is None:
 			agent.backend = shared_backend
 		elif isinstance(agent.backend, BackendConfig):
@@ -428,7 +431,7 @@ def module_prop_str(file_path: str, property_name: str) -> str:
 	return res
 
 
-class AppImpl:
+class AgentApp:
 
 	def __init__(self, config: AppConfig, agent_index: int, port_offset: int):
 		if agent_index < 0 or agent_index >= len(config.agents) or port_offset <= 0:
