@@ -8,7 +8,7 @@ from   fastapi                 import FastAPI
 from   fastapi.middleware.cors import CORSMiddleware
 
 
-from   numel                   import App, AppConfig, load_config, seed_everything
+from   numel                   import App, AppConfig, load_config, seed_everything, unroll_config
 
 
 parser = argparse.ArgumentParser(description="App configuration")
@@ -49,6 +49,14 @@ status_app.add_middleware(
 @status_app.get("/status")
 async def get_status():
 	return app_status
+
+
+@status_app.get("/default")
+async def get_default():
+	def_value = {
+		"config" : unroll_config(),
+	}
+	return def_value
 
 
 async def run_servers():

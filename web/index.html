@@ -176,7 +176,10 @@
 				</tr>
 				<tr>
 					<td><label for="debugMessage">Debug:</label></td>
-					<td><input type="checkbox" id="debugMessage" value="true" /></td>
+					<td>
+						<input type="checkbox" id="debugMessage" value="true" />
+						<!-- <button id="defaultConfigButton" onclick="getAppDefault()">Get</button> -->
+					</td>
 				</tr>
 			</table>
 		</div>
@@ -470,6 +473,13 @@
 			// sendButton     .disabled  = !sendEnabled;
 
 			return status;
+		}
+
+		async function getAppDefault() {
+			const serverUrl = serverUrlInput.value.trim();
+			const status    = await NumelApp.getDefault(serverUrl);
+			const message   = JSON.stringify(status);
+			alert(message);
 		}
 
 		appAgentSelect.disabled  = true;

@@ -203,7 +203,7 @@ def validate_config(config: AppConfig) -> bool:
 
 
 def unroll_config(config: AppConfig) -> AppConfig:
-	config_copy = copy.deepcopy(config)
+	config_copy = copy.deepcopy(config) if config is not None else AppConfig()
 
 	if not config_copy.backends      : config_copy.backends      = []
 	if not config_copy.models        : config_copy.models        = []

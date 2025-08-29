@@ -15,27 +15,34 @@ class NumelApp {
 		return status;
 	}
 
-	static async getStatus(url) {
-		const statusUrl = `${url}/status`;
-		const status    = await fetch(statusUrl, {
+	static async _get(url) {
+		const res = await fetch(url, {
 			headers: {
 				"Access-Control-Allow-Origin": "*",
 			},
 		}).then(async response => {
 			if (!response.ok) {
-				throw new Error(`HTTP error - status: ${response.status}`);
+				throw new Error(`HTTP error: ${response.status}`);
 			}
 			const result = await response.json();
 			result["error"] = null;
 			return result;
 		})
 		.catch(error => {
-			console.error("Error fetching status:", error);
+			console.error("Error fetching:", error);
 			const result = NumelApp._defaultStatus();
 			result["error"] = error;
 			return result;
 		});
-		return status;
+		return res;
+	}
+
+	static async getStatus(url) {
+		return NumelApp._get(url + "/status");
+	}
+
+	static async getDefault(url) {
+		return NumelApp._get(url + "/default");
 	}
 
 	static async create(url, userId, sessionId, subscriber) {
