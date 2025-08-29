@@ -1,8 +1,13 @@
 import argparse
+import asyncio
 import os
+import uvicorn
 
 
-from numel import App, AppConfig, load_config, module_prop_str, seed_everything
+from   fastapi                 import FastAPI
+from   fastapi.middleware.cors import CORSMiddleware
+
+from   numel                   import App, AppConfig, load_config, seed_everything
 
 
 parser = argparse.ArgumentParser(description="App configuration")
@@ -20,10 +25,50 @@ for module_name in impl_modules:
 	except Exception as e:
 		print(f"Error importing module '{module_name}': {e}")
 
-platform = App(config)
-app      = platform.generate_app()
-app_str  = module_prop_str(__file__, "app")
+app = App(config)
+
+agents_registry = []
+for i, agent in enumerate(app.agents):
+	agent_config = app.config.agents[agent.agent_index]
+	reg = {
+		"name" : agent_config.name,
+		"port" : app.config.port + agent.port_offset,
+	}
+	agents_registry.append(reg)
+
+app_status = {
+	"agents" : agents_registry,
+}
+
+status_app = FastAPI(title="Status")
+
+status_app.add_middleware(
+	CORSMiddleware,
+	allow_credentials = False,
+	allow_origins     = ["*"],
+	allow_methods     = ["*"],
+	allow_headers     = ["*"],
+)
+
+
+@status_app.get("/status")
+async def get_status():
+	return app_status
+
+
+async def run_servers():
+	status_config = uvicorn.Config(status_app, host="0.0.0.0", port=app.config.port)
+	status_server = uvicorn.Server(status_config)
+	servers       = [status_server]
+
+	for agent, reg in zip(app.agents, app_status["agents"]):
+		agent_app  = agent.generate_app()
+		app_config = uvicorn.Config(agent_app, host="0.0.0.0", port=reg["port"])
+		app_server = uvicorn.Server(app_config)
+		servers.append(app_server)
+
+	await asyncio.gather(*[server.serve() for server in servers])
 
 
 if __name__ == "__main__":
-	platform.launch(app_str)
+	asyncio.run(run_servers())

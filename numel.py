@@ -3,9 +3,9 @@ import json
 import os
 
 
-from collections.abc import Callable
-from pydantic        import BaseModel
-from typing          import Any, Dict, List, Optional, Tuple, Union
+from   collections.abc import Callable
+from   pydantic        import BaseModel
+from   typing          import Any, Dict, List, Optional, Required, Tuple, Union
 
 
 DEFAULT_SEED                                      : int  = 42
@@ -64,8 +64,8 @@ class BackendConfig(BaseModel):
 
 
 class ModelConfig(BaseModel):
-	type    : str = DEFAULT_MODEL_TYPE
-	id      : str = DEFAULT_MODEL_ID
+	type    : str           = DEFAULT_MODEL_TYPE
+	id      : str           = DEFAULT_MODEL_ID
 	path    : Optional[str] = None
 	wrapper : Optional[str] = None
 	version : Optional[str] = None
@@ -76,8 +76,8 @@ class ModelConfig(BaseModel):
 
 
 class EmbeddingConfig(BaseModel):
-	type    : str = DEFAULT_EMBEDDING_TYPE
-	id      : str = DEFAULT_EMBEDDING_ID
+	type    : str           = DEFAULT_EMBEDDING_TYPE
+	id      : str           = DEFAULT_EMBEDDING_ID
 	path    : Optional[str] = None
 	wrapper : Optional[str] = None
 	version : Optional[str] = None
@@ -88,110 +88,110 @@ class EmbeddingConfig(BaseModel):
 
 
 class KnowledgeDBConfig(BaseModel):
-	type        : str = DEFAULT_KNOWLEDGE_DB_TYPE
-	table_name  : str = DEFAULT_KNOWLEDGE_DB_TABLE_NAME
-	db_url      : str = DEFAULT_KNOWLEDGE_DB_URL
-	search_type : str = DEFAULT_KNOWLEDGE_DB_SEARCH_TYPE
+	type        : str           = DEFAULT_KNOWLEDGE_DB_TYPE
+	table_name  : str           = DEFAULT_KNOWLEDGE_DB_TABLE_NAME
+	db_url      : str           = DEFAULT_KNOWLEDGE_DB_URL
+	search_type : str           = DEFAULT_KNOWLEDGE_DB_SEARCH_TYPE
 	data        : Optional[Any] = None
 
 
 class KnowledgeConfig(BaseModel):
-	type  : str                           = DEFAULT_KNOWLEDGE_TYPE
+	type  : str                                     = DEFAULT_KNOWLEDGE_TYPE
 	db    : Optional[Union[KnowledgeDBConfig, int]] = None
-	model : Optional[Union[ModelConfig, int]] = None
-	urls  : Optional[List[str]] = None
-	data  : Optional[Any] = None
+	model : Optional[Union[ModelConfig, int]]       = None
+	urls  : Optional[List[str]]                     = None
+	data  : Optional[Any]                           = None
 
 
 class MemoryDBConfig(BaseModel):
-	type       : str = DEFAULT_MEMORY_DB_TYPE
-	table_name : str = DEFAULT_MEMORY_DB_TABLE_NAME
-	db_url     : str = DEFAULT_MEMORY_DB_URL
+	type       : str           = DEFAULT_MEMORY_DB_TYPE
+	table_name : str           = DEFAULT_MEMORY_DB_TABLE_NAME
+	db_url     : str           = DEFAULT_MEMORY_DB_URL
 	data       : Optional[Any] = None
 
 
 class MemoryConfig(BaseModel):
-	type       : str                        = DEFAULT_MEMORY_TYPE
+	type       : str                                  = DEFAULT_MEMORY_TYPE
 	db         : Optional[Union[MemoryDBConfig, int]] = None
-	model      : Optional[Union[ModelConfig, int]] = None
-	summarizer : Optional[Union[ModelConfig, int]] = None
-	data       : Optional[Any] = None
+	model      : Optional[Union[ModelConfig, int]]    = None
+	summarizer : Optional[Union[ModelConfig, int]]    = None
+	data       : Optional[Any]                        = None
 
 
 class StorageDBConfig(BaseModel):
-	type       : str = DEFAULT_STORAGE_DB_TYPE
-	table_name : str = DEFAULT_STORAGE_DB_TABLE_NAME
-	db_url     : str = DEFAULT_STORAGE_DB_URL
+	type       : str           = DEFAULT_STORAGE_DB_TYPE
+	table_name : str           = DEFAULT_STORAGE_DB_TABLE_NAME
+	db_url     : str           = DEFAULT_STORAGE_DB_URL
 	data       : Optional[Any] = None
 
 
 class StorageConfig(BaseModel):
-	type : str                         = DEFAULT_STORAGE_TYPE
+	type : str                                   = DEFAULT_STORAGE_TYPE
 	db   : Optional[Union[StorageDBConfig, int]] = None
-	data : Optional[Any] = None
+	data : Optional[Any]                         = None
 
 
 class ToolConfig(BaseModel):
-	type : str
+	type : str                      = Required
 	args : Optional[Dict[str, Any]] = None
-	ref  : Optional[str] = None
-	data : Optional[Any] = None
+	ref  : Optional[str]            = None
+	data : Optional[Any]            = None
 
 
 class OptionsConfig(BaseModel):
-	markdown                         : bool = DEFAULT_OPTIONS_MARKDOWN
-	search_knowledge                 : bool = DEFAULT_OPTIONS_SEARCH_KNOWLEDGE
-	enable_agentic_memory            : bool = DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY
-	add_history_to_messages          : bool = DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES
-	num_history_runs                 : int  = DEFAULT_OPTIONS_NUM_HISTORY_RUNS
-	enable_session_summaries         : bool = DEFAULT_OPTIONS_ENABLE_SESSION_SUMMARIES
-	search_previous_sessions_history : bool = DEFAULT_OPTIONS_SEARCH_PREVIOUS_SESSIONS_HISTORY
-	num_history_sessions             : int  = DEFAULT_OPTIONS_NUM_HISTORY_SESSIONS
-	show_tool_calls                  : bool = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
-	tool_call_limit                  : int  = DEFAULT_OPTIONS_TOOL_CALL_LIMIT
-	reasoning                        : bool = DEFAULT_OPTIONS_REASONING
-	stream_intermediate_steps        : bool = DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS
+	markdown                         : bool          = DEFAULT_OPTIONS_MARKDOWN
+	search_knowledge                 : bool          = DEFAULT_OPTIONS_SEARCH_KNOWLEDGE
+	enable_agentic_memory            : bool          = DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY
+	add_history_to_messages          : bool          = DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES
+	num_history_runs                 : int           = DEFAULT_OPTIONS_NUM_HISTORY_RUNS
+	enable_session_summaries         : bool          = DEFAULT_OPTIONS_ENABLE_SESSION_SUMMARIES
+	search_previous_sessions_history : bool          = DEFAULT_OPTIONS_SEARCH_PREVIOUS_SESSIONS_HISTORY
+	num_history_sessions             : int           = DEFAULT_OPTIONS_NUM_HISTORY_SESSIONS
+	show_tool_calls                  : bool          = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
+	tool_call_limit                  : int           = DEFAULT_OPTIONS_TOOL_CALL_LIMIT
+	reasoning                        : bool          = DEFAULT_OPTIONS_REASONING
+	stream_intermediate_steps        : bool          = DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS
 	data                             : Optional[Any] = None
 
 
 class AgentConfig(BaseModel):
-	backend      : Optional[Union[BackendConfig, int]]   = None
-	model        : Optional[Union[ModelConfig, int]]     = None
-	embedding    : Optional[Union[EmbeddingConfig, int]] = None
-	options      : Optional[Union[OptionsConfig, int]]   = None
-	version      : Optional[str] = None
-	name         : Optional[str] = None
-	author       : Optional[str] = None
-	description  : Optional[str] = None
-	instructions : Optional[List[str]] = None
+	backend      : Optional[Union[BackendConfig, int]]         = None
+	model        : Optional[Union[ModelConfig, int]]           = None
+	embedding    : Optional[Union[EmbeddingConfig, int]]       = None
+	options      : Optional[Union[OptionsConfig, int]]         = None
+	version      : Optional[str]                               = None
+	name         : Optional[str]                               = None
+	author       : Optional[str]                               = None
+	description  : Optional[str]                               = None
+	instructions : Optional[List[str]]                         = None
 	knowledge    : Optional[List[Union[KnowledgeConfig, int]]] = None
-	memory       : Optional[Union[MemoryConfig, int]] = None
-	storage      : Optional[Union[StorageConfig, int]] = None
-	tools        : Optional[List[ToolConfig]] = None
-	data         : Optional[Any] = None
+	memory       : Optional[Union[MemoryConfig, int]]          = None
+	storage      : Optional[Union[StorageConfig, int]]         = None
+	tools        : Optional[List[ToolConfig]]                  = None
+	data         : Optional[Any]                               = None
 
 
 class AppConfig(BaseModel):
-	port          : int                       = DEFAULT_APP_PORT
-	reload        : bool                      = DEFAULT_APP_RELOAD
+	port          : int                                 = DEFAULT_APP_PORT
+	reload        : bool                                = DEFAULT_APP_RELOAD
 	backend       : Optional[Union[BackendConfig, int]] = None
-	version       : Optional[str] = None
-	name          : Optional[str] = None
-	author        : Optional[str] = None
-	description   : Optional[str] = None
-	backends      : Optional[List[BackendConfig]] = None
-	models        : Optional[List[ModelConfig]] = None
-	embeddings    : Optional[List[EmbeddingConfig]] = None
-	knowledge_dbs : Optional[List[KnowledgeDBConfig]] = None
-	knowledges    : Optional[List[KnowledgeConfig]] = None
-	memory_dbs    : Optional[List[MemoryDBConfig]] = None
-	memories      : Optional[List[MemoryConfig]] = None
-	storage_dbs   : Optional[List[StorageDBConfig]] = None
-	storages      : Optional[List[StorageConfig]] = None
-	options       : Optional[List[OptionsConfig]] = None
-	agents        : Optional[List[AgentConfig]] = None
-	seed          : Optional[int] = None
-	data          : Optional[Any] = None
+	version       : Optional[str]                       = None
+	name          : Optional[str]                       = None
+	author        : Optional[str]                       = None
+	description   : Optional[str]                       = None
+	backends      : Optional[List[BackendConfig]]       = None
+	models        : Optional[List[ModelConfig]]         = None
+	embeddings    : Optional[List[EmbeddingConfig]]     = None
+	knowledge_dbs : Optional[List[KnowledgeDBConfig]]   = None
+	knowledges    : Optional[List[KnowledgeConfig]]     = None
+	memory_dbs    : Optional[List[MemoryDBConfig]]      = None
+	memories      : Optional[List[MemoryConfig]]        = None
+	storage_dbs   : Optional[List[StorageDBConfig]]     = None
+	storages      : Optional[List[StorageConfig]]       = None
+	options       : Optional[List[OptionsConfig]]       = None
+	agents        : Optional[List[AgentConfig]]         = None
+	seed          : Optional[int]                       = None
+	data          : Optional[Any]                       = None
 
 
 def validate_config(config: AppConfig) -> bool:
@@ -238,7 +238,6 @@ def unroll_config(config: AppConfig) -> AppConfig:
 	knowledge_db_url_base = None
 	knowledge_db_index    = 0
 	if True:
-		db_index   = 0
 		db_url_len = 0
 		for db in config_copy.knowledge_dbs:
 			if getattr(db, "_counter", 0) != 0 and db.db_url:
@@ -248,7 +247,6 @@ def unroll_config(config: AppConfig) -> AppConfig:
 	memory_db_url_base = None
 	memory_db_index    = 0
 	if True:
-		db_index   = 0
 		db_url_len = 0
 		for db in config_copy.memory_dbs:
 			if getattr(db, "_counter", 0) != 0 and db.db_url:
@@ -432,9 +430,13 @@ def module_prop_str(file_path: str, property_name: str) -> str:
 
 class AppImpl:
 
-	def __init__(self, config: AppConfig):
-		stugre = copy.deepcopy(config)
-		self.config = copy.deepcopy(config)
+	def __init__(self, config: AppConfig, agent_index: int, port_offset: int):
+		if agent_index < 0 or agent_index >= len(config.agents) or port_offset <= 0:
+			raise ValueError("Invalid Agno app configuration")
+
+		self.config      = copy.deepcopy(config)
+		self.agent_index = agent_index
+		self.port_offset = port_offset
 
 
 	def is_valid(self) -> bool:
@@ -462,21 +464,28 @@ class App:
 	def __init__(self, config: AppConfig):
 		if not validate_config(config):
 			raise ValueError("Invalid app configuration")
-		
-		config_copy = unroll_config(config)
-		backend     = config_copy.backends[config_copy.backend]
 
-		self.d      = App._backends[(backend.type, backend.version)](config_copy)
-		self.config = self.d.config
+		config_copy = unroll_config(config)
+
+		agents = []
+		for i, agent in enumerate(config.agents):
+			backend = config_copy.backends[agent.backend]
+			agent   = App._backends[(backend.type, backend.version)](config_copy, i, i + 1)
+			if agent.is_valid():
+				agents.append(agent)
+
+		self.agents = agents
+		self.config = config
 
 
 	def is_valid(self) -> bool:
-		return self.d.is_valid()
+		return len(self.agents) != 0
 
 
-	def generate_app(self) -> Any:
-		return self.d.generate_app()
+	# def generate_app(self) -> Any:
+	# 	apps = [agent.generate_app() for agent in self.agents]
+	# 	return apps
 
 
-	def launch(self, app: str) -> None:
-		self.d.launch(app)
+	# def launch(self, app: str) -> None:
+	# 	self.d.launch(app)

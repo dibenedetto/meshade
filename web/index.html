@@ -94,7 +94,7 @@
 		}
 
 		.status {
-			margin: 10px 0;
+			margin: 15px 0;
 			padding: 8px;
 			border-radius: 4px;
 			font-size: 0.9em;
@@ -105,15 +105,15 @@
 		.status.disconnected { background: #f8d7da; color: #721c24; }
 
 		.config {
-			margin-bottom: 20px;
-			padding: 15px;
+			margin-bottom: 15px;
+			padding: 10px;
 			background: #e9ecef;
 			border-radius: 6px;
 		}
 
 		.config input {
 			width: 100%;
-			padding: 8px;
+			padding: 5px;
 			border: 1px solid #ccc;
 			border-radius: 4px;
 			margin: 5px 0;
@@ -124,6 +124,12 @@
 			color: #6c757d;
 			font-style: italic;
 		}
+
+		.input-row {
+			display: flex;
+			align-items: center; /* vertically align label and input */
+			gap: 0.5em; /* space between label and input */
+		}
 	</style>
 </head>
 <body>
@@ -131,15 +137,40 @@
 		<h1>Numel AI Playground</h1>
 
 		<div class="config">
-			<label for="serverUrl">Agent Server URL:</label>
-			<input type="url" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000" />
-			<label for="sessionId">Session ID:</label>
-			<input type="text" id="sessionId" value="" placeholder="Optional session ID" />
-			<label for="systemMessage">Show System Messages:</label>
-			<input type="checkbox" id="systemMessage" value="true" />
+			<table>
+				<tr>
+					<td><label for="serverUrl">Agent Server URL:</label></td>
+					<td><input type="url" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000" /></td>
+				</tr>
+				<tr>
+					<td><label for="agents">Agents:</label></td>
+					<td>
+						<button id="appStatusButton" onclick="getAppStatus()">&#x21bb;</button>
+						&nbsp;&nbsp;
+						<select id="appAgentSelect"><option value="-1"> - None - </option></select>
+					</td>
+				</tr>
+				<tr>
+					<td><label for="sessionId">Session ID:</label></td>
+					<td><input type="text" id="sessionId" value="" placeholder="Optional Session ID" /></td>
+				</tr>
+				<tr>
+					<td><label for="userId">User ID:</label></td>
+					<td><input type="text" id="userId" value="" placeholder="Optional User ID" /></td>
+				</tr>
+			</table>
 		</div>
 
 		<div id="status" class="status disconnected">Not connected</div>
+
+		<div class="config">
+			<table>
+				<tr>
+					<td><label for="systemMessage">Show System Messages:</label></td>
+					<td><input type="checkbox" id="systemMessage" value="true" /></td>
+				</tr>
+			</table>
+		</div>
 
 		<div id="chatContainer" class="chat-container"></div>
 
@@ -156,100 +187,200 @@
 	<script src="dist/agui-client.bundle.js"></script>
 
 	<script>
-		class AGUIClientAgent extends AGUI.HttpAgent
-		{
-			constructor(options, subscriber) {
-				super(options);
-
-				if (subscriber) {
-					super.subscribe(subscriber);
-				}
+		class NumelApp {
+			static _randomId() {
+				const rmax = 1000000000.0;
+				const id   = Math.floor(Math.random() * rmax);
+				return id;
 			}
 
-			async sendMessage(message) {
-				const messageId   = "test-msg";
+			static _defaultStatus() {
+				const status = {
+					"agents" : [],
+				};
+				return status;
+			}
+
+			static async fetchStatus(url) {
+				if (false)
+				{
+					return {
+						"agents": [
+							{
+								"name": "Gre Vis",
+								"port": 8001,
+							},
+						],
+					};
+				}
+				const statusUrl = `${url}/status`;
+				const status    = await fetch(statusUrl, {
+					headers: {
+						"Access-Control-Allow-Origin": "*",
+					},
+				}).then(response => {
+					if (!response.ok) {
+						throw new Error(`HTTP error - status: ${response.status}`);
+					}
+					return response.json();
+				})
+				.catch(error => {
+					console.error("Error fetching status:", error);
+					return NumelApp._defaultStatus();
+				});
+				return status;
+			}
+
+			constructor(url, subscriber) {
+				this.url        = url;
+				this.subscriber = subscriber;
+				this.status     = NumelApp._defaultStatus();
+				this.agent      = null;
+				this.agentIndex = -1;
+			}
+
+			clear() {
+				this.disconnect();
+				this.status     = NumelApp._defaultStatus();
+				this.agent      = null;
+				this.agentIndex = -1;
+			}
+
+			async updateStatus() {
+				this.status = await NumelApp.fetchStatus(this.url);
+				return this.status;
+			}
+
+			connect(index) {
+				this.disconnect();
+				const agents = this.status["agents"] ?? null;
+				if (!agents || (index < 0) || (index >= agents.length)) {
+					return false;
+				}
+				const info    = agents[index];
+				const baseUrl = this.url.substr(0, this.url.lastIndexOf(":"));
+				const port    = info["port"] + index;
+				const url     = `${baseUrl}:${port}/agui`;
+				const agent   = new AGUI.HttpAgent({
+					name    : info["name"],
+					url     : url,
+					// headers : {
+					// 	"Access-Control-Allow-Origin": "*",
+					// },
+				});
+				if (this.subscriber) {
+					agent.subscribe(this.subscriber);
+				}
+				this.agent    = agent
+				this.agentIdx = index;
+				return true;
+			}
+
+			disconnect() {
+				if (!this.isConnected()) {
+					return false;
+				}
+				this.agent    = null;
+				this.agentIdx = -1;
+				return true;
+			}
+
+			isConnected() {
+				return (this.agent != null);
+			}
+
+			agentIndex() {
+				return this.agentIdx;
+			}
+
+			async send(message) {
+				const messageId   = `numel-message-${NumelApp._randomId()}`;
 				const userMessage = {
 					id      : messageId,
 					role    : "user",
 					content : message,
 				};
-				this.setMessages([userMessage]);
-				return await this.runAgent({});
+				this.agent.setMessages([userMessage]);
+				return await this.agent.runAgent({});
 			}
 		};
 
-		let aguiClient  = null;
+		let aguiApp     = null;
 		let isConnected = false;
+		let agentIndex  = -1;
 
 		let messagePrevRole    = null;
 		let messagePrevElement = null;
 
 		// DOM elements
-		const chatContainer = document.getElementById('chatContainer');
-		const messageInput = document.getElementById('messageInput');
-		const sendButton = document.getElementById('sendButton');
-		const connectButton = document.getElementById('connectButton');
-		const statusDiv = document.getElementById('status');
-		const serverUrlInput = document.getElementById('serverUrl');
-		const sessionIdInput = document.getElementById('sessionId');
-		const loadingDiv = document.getElementById('loading');
-		const systemMsgButton = document.getElementById('systemMessage');
+		const chatContainer   = document.getElementById("chatContainer");
+		const messageInput    = document.getElementById("messageInput");
+		const sendButton      = document.getElementById("sendButton");
+		const connectButton   = document.getElementById("connectButton");
+		const statusDiv       = document.getElementById("status");
+		const serverUrlInput  = document.getElementById("serverUrl");
+		const sessionIdInput  = document.getElementById("sessionId");
+		const userIdInput     = document.getElementById("userId");
+		const loadingDiv      = document.getElementById("loading");
+		const systemMsgButton = document.getElementById("systemMessage");
+		const appStatusButton = document.getElementById("appStatusButton");
+		const appAgentSelect  = document.getElementById("appAgentSelect");
 
 		function clearChat() {
-			chatContainer.innerHTML = '';
+			messagePrevRole         = null;
+			messagePrevElement      = null;
+			chatContainer.innerHTML = "";
 		}
 
 		function changeSystemVisibility() {
-			const divs    = document.getElementsByClassName('message system');
-			const display = this.checked ? 'block' : 'none';
+			const divs    = document.getElementsByClassName("message system");
+			const display = this.checked ? "block" : "none";
 			for (let dv of divs) {
 				dv.style.display = display;
 			}
 		}
 
-		systemMsgButton.addEventListener('change', changeSystemVisibility);
-
 		// Check if AG-UI client is loaded
 		function checkAGUILoaded() {
-			if (typeof AGUI !== 'undefined' && AGUI.HttpAgent) {
-				loadingDiv.style.display = 'none';
-				addMessage('system', '✅ AG-UI client loaded successfully');
+			if (typeof AGUI !== "undefined" && AGUI.HttpAgent) {
+				loadingDiv.style.display = "none";
+				addMessage("system", "✅ AG-UI client loaded successfully");
 			} else {
-				loadingDiv.style.display = 'block';
-				loadingDiv.textContent = '❌ Failed to load AG-UI client. Make sure agui-client.bundle.js is built and available.';
-				addMessage('system-error', '❌ Error: AG-UI client not found. Please build the bundle first.');
+				loadingDiv.style.display = "block";
+				loadingDiv.textContent = "❌ Failed to load AG-UI client. Make sure agui-client.bundle.js is built and available.";
+				addMessage("system-error", "❌ Error: AG-UI client not found. Please build the bundle first.");
 			}
 		}
 
-		function connect() {
+		function enableAppInput(enable) {
+			serverUrlInput  .disabled = !enable;
+			sessionIdInput  .disabled = !enable;
+			userIdInput     .disabled = !enable;
+			appStatusButton .disabled = !enable;
+			appAgentSelect  .disabled = !enable;
+		}
+
+		async function connect() {
 			const serverUrl = serverUrlInput.value.trim();
 			const sessionId = sessionIdInput.value.trim();
 
 			if (!serverUrl) {
-				addMessage('system', '⚠️ Please enter a valid server URL');
+				addMessage("system", "⚠️ Please enter a valid server URL");
 				return;
 			}
 
-			if (typeof AGUI === 'undefined' || !AGUI.HttpAgent) {
-				addMessage('system', '⚠️ AG-UI client not loaded. Please build the bundle first.');
+			if (typeof AGUI === "undefined" || !AGUI.HttpAgent) {
+				addMessage("system", "⚠️ AG-UI client not loaded. Please build the bundle first.");
 				return;
 			}
 
-			updateStatus('connecting', 'Connecting...');
+			enableAppInput(false);
+
+			updateStatus("connecting", "Connecting...");
 
 			try {
-				clearChat();
-
-				endpoint = '/agui' // Specify the agno endpoint
-				url = `${serverUrl}${endpoint}`
-				// Initialize AG-UI HttpAgent
-				// aguiClient = new AGUI.HttpAgent({
-				aguiClient = new AGUIClientAgent({
-					url: url,
-					headers: {
-						'Access-Control-Allow-Origin': '*',
-					},
-				}, {
+				aguiApp = new NumelApp(serverUrl,
+				{
 					onRunInitialized          (params) { handleAGUIEvent(params.event); },
 					onRunFailed               (params) { handleAGUIEvent(params.event); },
 					onRunFinalized            (params) { handleAGUIEvent(params.event); },
@@ -277,36 +408,42 @@
 					onNewToolCall             (params) { handleAGUIEvent(params.event); },
 				});
 
-				isConnected = true;
-				updateStatus('connected', 'AG-UI client ready');
-				enableInput(true);
-				connectButton.textContent = 'Disconnect';
-				addMessage('system', `✅ AG-UI client initialized for ${url}`);
-				addMessage('agent', 'Hi, I am Numel, a helpful AI playground. Ask me anything you want 🙂');
+				await aguiApp.updateStatus();
+				aguiApp.connect(agentIndex);
 
+				isConnected = true;
+
+				clearChat();
+				updateStatus("connected", "AG-UI client ready");
+				enableInput(true);
+				connectButton.textContent = "Disconnect";
+				addMessage("system", `✅ AG-UI client initialized for ${serverUrl}`);
+				addMessage("agent", "Hi, I am Numel, a helpful AI playground. Ask me anything you want 🙂");
 			} catch (error) {
-				console.error('Failed to initialize AG-UI client:', error);
-				addMessage('system-error', `❌ Connection failed: ${error.message}`);
-				updateStatus('disconnected', 'Connection failed');
+				console.error("Failed to initialize AG-UI client:", error);
+				addMessage("system-error", `❌ Connection failed: ${error.message}<br/>`);
+				updateStatus("disconnected", "Connection failed");
+				enableAppInput(true);
 			}
 		}
 
 		function disconnect() {
-			if (aguiClient) {
-				// aguiClient.disconnect();
-				aguiClient = null;
+			if (aguiApp) {
+				// aguiApp.disconnect();
+				aguiApp = null;
 			}
 
 			isConnected = false;
-			updateStatus('disconnected', 'Disconnected');
+			updateStatus("disconnected", "Disconnected");
 			enableInput(false);
-			connectButton.textContent = 'Connect';
-			addMessage('system', 'ℹ️ Disconnected from agent');
-			addMessage('agent', 'See you soon 👋');
+			connectButton.textContent = "Connect";
+			addMessage("system", "ℹ️ Disconnected from agent");
+			addMessage("agent", "See you soon 👋");
+			enableAppInput(true);
 		}
 
 		function handleAGUIEvent(event) {
-			console.log('AG-UI Event:', event);
+			console.log("AG-UI Event:", event);
 
 			if (!event) return;
 
@@ -314,103 +451,71 @@
 			switch (event.type) {
 				case AGUI.EventType.TEXT_MESSAGE_CONTENT:
 				case AGUI.EventType.TEXT_MESSAGE_CHUNK:
-					const content = event.delta || 'No content';
-					addMessage('agent', content);
+					const content = event.delta || "No content";
+					addMessage("agent", content);
 					break;
 
 				case AGUI.EventType.TEXT_MESSAGE_START:
-					addMessage('system', '🤖 Agent is responding...');
+					addMessage("system", "🤖 Agent is responding...");
 					break;
 
 				case AGUI.EventType.TEXT_MESSAGE_END:
-					addMessage('system', '✅ Response complete');
+					addMessage("system", "✅ Response complete");
 					break;
 
 				case AGUI.EventType.RUN_STARTED:
-					addMessage('system', '🚀 Agent run started');
+					addMessage("system", "🚀 Agent run started");
 					break;
 
 				case AGUI.EventType.RUN_FINISHED:
-					addMessage('system', '🏁 Agent run finished');
+					addMessage("system", "🏁 Agent run finished");
 					break;
 
 				case AGUI.EventType.RUN_ERROR:
-					addMessage('system-error', `❌ Error: ${event.error || 'Unknown error'}`);
+					addMessage("system-error", `❌ Error: ${event.error || "Unknown error"}`);
 					break;
 
 				case AGUI.EventType.TOOL_CALL_START:
-					addMessage('system', `🔧 Tool call: ${event.tool_name || 'unknown'}`);
+					addMessage("system", `🔧 Tool call: ${event.tool_name || "unknown"}`);
 					break;
 
 				case AGUI.EventType.TOOL_CALL_RESULT:
-					addMessage('system', `✅ Tool result received`);
+					addMessage("system", `✅ Tool result received`);
 					break;
 
 				default:
 					// Handle other AG-UI event types
-					addMessage('system', `ℹ️ Event: ${event.type}`);
-					console.log('Unhandled event:', event);
+					addMessage("system", `ℹ️ Event: ${event.type}`);
+					console.log("Unhandled event:", event);
 			}
 		}
 
 		async function sendMessage() {
 			const message = messageInput.value.trim();
-			if (!message || !isConnected || !aguiClient) return;
+			if (!message || !isConnected || !aguiApp) return;
 
-			addMessage('user', message);
-			messageInput.value = '';
+			addMessage("user", message);
+			messageInput.value = "";
 			sendButton.disabled = true;
-			sendButton.textContent = 'Sending...';
+			sendButton.textContent = "Sending...";
 
 			try {
-				// const sessionId = sessionIdInput.value.trim() || `session_${Date.now()}`;
-
-				// // Create RunAgentInput
-				// const input = {
-				// 	messages: [{
-				// 		role: 'user',
-				// 		content: message
-				// 	}],
-				// 	session_id: sessionId,
-				// 	stream: true
-				// };
-
-				// // Use the HttpAgent to run the request
-				// const response = await aguiClient.run(input);
-
-				// // Handle the streaming response
-				// if (response && response.body) {
-				// 	const reader = response.body.getReader();
-
-				// 	try {
-				// 		// Parse the SSE stream
-				// 		for await (const event of AGUI.parseSSEStream(reader)) {
-				// 			handleAGUIEvent(event);
-				// 		}
-				// 	} catch (streamError) {
-				// 		console.error('Stream parsing error:', streamError);
-				// 		addMessage('system', `Stream error: ${streamError.message}`);
-				// 	}
-				// } else {
-				// 	addMessage('system', 'No response received from agent');
-				// }
-
-				await aguiClient.sendMessage(message);
+				await aguiApp.send(message);
 			} catch (error) {
-				console.error('Failed to send message:', error);
-				addMessage('system-error', `❌ Failed to send message: ${error.message}`);
+				console.error("Failed to send message:", error);
+				addMessage("system-error", `❌ Failed to send message: ${error.message}`);
 			} finally {
 				sendButton.disabled = false;
-				sendButton.textContent = 'Send';
+				sendButton.textContent = "Send";
 			}
 		}
 
 		function addMessage(role, content) {
 			if (messagePrevRole != role) {
-				const messageDiv = document.createElement('div');
+				const messageDiv = document.createElement("div");
 				messageDiv.className = `message ${role}`;
-				if (role == 'system') {
-					const display = systemMsgButton.checked ? 'block' : 'none';
+				if (role == "system") {
+					const display = systemMsgButton.checked ? "block" : "none";
 					messageDiv.style.display = display;
 				}
 				messageDiv.innerHTML = content;
@@ -418,7 +523,7 @@
 				messagePrevRole    = role;
 				messagePrevElement = messageDiv;
 			} else {
-				if (role == 'system') {
+				if (role == "system") {
 					content = `<br/>${content}`;
 				}
 				messagePrevElement.innerHTML += content;
@@ -432,8 +537,9 @@
 		}
 
 		function enableInput(enabled) {
-			messageInput.disabled = !enabled;
-			sendButton.disabled = !enabled;
+			systemMsgButton .disabled = !enabled;
+			messageInput    .disabled = !enabled;
+			sendButton      .disabled = !enabled;
 		}
 
 		function toggleConnection() {
@@ -444,16 +550,56 @@
 			}
 		}
 
+		async function getAppStatus() {
+			enableInput    (false);
+			enableAppInput (false);
+
+			const serverUrl = serverUrlInput.value.trim();
+			const status    = await NumelApp.fetchStatus(serverUrl);
+			const agents    = status["agents"];
+			let   content   = "";
+			if (agents.length == 0) {
+				agentIndex = -1;
+				content    = "<option value='-1'> - None - </option>";
+			}
+			else {
+				agentIndex = 0;
+				for (let i=0; i<agents.length; ++i) {
+					let selected = (i == agentIndex) ? " selected" : "";
+					content += `<option value="${i}"${selected}>${agents[i]["name"]}</option>`;
+				}
+			}
+
+			enableInput    (true);
+			enableAppInput (true);
+
+			appAgentSelect.innerHTML = content;
+			appAgentSelect.disabled  = false;
+		}
+
+		appAgentSelect.disabled  = true;
+
 		// Event listeners
-		messageInput.addEventListener('keypress', (e) => {
-			if (e.key === 'Enter' && !e.shiftKey) {
+		serverUrlInput.addEventListener("change", (e) => {
+			appAgentSelect.disabled  = true;
+			appAgentSelect.innerHTML = "<option value='-1'> - None - </option>";
+		});
+
+		appAgentSelect.addEventListener("change", (e) => {
+			agentIndex = this.value;
+		});
+
+		systemMsgButton.addEventListener("change", changeSystemVisibility);
+
+		messageInput.addEventListener("keypress", (e) => {
+			if (e.key === "Enter" && !e.shiftKey) {
 				e.preventDefault();
 				sendMessage();
 			}
 		});
 
 		// Initialize when page loads
-		document.addEventListener('DOMContentLoaded', () => {
+		document.addEventListener("DOMContentLoaded", () => {
 			checkAGUILoaded();
 		});
 

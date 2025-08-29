@@ -1,23 +1,22 @@
-from typing                    import Any
+from   typing                    import Any
+  
+  
+from   agno.agent                import Agent
+from   agno.app.agui.app         import AGUIApp
+from   agno.knowledge.combined   import CombinedKnowledgeBase
+from   agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
+from   agno.memory.v2.db.sqlite  import SqliteMemoryDb
+from   agno.memory.v2.memory     import Memory
+from   agno.memory.v2.summarizer import SessionSummarizer
+from   agno.models.openai        import OpenAIChat
+from   agno.storage.sqlite       import SqliteStorage
+from   agno.tools.duckduckgo     import DuckDuckGoTools
+from   agno.tools.reasoning      import ReasoningTools
+from   agno.vectordb.lancedb     import LanceDb
+from   agno.vectordb.search      import SearchType
 
 
-from agno.agent                import Agent
-from agno.app.agui.app         import AGUIApp
-from agno.knowledge.combined   import CombinedKnowledgeBase
-from agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
-from agno.memory.v2.db.sqlite  import SqliteMemoryDb
-from agno.memory.v2.memory     import Memory
-from agno.memory.v2.summarizer import SessionSummarizer
-from agno.models.openai        import OpenAIChat
-from agno.storage.sqlite       import SqliteStorage
-from agno.tools                import tool
-from agno.tools.duckduckgo     import DuckDuckGoTools
-from agno.tools.reasoning      import ReasoningTools
-from agno.vectordb.lancedb     import LanceDb
-from agno.vectordb.search      import SearchType
-
-
-from numel import (
+from   numel                     import (
 	App,
 	AppConfig,
 	AppImpl,
@@ -33,30 +32,6 @@ from numel import (
 	compatible_backends,
 )
 
-import asyncio
-
-
-@tool
-async def start_webcam_stream(duration_seconds: int = 10, interval_seconds: int = 2):
-	"""
-	Start webcam streaming that captures frames periodically.
-	
-	Args:
-		duration_seconds: How long to stream (default 30s)
-		interval_seconds: Interval between captures (default 5s)
-	"""
-	# results = []
-	for i in range(duration_seconds // interval_seconds):
-		# Simulate analysis (you could call vision models here)
-		timestamp = i * interval_seconds
-		item = f"Frame {i+1} at {timestamp}s: Webcam active, frame captured"
-		yield item
-
-		# Wait for next interval
-		await asyncio.sleep(interval_seconds)
-	
-	# return f"Webcam stream completed. Captured {len(results)} frames: " + "; ".join(results)
-	yield "-- done --"
 
 def agno_validate_config(config: AppConfig) -> bool:
 	# TODO: Implement validation logic for the Agno app configuration
@@ -65,19 +40,14 @@ def agno_validate_config(config: AppConfig) -> bool:
 
 class AgnoAppImpl(AppImpl):
 
-	def __init__(self, config: AppConfig):
-		super().__init__(config)
+	def __init__(self, config: AppConfig, agent_index: int, port_offset: int):
+		super().__init__(config, agent_index, port_offset)
 
 		if not agno_validate_config(self.config):
 			raise ValueError("Invalid Agno app configuration")
 
-		agent_config = None
-		for agent in self.config.agents:
-			if agent_config is None and compatible_backends(config.backends[config.backend], config.backends[agent.backend]):
-				agent_config = agent
-				break
-
-		if not agent_config:
+		agent_config = self.config.agents[self.agent_index]
+		if not agent_config or not compatible_backends(config.backends[config.backend], config.backends[agent_config.backend]):
 			raise ValueError("Agno agent configuration not found")
 
 		def get_model(model_config: ModelConfig, do_raise: bool) -> Any:
@@ -249,8 +219,8 @@ class AgnoAppImpl(AppImpl):
 				elif tool_config.type == "web_search":
 					max_results = tool_config.args.get("max_results", DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS)
 					tool = DuckDuckGoTools(fixed_max_results=max_results)
-				elif tool_config.type == "webcam":
-					tool = start_webcam_stream
+				# elif tool_config.type == "webcam":
+				# 	tool = start_webcam_stream
 				else:
 					pass
 			if tool is not None:
@@ -311,7 +281,7 @@ class AgnoAppImpl(AppImpl):
 
 
 	def launch(self, app: str) -> None:
-		self.agui_app.serve(app=app, port=self.config.port, reload=self.config.reload)
+		self.agui_app.serve(app=app, port=self.config.port + self.port_offset, reload=self.config.reload)
 
 
 App.register("agno", "", AgnoAppImpl)
