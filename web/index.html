@@ -202,8 +202,8 @@
 	<script src="./numel.js"></script>
 
 	<script>
-		const startMessage = "Hi, I am Numel, an AI playground. Ask me anything you want 🙂";
-		const endMessage   = "See you soon 👋";
+		const startMessage = "🤖 Hi, I am Numel, an AI playground. Ask me anything you want 🙂";
+		const endMessage   = "🤖 See you soon 👋";
 
 		let aguiApp     = null;
 		let isConnected = false;
@@ -279,7 +279,7 @@
 			updateStatus("connecting", "Connecting...");
 
 			try {
-				status = await getAppStatus();
+				const status = await getAppStatus();
 				if (status["error"]) {
 					throw "zune!";
 				}
@@ -300,7 +300,7 @@
 				enableInput(true);
 				connectButton.textContent = "Disconnect";
 				addMessage("system", `✅ AG-UI client initialized for ${serverUrl}`);
-				addMessage("agent", startMessage);
+				addMessage("ui", startMessage);
 			} catch (error) {
 				console.error("Failed to initialize AG-UI client:", error);
 				addMessage("system-error", `❌ Connection failed: ${error.message}<br/>`);
@@ -319,7 +319,7 @@
 			enableInput(false);
 			connectButton.textContent = "Connect";
 			addMessage("system", "ℹ️ Disconnected from agent");
-			addMessage("agent", endMessage);
+			addMessage("ui", endMessage);
 			enableAppInput(true);
 		}
 
@@ -378,7 +378,7 @@
 			if (agentPrevIndex != agentCurrIndex) {
 				agentPrevIndex = agentCurrIndex;
 				agentName      = aguiApp.status["config"]["agents"][agentPrevIndex]["name"];
-				addMessage("ui", `🤖 Talking to Agent "${agentName}" (index ${agentPrevIndex})`);
+				addMessage("ui", `🤖 Talking to Agent "${agentName}"`);
 			}
 
 			messageInput    .value       = "";
@@ -468,6 +468,8 @@
 			appAgentSelect .disabled  = false;
 			// connectButton  .disabled  = false;
 			// sendButton     .disabled  = !sendEnabled;
+
+			return status;
 		}
 
 		appAgentSelect.disabled  = true;

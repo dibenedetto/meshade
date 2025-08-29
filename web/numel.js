@@ -21,11 +21,11 @@ class NumelApp {
 			headers: {
 				"Access-Control-Allow-Origin": "*",
 			},
-		}).then(response => {
+		}).then(async response => {
 			if (!response.ok) {
 				throw new Error(`HTTP error - status: ${response.status}`);
 			}
-			const result = response.json();
+			const result = await response.json();
 			result["error"] = null;
 			return result;
 		})
@@ -33,7 +33,7 @@ class NumelApp {
 			console.error("Error fetching status:", error);
 			const result = NumelApp._defaultStatus();
 			result["error"] = error;
-			return NumelApp._defaultStatus();
+			return result;
 		});
 		return status;
 	}
