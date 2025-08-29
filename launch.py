@@ -35,9 +35,9 @@ app_status = {
 	"config" : app.config,
 }
 
-status_app = FastAPI(title="Status")
+ctrl_app = FastAPI(title="Status")
 
-status_app.add_middleware(
+ctrl_app.add_middleware(
 	CORSMiddleware,
 	allow_credentials = False,
 	allow_origins     = ["*"],
@@ -46,12 +46,12 @@ status_app.add_middleware(
 )
 
 
-@status_app.get("/status")
+@ctrl_app.get("/status")
 async def get_status():
 	return app_status
 
 
-@status_app.get("/default")
+@ctrl_app.get("/default")
 async def get_default():
 	def_value = {
 		"config" : unroll_config(),
@@ -60,16 +60,16 @@ async def get_default():
 
 
 async def run_servers():
-	localhost = "0.0.0.0"
+	host = "0.0.0.0"
 
-	status_config = uvicorn.Config(status_app, host=localhost, port=app.config.port)
-	status_server = uvicorn.Server(status_config)
-	servers       = [status_server]
+	ctrl_config = uvicorn.Config(ctrl_app, host=host, port=app.config.port)
+	ctrl_server = uvicorn.Server(ctrl_config)
+	servers     = [ctrl_server]
 
 	for agent in app.agents:
 		agent_app    = agent.generate_app()
 		agent_port   = app.config.agents[agent.agent_index].port
-		agent_config = uvicorn.Config(agent_app, host=localhost, port=agent_port)
+		agent_config = uvicorn.Config(agent_app, host=host, port=agent_port)
 		agent_server = uvicorn.Server(agent_config)
 		servers.append(agent_server)
 

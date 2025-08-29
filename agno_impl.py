@@ -8,6 +8,7 @@ from   agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
 from   agno.memory.v2.db.sqlite  import SqliteMemoryDb
 from   agno.memory.v2.memory     import Memory
 from   agno.memory.v2.summarizer import SessionSummarizer
+from   agno.models.ollama        import Ollama
 from   agno.models.openai        import OpenAIChat
 from   agno.storage.sqlite       import SqliteStorage
 from   agno.tools.duckduckgo     import DuckDuckGoTools
@@ -54,6 +55,8 @@ class AgnoAgentApp(AgentApp):
 			if model_config:
 				if model_config.type == "openai":
 					return OpenAIChat(id=model_config.id)
+				if model_config.type == "ollama":
+					return Ollama(id=model_config.id)
 			if do_raise:
 				raise ValueError(f"Unsupported Agno model")
 			return None
@@ -70,9 +73,9 @@ class AgnoAgentApp(AgentApp):
 		def get_search_type(value: str, do_raise: bool) -> SearchType:
 			if value == "hybrid":
 				return SearchType.hybrid
-			elif value == "keyword":
+			if value == "keyword":
 				return SearchType.keyword
-			elif value == "vector":
+			if value == "vector":
 				return SearchType.vector
 			if do_raise:
 				raise ValueError(f"Invalid Agno db search type: {value}")

@@ -17,15 +17,15 @@
 
 	"models" : [
 		{
-			"type" : "openai",
-			"id"   : "gpt-4o"
+			"type" : "ollama",
+			"id"   : "mistral"
 		}
 	],
 
 	"embeddings" : [
 		{
-			"type" : "openai",
-			"id"   : "gpt-4o"
+			"type" : "ollama",
+			"id"   : "mistral"
 		}
 	],
 

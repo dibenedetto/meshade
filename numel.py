@@ -15,11 +15,11 @@ DEFAULT_API_KEY                                   : str  = None
 DEFAULT_BACKEND_TYPE                              : str  = "agno"
 DEFAULT_BACKEND_VERSION                           : str  = ""
 
-DEFAULT_MODEL_TYPE                                : str  = "openai"
-DEFAULT_MODEL_ID                                  : str  = "gpt-4o"
+DEFAULT_MODEL_TYPE                                : str  = "ollama"
+DEFAULT_MODEL_ID                                  : str  = "deepseek-r1:8b"
 
-DEFAULT_EMBEDDING_TYPE                            : str  = "openai"
-DEFAULT_EMBEDDING_ID                              : str  = "gpt-4o"
+DEFAULT_EMBEDDING_TYPE                            : str  = "ollama"
+DEFAULT_EMBEDDING_ID                              : str  = "deepseek-r1:8b"
 
 DEFAULT_KNOWLEDGE_DB_TYPE                         : str  = "lancedb"
 DEFAULT_KNOWLEDGE_DB_TABLE_NAME                   : str  = "knowledge"

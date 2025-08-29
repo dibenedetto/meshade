@@ -7,6 +7,7 @@ lancedb
 langchain-text-splitters
 langdetect
 numpy
+ollama
 openai
 pillow
 pydicom
