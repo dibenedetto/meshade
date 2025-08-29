@@ -62,7 +62,7 @@
 		}
 
 		.message.ui {
-			background: #6c757d;
+			background: #365138;
 			color: white;
 			font-size: 0.9em;
 		}
@@ -198,7 +198,7 @@
 	</div>
 
 	<!-- Include the bundled AG-UI client -->
-	<script src="dist/agui-client.bundle.js"></script>
+	<script src="./dist/agui-client.bundle.js"></script>
 	<script src="./numel.js"></script>
 
 	<script>
@@ -327,12 +327,9 @@
 		}
 
 		function disconnect() {
-			if (aguiApp) {
-				aguiApp.disconnect();
-				aguiApp = null;
-			}
-
+			aguiApp     = null;
 			isConnected = false;
+
 			updateStatus("disconnected", "Disconnected");
 			enableInput(false);
 			connectButton.textContent = "Connect";
