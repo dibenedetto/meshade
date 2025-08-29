@@ -1,4 +1,5 @@
 class NumelApp {
+
 	static _randomId() {
 		const rmax = 1000000000.0;
 		const id   = Math.floor(Math.random() * rmax);
@@ -24,10 +25,14 @@ class NumelApp {
 			if (!response.ok) {
 				throw new Error(`HTTP error - status: ${response.status}`);
 			}
-			return response.json();
+			const result = response.json();
+			result["error"] = null;
+			return result;
 		})
 		.catch(error => {
 			console.error("Error fetching status:", error);
+			const result = NumelApp._defaultStatus();
+			result["error"] = error;
 			return NumelApp._defaultStatus();
 		});
 		return status;
