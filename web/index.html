@@ -187,7 +187,7 @@
 			<input type="text" id="messageInput" placeholder="Type your message..." disabled>
 			<button id="sendButton" onclick="sendMessage()" disabled>Send</button>
 			<button id="connectButton" onclick="toggleConnection()">Connect</button>
-			<button id="clearChatContent" onclick="clearChat()">&#xe020;</button>
+			<button id="clearChatButton" onclick="clearChat()">&#xe020;</button>
 		</div>
 
 		<div id="loading" class="loading">Loading AG-UI client...</div>
@@ -226,6 +226,7 @@
 		const loadingDiv      = document.getElementById("loading");
 		const systemMsgButton = document.getElementById("debugMessage");
 		const appAgentSelect  = document.getElementById("appAgentSelect");
+		const clearChatButton = document.getElementById("clearChatButton");
 
 		function clearChat() {
 			messagePrevRole         = null;
@@ -408,9 +409,11 @@
 				addMessage("ui", `🤖 Talking to Agent "${agentName}" (index ${agentPrevIndex})`);
 			}
 
-			messageInput.value = "";
-			sendButton.disabled = true;
-			sendButton.textContent = "Sending...";
+			messageInput    .value       = "";
+			sendButton      .textContent = "Sending...";
+			sendButton      .disabled    = true;
+			connectButton   .disabled    = true;
+			clearChatButton .disabled    = true;
 
 			try {
 				await aguiApp.send(message, agentPrevIndex);
@@ -418,8 +421,10 @@
 				console.error("Failed to send message:", error);
 				addMessage("system-error", `❌ Failed to send message: ${error.message}`);
 			} finally {
-				sendButton.disabled = false;
-				sendButton.textContent = "Send";
+				sendButton      .textContent = "Send";
+				sendButton      .disabled    = false;
+				connectButton   .disabled    = false;
+				clearChatButton .disabled    = false;
 			}
 		}
 
