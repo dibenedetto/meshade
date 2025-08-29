@@ -312,6 +312,7 @@
 
 				isConnected = true;
 
+				appAgentSelect.disabled = false;
 				clearChat();
 				updateStatus("connected", "AG-UI client ready");
 				enableInput(true);
@@ -329,6 +330,8 @@
 		function disconnect() {
 			aguiApp     = null;
 			isConnected = false;
+
+			messageInput.value = "";
 
 			updateStatus("disconnected", "Disconnected");
 			enableInput(false);
@@ -390,13 +393,14 @@
 			const message = messageInput.value.trim();
 			if (!message || !isConnected || !aguiApp) return;
 
+			addMessage("user", message);
+
 			if (agentPrevIndex != agentCurrIndex) {
 				agentPrevIndex = agentCurrIndex;
 				agentName      = aguiApp.status["config"]["agents"][agentPrevIndex]["name"];
 				addMessage("ui", `🤖 Talking to Agent "${agentName}" (index ${agentPrevIndex})`);
 			}
 
-			addMessage("user", message);
 			messageInput.value = "";
 			sendButton.disabled = true;
 			sendButton.textContent = "Sending...";
@@ -452,9 +456,9 @@
 		}
 
 		async function getAppStatus() {
-			sendEnabled = !sendButton.disabled;
-			enableInput    (false);
-			enableAppInput (false);
+			// sendEnabled = !sendButton.disabled;
+			// enableInput    (false);
+			// enableAppInput (false);
 
 			const serverUrl = serverUrlInput.value.trim();
 			const status    = await NumelApp.getStatus(serverUrl);
@@ -473,13 +477,13 @@
 				}
 			}
 
-			enableInput    (true);
-			enableAppInput (true);
+			// enableInput    (true);
+			// enableAppInput (true);
 
 			appAgentSelect .innerHTML = content;
 			appAgentSelect .disabled  = false;
-			connectButton  .disabled  = false;
-			sendButton     .disabled  = !sendEnabled;
+			// connectButton  .disabled  = false;
+			// sendButton     .disabled  = !sendEnabled;
 		}
 
 		appAgentSelect.disabled  = true;
