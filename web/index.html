@@ -173,7 +173,7 @@
 				<tr>
 					<td><label for="agents">Agent:</label></td>
 					<td><select id="appAgentSelect"><option value="-1"> - None - </option></select>
-					<button id="usunne" onclick="buildAgent()">Create Agent (ask for locals, check, pay, give api keys, ...)</button>
+					<!-- <button id="usunne" onclick="buildAgent()">Create Agent (ask for locals, check, pay, give api keys, ...)</button> -->
 					</td>
 				</tr>
 				<tr>
@@ -413,16 +413,14 @@
 					const display = systemMsgButton.checked ? "block" : "none";
 					messageDiv.style.display = display;
 				}
-				messageDiv.innerHTML = content;
+				messageDiv.innerHTML = "";
 				chatContainer.appendChild(messageDiv);
 				messagePrevRole    = role;
 				messagePrevElement = messageDiv;
-			} else {
-				if (role == "system") {
-					content = `<br/>${content}`;
-				}
-				messagePrevElement.innerHTML += content;
+			} else if (role == "system") {
+				content = `<br/>${content}`;
 			}
+			messagePrevElement.innerHTML += content;
 			chatContainer.scrollTop = chatContainer.scrollHeight;
 		}
 

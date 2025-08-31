@@ -1,8 +1,8 @@
 {
 	"version"     : "1.0.0",
-	"name"        : "MeShade Playground",
-	"description" : "MeShade AI Playground",
-	"author"      : "marco@meshade.ai",
+	"name"        : "Numel Playground",
+	"description" : "Numel AI Playground",
+	"author"      : "marco@numel.app",
 	"backend"     : 0,
 	"port"        : 8000,
 	"seed"        : 42,
@@ -99,11 +99,11 @@
 	"agents" : [
 		{
 			"version" : "1.0.0",
-			"name"    : "MeShade Assistant",
-			"author"  : "user@meshade.com",
+			"name"    : "Numel Assistant",
+			"author"  : "user@numel.app",
 			"data"    : null,
 
-			"description"  : "MeShade AI Assistant",
+			"description"  : "Numel AI Assistant",
 			"instructions" : [
 				"Be helpful and informative",
 				"Provide accurate and relevant information",
@@ -134,13 +134,13 @@
 		},
 		{
 			"version" : "1.0.0",
-			"name"    : "Arrogant Assistant",
-			"author"  : "arrogant@meshade.com",
+			"name"    : "Italian Assistant",
+			"author"  : "italian@numel.app",
 			"data"    : null,
 
-			"description"  : "Arrogant AI Assistant",
+			"description"  : "Italian AI Assistant",
 			"instructions" : [
-				"Be arrogant in your answers"
+				"Always answer in Italian"
 			],
 
 			"backend" : 0,

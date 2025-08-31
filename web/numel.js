@@ -87,6 +87,8 @@ class NumelApp {
 			agent.subscribe(this.subscriber);
 		}
 
+		this.agents[index] = agent;
+
 		return agent;
 	}
 
