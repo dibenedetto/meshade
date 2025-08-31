@@ -68,18 +68,18 @@ class NumelApp {
 		if (!configs || (index >= configs.length)) {
 			return null;
 		}
+
 		const config = configs[index];
 		if (!config) {
 			return null;
 		}
 
-		const info    = config;
 		const baseUrl = this.url.substr(0, this.url.lastIndexOf(":"));
-		const port    = info["port"];
+		const port    = config["port"];
 		const url     = `${baseUrl}:${port}/agui`;
 
 		agent = new AGUI.HttpAgent({
-			name : info["name"],
+			name : config["name"],
 			url  : url,
 		});
 
