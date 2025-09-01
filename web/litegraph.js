@@ -22,7 +22,7 @@
         NODE_TITLE_TEXT_Y: 20,
         NODE_SLOT_HEIGHT: 20,
         NODE_WIDGET_HEIGHT: 20,
-        NODE_WIDTH: 140,
+        NODE_WIDTH: 160,
         NODE_MIN_WIDTH: 50,
         NODE_COLLAPSED_RADIUS: 10,
         NODE_COLLAPSED_WIDTH: 80,
@@ -10061,13 +10061,63 @@ LGraphNode.prototype.executeAction = function(action)
 
 	                    //ctx.stroke();
                         ctx.fillStyle = secondary_text_color;
-                        const label = w.label || w.name;	
+                        const label = w.label || w.name;
+                        var labelWidth = 0;
+                        var maxLabelWidth = widget_width * 0.35; // Reserve 35% for label
+                        
                         if (label != null) {
-                            ctx.fillText(label, margin * 2, y + H * 0.7);
+                            // Smart label truncation based on actual width
+                            var labelText = label;
+                            var measuredWidth = ctx.measureText(labelText).width;
+                            
+                            if (measuredWidth > maxLabelWidth) {
+                                // Binary search for optimal truncation length
+                                var low = 0, high = labelText.length;
+                                var ellipsisWidth = ctx.measureText("...").width;
+                                var targetWidth = maxLabelWidth - ellipsisWidth;
+                                
+                                while (low < high) {
+                                    var mid = Math.floor((low + high + 1) / 2);
+                                    if (ctx.measureText(labelText.substr(0, mid)).width <= targetWidth) {
+                                        low = mid;
+                                    } else {
+                                        high = mid - 1;
+                                    }
+                                }
+                                labelText = labelText.substr(0, low) + "...";
+                                measuredWidth = ctx.measureText(labelText).width;
+                            }
+                            
+                            labelWidth = measuredWidth;
+                            ctx.fillText(labelText, margin * 2, y + H * 0.7);
                         }
+                        
                         ctx.fillStyle = text_color;
                         ctx.textAlign = "right";
-                        ctx.fillText(String(w.value).substr(0,30), widget_width - margin * 2, y + H * 0.7); //30 chars max
+                        
+                        // Smart value truncation
+                        var valueMaxWidth = widget_width - labelWidth - margin * 4;
+                        var valueText = String(w.value);
+                        var measuredValueWidth = ctx.measureText(valueText).width;
+                        
+                        if (measuredValueWidth > valueMaxWidth) {
+                            // Binary search for optimal value truncation
+                            var low = 0, high = valueText.length;
+                            var ellipsisWidth = ctx.measureText("...").width;
+                            var targetWidth = valueMaxWidth - ellipsisWidth;
+                            
+                            while (low < high) {
+                                var mid = Math.floor((low + high + 1) / 2);
+                                if (ctx.measureText(valueText.substr(0, mid)).width <= targetWidth) {
+                                    low = mid;
+                                } else {
+                                    high = mid - 1;
+                                }
+                            }
+                            valueText = valueText.substr(0, Math.max(1, low)) + "...";
+                        }
+                        
+                        ctx.fillText(valueText, widget_width - margin * 2, y + H * 0.7);
 						ctx.restore();
                     }
                     break;
@@ -13701,6 +13751,10 @@ LGraphNode.prototype.executeAction = function(action)
         root.style.minWidth = 100;
         root.style.minHeight = 100;
         root.style.pointerEvents = "none";
+        root.style.setProperty('position', 'fixed', 'important');
+        root.style.setProperty('z-index', '999999', 'important');
+        root.style.setProperty('transform', 'none', 'important');
+        root.style.setProperty('margin', '0', 'important');
         setTimeout(function() {
             root.style.pointerEvents = "auto";
         }, 100); //delay so the mouse up event is not caught by this element
@@ -13806,17 +13860,34 @@ LGraphNode.prototype.executeAction = function(action)
             root_document = document;
         }
 
-		if( root_document.fullscreenElement )
-	        root_document.fullscreenElement.appendChild(root);
-		else
-		    root_document.body.appendChild(root);
+		// Try different positioning strategies
+		var canvas = LGraphCanvas.active_canvas ? LGraphCanvas.active_canvas.canvas : null;
+		var useAlternativePosition = false;
+		
+		if (canvas && options.event) {
+			// Check if we should use canvas-relative positioning
+			var canvasRect = canvas.getBoundingClientRect();
+			var canvasParent = canvas.parentElement;
+			
+			// If canvas is in a positioned container, try alternative approach
+			if (canvasParent && window.getComputedStyle(canvasParent).position !== 'static') {
+				useAlternativePosition = true;
+			}
+		}
+		
+		// Always append to document body first
+		root_document.body.appendChild(root);
 
         //compute best position
         var left = options.left || 0;
         var top = options.top || 0;
         if (options.event) {
-            left = options.event.clientX - 10;
-            top = options.event.clientY - 10;
+            var evt = options.event;
+            
+            // Try using page coordinates first
+            left = (evt.pageX || evt.clientX) - 10;
+            top = (evt.pageY || evt.clientY) - 10;
+            
             if (options.title) {
                 top -= 20;
             }
@@ -13828,19 +13899,25 @@ LGraphNode.prototype.executeAction = function(action)
 
             var body_rect = document.body.getBoundingClientRect();
             var root_rect = root.getBoundingClientRect();
+            
 			if(body_rect.height == 0)
 				console.error("document.body height is 0. That is dangerous, set html,body { height: 100%; }");
 
-            if (body_rect.width && left > body_rect.width - root_rect.width - 10) {
-                left = body_rect.width - root_rect.width - 10;
+            // Use viewport dimensions instead of body rect for bounds checking
+            var viewportWidth = window.innerWidth;
+            var viewportHeight = window.innerHeight;
+            
+            if (left > viewportWidth - root_rect.width - 10) {
+                left = viewportWidth - root_rect.width - 10;
             }
-            if (body_rect.height && top > body_rect.height - root_rect.height - 10) {
-                top = body_rect.height - root_rect.height - 10;
+            if (top > viewportHeight - root_rect.height - 10) {
+                top = viewportHeight - root_rect.height - 10;
             }
         }
 
-        root.style.left = left + "px";
-        root.style.top = top + "px";
+        // Force positioning with higher specificity
+        root.style.setProperty('left', left + 'px', 'important');
+        root.style.setProperty('top', top + 'px', 'important');
 
         if (options.scale) {
             root.style.transform = "scale(" + options.scale + ")";
@@ -34570,4 +34647,3 @@ LiteGraph.registerNodeType("network/httprequest", HTTPRequestNode);
 
 	
 })(this);
-

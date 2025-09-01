@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generic Pydantic to LiteGraph Schema Converter</title>
+    <script src="litegraph.js"></script>
+    <link rel="stylesheet" href="litegraph.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background: #2a2a2a;
+            color: white;
+        }
+        
+        #header {
+            background: #333;
+            padding: 10px;
+            border-bottom: 1px solid #555;
+        }
+        
+        #schema-input {
+            width: 100%;
+            height: 100px;
+            background: #444;
+            color: white;
+            border: 1px solid #666;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+        
+        #controls {
+            background: #333;
+            padding: 15px;
+            border-bottom: 1px solid #555;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            min-height: 50px;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        
+        button:hover { background: #45a049; }
+        button.secondary { background: #2196F3; }
+        button.secondary:hover { background: #1976D2; }
+        
+        #canvas-container {
+            position: absolute;
+            top: 320px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        }
+        
+        #mycanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+        
+        .status.success { background: #4CAF50; }
+        .status.error { background: #f44336; }
+        
+        .litegraph .node {
+            min-width: 400px !important;
+        }
+        
+        .litegraph .node input[type="text"],
+        .litegraph .node select {
+            max-width: 240px !important;
+            width: 240px !important;
+            font-size: 12px !important;
+            background: #444 !important;
+            color: white !important;
+            border: 1px solid #666 !important;
+            padding: 4px 8px !important;
+            box-sizing: border-box !important;
+            margin: 2px 0 !important;
+            float: right !important;
+        }
+        
+        /* Specific widget layout fixes */
+        #mycanvas .litegraph .node .widget {
+            width: 100% !important;
+            display: block !important;
+            clear: both !important;
+            margin: 8px 4px !important;
+            min-height: 26px !important;
+            position: relative !important;
+        }
+        
+        #mycanvas .litegraph .node .widget .widget_name {
+            display: inline-block !important;
+            float: left !important;
+            width: 120px !important;
+            font-size: 11px !important;
+            color: #ccc !important;
+            line-height: 20px !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
+        }
+        
+        #mycanvas .litegraph .node input[type="text"] {
+            position: absolute !important;
+            right: 4px !important;
+            top: 0px !important;
+            width: 60% !important;
+            max-width: 240px !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h3>Generic Pydantic Schema → LiteGraph Converter</h3>
+        <textarea id="schema-input" placeholder="Paste Pydantic schema here..."></textarea>
+    </div>
+    
+    <div id="controls">
+        <button onclick="parseSchema()" style="background: #ff6b35;">🔄 Parse Schema</button>
+        <button class="secondary" onclick="loadExample()">📝 Load Example</button>
+        <button class="secondary" onclick="clearAll()">🗑️ Clear All</button>
+        <button class="secondary" onclick="exportJSON()">💾 Export JSON</button>
+        <span id="status" style="margin-left: 20px;"></span>
+    </div>
+    
+    <div id="canvas-container">
+        <canvas id="mycanvas"></canvas>
+    </div>
+
+    <script>
+        let graph, canvas;
+        let schemaModels = {};
+        
+        // Initialize
+        function init() {
+            graph = new LGraph();
+            canvas = new LGraphCanvas("#mycanvas", graph);
+            canvas.resize();
+            canvas.ds.scale = 1.0;
+            canvas.allow_dragcanvas = true;
+            canvas.allow_dragnodes = true;
+            graph.start();
+            
+            window.addEventListener('resize', () => canvas.resize());
+        }
+        
+        // Simple schema parser
+        function parseSchema() {
+            const input = document.getElementById('schema-input').value.trim();
+            if (!input) {
+                showStatus('Please enter a schema', 'error');
+                return;
+            }
+            
+            try {
+                schemaModels = parseSchemaText(input);
+                generateNodes(schemaModels);
+                createToolbarButtons(schemaModels);
+                showStatus(`Parsed ${Object.keys(schemaModels).length} models`, 'success');
+            } catch (error) {
+                showStatus(`Parse error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Parse schema text into structured data
+        function parseSchemaText(text) {
+            const models = {};
+            const constants = {};
+            const lines = text.split('\n');
+            let currentModel = null;
+            let inClass = false;
+            
+            // First pass - collect constants and model names
+            for (let line of lines) {
+                line = line.trim();
+                if (line.startsWith('#') || line.startsWith('from ') || line.startsWith('import ')) continue;
+                
+                // Parse constants
+                const constantMatch = line.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.+)$/);
+                if (constantMatch && !inClass) {
+                    constants[constantMatch[1]] = parseConstantValue(constantMatch[2]);
+                }
+                
+                // Collect model names
+                const classMatch = line.match(/^class\s+(\w+)\s*\([^)]*BaseModel[^)]*\):/);
+                if (classMatch) {
+                    models[classMatch[1]] = { fields: {}, relationships: [], constants: constants };
+                }
+            }
+            
+            // Store models globally for reference detection
+            schemaModels = models;
+            
+            // Second pass - parse fields and relationships
+            inClass = false;
+            currentModel = null;
+            
+            for (let line of lines) {
+                line = line.trim();
+                if (line.startsWith('#') || line.startsWith('from ') || line.startsWith('import ')) continue;
+                
+                // Class definition
+                const classMatch = line.match(/^class\s+(\w+)\s*\([^)]*BaseModel[^)]*\):/);
+                if (classMatch) {
+                    currentModel = classMatch[1];
+                    inClass = true;
+                    continue;
+                }
+                
+                // Field definition
+                if (inClass && currentModel && line.includes(':') && !line.startsWith('def ')) {
+                    const field = parseField(line, constants);
+                    if (field) {
+                        models[currentModel].fields[field.name] = field;
+                        
+                        // Add relationship if this field references another model
+                        if (field.isReference && field.referenceType) {
+                            models[currentModel].relationships.push({
+                                field: field.name,
+                                target: field.referenceType,
+                                isOptional: field.isOptional,
+                                isList: field.isList
+                            });
+                        }
+                    }
+                }
+                
+                // End of class
+                if (inClass && (line === '' || line.startsWith('class '))) {
+                    if (line.startsWith('class ')) {
+                        const classMatch = line.match(/^class\s+(\w+)\s*\([^)]*BaseModel[^)]*\):/);
+                        if (classMatch) {
+                            currentModel = classMatch[1];
+                        }
+                    } else {
+                        inClass = false;
+                        currentModel = null;
+                    }
+                }
+            }
+            
+            return models;
+        }
+        
+        // Parse individual field
+        function parseField(line, constants = {}) {
+            // Handle various field patterns
+            const patterns = [
+                /(\w+)\s*:\s*(Optional\[([^\]]+)\])\s*=\s*(.+)/, // name: Optional[type] = default
+                /(\w+)\s*:\s*(List\[([^\]]+)\])\s*=\s*(.+)/, // name: List[type] = default  
+                /(\w+)\s*:\s*(Union\[([^\]]+)\])\s*=\s*(.+)/, // name: Union[types] = default
+                /(\w+)\s*:\s*(\w+)\s*=\s*(.+)/, // name: type = default
+                /(\w+)\s*:\s*(Optional\[([^\]]+)\])/, // name: Optional[type] (no default)
+                /(\w+)\s*:\s*(List\[([^\]]+)\])/, // name: List[type] (no default)
+                /(\w+)\s*:\s*(\w+)/, // name: type (no default)
+            ];
+            
+            for (let pattern of patterns) {
+                const match = line.match(pattern);
+                if (match) {
+                    const name = match[1];
+                    const typeStr = match[2];
+                    let defaultValue = match[4] || match[3] || '';
+                    
+                    // For patterns with inner type (Optional[Type], List[Type])
+                    const innerType = match[3];
+                    
+                    // Resolve constant references
+                    if (defaultValue && constants[defaultValue]) {
+                        defaultValue = constants[defaultValue];
+                    }
+                    
+                    const isRef = isModelReference(typeStr);
+                    const refType = extractReferenceType(typeStr);
+                    
+                    return {
+                        name,
+                        type: extractBaseType(typeStr),
+                        originalType: typeStr,
+                        innerType: innerType,
+                        default: parseDefault(defaultValue),
+                        isOptional: typeStr.includes('Optional') || defaultValue === 'None',
+                        isList: typeStr.includes('List'),
+                        isUnion: typeStr.includes('Union'),
+                        isReference: isRef,
+                        referenceType: refType,
+                        usesConstant: constants.hasOwnProperty(defaultValue)
+                    };
+                }
+            }
+            return null;
+        }
+        
+        // Helper functions
+        function extractBaseType(typeStr) {
+            if (typeStr.includes('str')) return 'string';
+            if (typeStr.includes('int')) return 'number';
+            if (typeStr.includes('float')) return 'number';
+            if (typeStr.includes('bool')) return 'boolean';
+            if (typeStr.includes('List')) return 'array';
+            return 'string'; // default
+        }
+        
+        function parseDefault(defaultStr) {
+            if (!defaultStr || defaultStr === 'None') return '';
+            if (defaultStr.startsWith('"') || defaultStr.startsWith("'")) {
+                return defaultStr.slice(1, -1); // Remove quotes
+            }
+            if (defaultStr.startsWith('[') && defaultStr.endsWith(']')) {
+                // Handle list defaults
+                try {
+                    return defaultStr.slice(1, -1).split(',').map(s => s.trim().replace(/['"]/g, '')).join(', ');
+                } catch (e) {
+                    return defaultStr;
+                }
+            }
+            return defaultStr;
+        }
+        
+        function parseConstantValue(valueStr) {
+            valueStr = valueStr.trim();
+            
+            // String values
+            if (valueStr.startsWith('"') || valueStr.startsWith("'")) {
+                return valueStr.slice(1, -1);
+            }
+            
+            // List values
+            if (valueStr.startsWith('[') && valueStr.endsWith(']')) {
+                try {
+                    return valueStr.slice(1, -1).split(',').map(s => s.trim().replace(/['"]/g, ''));
+                } catch (e) {
+                    return valueStr;
+                }
+            }
+            
+            // Numeric values
+            if (!isNaN(valueStr)) {
+                return valueStr.includes('.') ? parseFloat(valueStr) : parseInt(valueStr);
+            }
+            
+            // Boolean values
+            if (valueStr === 'True') return true;
+            if (valueStr === 'False') return false;
+            
+            return valueStr;
+        }
+        
+        function isModelReference(typeStr) {
+            // Check if type string contains any model names from the current schema
+            if (!schemaModels || Object.keys(schemaModels).length === 0) return false;
+            
+            const modelNames = Object.keys(schemaModels);
+            return modelNames.some(name => {
+                // Check for direct reference: ModelName
+                if (typeStr.includes(name)) return true;
+                // Check for Optional reference: Optional[ModelName]
+                if (typeStr.includes(`Optional[${name}]`)) return true;
+                // Check for Union reference: Union[ModelName, int]
+                if (typeStr.includes(`Union[`) && typeStr.includes(name)) return true;
+                // Check for List reference: List[ModelName]
+                if (typeStr.includes(`List[${name}]`)) return true;
+                return false;
+            });
+        }
+        
+        function extractReferenceType(typeStr) {
+            if (!schemaModels || Object.keys(schemaModels).length === 0) return null;
+            
+            const modelNames = Object.keys(schemaModels);
+            for (let name of modelNames) {
+                // Direct reference
+                if (typeStr === name) return name;
+                // Optional reference
+                if (typeStr === `Optional[${name}]`) return name;
+                // List reference
+                if (typeStr === `List[${name}]`) return name;
+                // Union reference (get first model found)
+                if (typeStr.includes(`Union[`) && typeStr.includes(name)) return name;
+                // Complex nested patterns
+                if (typeStr.includes(name) && (
+                    typeStr.includes('[') || 
+                    typeStr.includes('Optional') || 
+                    typeStr.includes('List') ||
+                    typeStr.includes('Union')
+                )) {
+                    return name;
+                }
+            }
+            return null;
+        }
+        
+        // Generate LiteGraph node classes
+        function generateNodes(models) {
+            // Clear existing nodes
+            Object.keys(LiteGraph.registered_node_types).forEach(key => {
+                if (key.startsWith('schema/')) {
+                    delete LiteGraph.registered_node_types[key];
+                }
+            });
+            
+            Object.entries(models).forEach(([modelName, model]) => {
+                createNodeClass(modelName, model);
+            });
+        }
+        
+        // Create a LiteGraph node class from schema
+        function createNodeClass(modelName, model) {
+            class SchemaNode extends LGraphNode {
+                constructor() {
+                    super();
+                    this.title = modelName;
+                    this.color = getColorForModel(modelName);
+                    this.size = [400, Math.max(120, Object.keys(model.fields).length * 35 + model.relationships.length * 30 + 100)];
+                    this.resizable = false;
+                    
+                    // Add inputs for relationships FIRST
+                    model.relationships.forEach(rel => {
+                        this.addInput(rel.field, rel.target);
+                    });
+                    
+                    // Add properties for non-relationship fields
+                    Object.entries(model.fields).forEach(([fieldName, field]) => {
+                        if (!field.isReference) {
+                            this.addProperty(fieldName, field);
+                        }
+                    });
+                    
+                    // Add output
+                    this.addOutput(modelName.toLowerCase(), modelName);
+                    
+                    // Initialize properties
+                    this.properties = this.properties || {};
+                    
+                    // Debug info
+                    console.log(`Created ${modelName} with relationships:`, model.relationships);
+                }
+                
+                addProperty(fieldName, field) {
+                    this.properties = this.properties || {};
+                    let defaultValue = field.default || '';
+                    this.properties[fieldName] = defaultValue;
+                    
+                    // Truncate field name if too long for display
+                    let displayName = fieldName;
+                    if (fieldName.length > 12) {
+                        displayName = fieldName.substring(0, 10) + '..';
+                    }
+                    
+                    if (field.type === 'boolean') {
+                        const boolValue = defaultValue === true || defaultValue === 'True' || defaultValue === 'true';
+                        this.addWidget("toggle", displayName, boolValue, (v) => {
+                            this.properties[fieldName] = v;
+                        });
+                    } else if (field.type === 'number') {
+                        const numValue = parseFloat(defaultValue) || 0;
+                        this.addWidget("number", displayName, numValue, (v) => {
+                            this.properties[fieldName] = v;
+                        });
+                    } else {
+                        // For text fields, show truncated value but allow full editing
+                        let displayValue = String(defaultValue);
+                        if (displayValue.length > 20) {
+                            displayValue = displayValue.substring(0, 17) + '...';
+                        }
+                        
+                        const widget = this.addWidget("text", displayName, displayValue, (v) => {
+                            this.properties[fieldName] = v;
+                        });
+                        
+                        // Store original value and field name for reference
+                        if (widget) {
+                            widget._originalFieldName = fieldName;
+                            widget._originalValue = defaultValue;
+                            
+                            // Override the widget's value getter/setter to handle full values
+                            const originalValue = widget.value;
+                            Object.defineProperty(widget, 'value', {
+                                get: function() {
+                                    return this._currentValue !== undefined ? this._currentValue : originalValue;
+                                },
+                                set: function(val) {
+                                    this._currentValue = val;
+                                    // Update the actual property with full value
+                                    if (this.node && this.node.properties) {
+                                        this.node.properties[this._originalFieldName] = val;
+                                    }
+                                }
+                            });
+                            
+                            // Set initial value
+                            widget.value = defaultValue;
+                        }
+                    }
+                }
+                
+                onExecute() {
+                    const config = { ...this.properties };
+                    
+                    // Add connected relationship inputs
+                    if (this.inputs) {
+                        this.inputs.forEach((input, index) => {
+                            const data = this.getInputData(index);
+                            if (data) {
+                                config[input.name] = data;
+                            }
+                        });
+                    }
+                    
+                    // Clean up empty values
+                    Object.keys(config).forEach(key => {
+                        if (config[key] === '' || config[key] === null) {
+                            delete config[key];
+                        }
+                    });
+                    
+                    this.setOutputData(0, config);
+                }
+            }
+            
+            LiteGraph.registerNodeType(`schema/${modelName}`, SchemaNode);
+        }
+        
+        // Create toolbar buttons
+        function createToolbarButtons(models) {
+            const controls = document.getElementById('controls');
+            
+            // Remove existing schema buttons
+            const existingButtons = controls.querySelectorAll('button[data-schema]');
+            existingButtons.forEach(btn => btn.remove());
+            
+            // Add new buttons
+            Object.keys(models).forEach(modelName => {
+                const btn = document.createElement('button');
+                btn.textContent = `Add ${modelName}`;
+                btn.setAttribute('data-schema', 'true');
+                btn.onclick = () => addSchemaNode(modelName);
+                controls.appendChild(btn);
+            });
+        }
+        
+        // Add node to graph
+        function addSchemaNode(modelName) {
+            const node = LiteGraph.createNode(`schema/${modelName}`);
+            node.pos = [Math.random() * 300, Math.random() * 300];
+            graph.add(node);
+        }
+        
+        // Utility functions
+        function getColorForModel(modelName) {
+            const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c'];
+            const hash = modelName.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+            return colors[hash % colors.length];
+        }
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            setTimeout(() => status.textContent = '', 3000);
+        }
+        
+        function loadExample() {
+            document.getElementById('schema-input').value = `from pydantic import BaseModel
+from typing import Optional, List
+
+# Constants
+DEFAULT_PORT = 8000
+DEFAULT_HOST = "localhost"
+MAX_RETRIES = 3
+SUPPORTED_FORMATS = ["json", "yaml", "xml"]
+
+class DatabaseConfig(BaseModel):
+    host: str = DEFAULT_HOST
+    port: int = DEFAULT_PORT
+    max_retries: int = MAX_RETRIES
+    ssl_enabled: bool = True
+
+class APIConfig(BaseModel):
+    base_url: str = "https://api.example.com"
+    timeout: int = 30
+    formats: List[str] = SUPPORTED_FORMATS
+    database: Optional[DatabaseConfig] = None
+
+class AppConfig(BaseModel):
+    name: str = "MyApp"
+    version: str = "1.0.0"
+    debug: bool = False
+    api: Optional[APIConfig] = None`;
+        }
+        
+        function clearAll() {
+            graph.clear();
+            document.getElementById('schema-input').value = '';
+            const controls = document.getElementById('controls');
+            const schemaButtons = controls.querySelectorAll('button[data-schema]');
+            schemaButtons.forEach(btn => btn.remove());
+            showStatus('Cleared', 'success');
+        }
+        
+        function exportJSON() {
+            const configs = [];
+            graph._nodes.forEach(node => {
+                if (node.outputs && node.outputs.length > 0) {
+                    const data = node.getOutputData(0);
+                    if (data) configs.push(data);
+                }
+            });
+            
+            const json = JSON.stringify(configs.length === 1 ? configs[0] : configs, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'schema-config.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>

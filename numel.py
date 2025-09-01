@@ -16,10 +16,10 @@ DEFAULT_BACKEND_TYPE                              : str  = "agno"
 DEFAULT_BACKEND_VERSION                           : str  = ""
 
 DEFAULT_MODEL_TYPE                                : str  = "ollama"
-DEFAULT_MODEL_ID                                  : str  = "deepseek-r1:8b"
+DEFAULT_MODEL_ID                                  : str  = "mistral"
 
 DEFAULT_EMBEDDING_TYPE                            : str  = "ollama"
-DEFAULT_EMBEDDING_ID                              : str  = "deepseek-r1:8b"
+DEFAULT_EMBEDDING_ID                              : str  = "mistral"
 
 DEFAULT_KNOWLEDGE_DB_TYPE                         : str  = "lancedb"
 DEFAULT_KNOWLEDGE_DB_TABLE_NAME                   : str  = "knowledge"

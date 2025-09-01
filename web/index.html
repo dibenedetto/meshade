@@ -318,7 +318,7 @@
 			try {
 				const status = await getAppStatus();
 				if (status["error"]) {
-					throw "zune!";
+					throw "ERROR";
 				}
 
 				aguiApp = await NumelApp.create(serverUrl, userId, sessionId,
