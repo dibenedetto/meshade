@@ -72,28 +72,34 @@ class NumelApp {
 	}
 
 	static async connect(url, userId, sessionId, config, subscriber) {
-		let status = null;
-		await NumelApp._stop(url);
-		if (config) {
-			status = await NumelApp._putConfig(url, config);
+		try {
+			let status = null;
+			await NumelApp._stop(url);
+			if (config) {
+				status = await NumelApp._putConfig(url, config);
+				if (!status || status.error) {
+					return null;
+				}
+			}
+			status = await NumelApp._start(url);
 			if (!status || status.error) {
 				return null;
 			}
+			const app = new NumelApp(url, userId, sessionId, subscriber);
+			status = await app._update();
+			if (!status || status.error) {
+				return null;
+			}
+			if (!app.isValid()) {
+				await NumelApp._stop(url);
+				return null;
+			}
+			return app;
 		}
-		status = await NumelApp._start(url);
-		if (!status || status.error) {
+		catch (error) {
+			console.error("Error connecting to Numel app:", error);
 			return null;
 		}
-		const app = new NumelApp(url, userId, sessionId, subscriber);
-		status = await app._update();
-		if (!status || status.error) {
-			return null;
-		}
-		if (!app.isValid()) {
-			await NumelApp._stop(url);
-			return null;
-		}
-		return app;
 	}
 
 	constructor(url, userId, sessionId, subscriber) {

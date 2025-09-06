@@ -70,6 +70,26 @@ DEFAULT_APP_PORT                                  : int  = 8000
 DEFAULT_APP_RELOAD                                : bool = True
 
 
+# class Capabilities(BaseModel):
+# 	name          : Optional[str]                       = None
+# 	description   : Optional[str]                       = None
+# 	reference     : Optional[str]                       = None
+
+# 	type          : str
+# 	version       : str
+
+# 	models        : Optional[List[ModelConfig]]         = None
+# 	embeddings    : Optional[List[EmbeddingConfig]]     = None
+# 	knowledge_dbs : Optional[List[KnowledgeDBConfig]]   = None
+# 	knowledges    : Optional[List[KnowledgeConfig]]     = None
+# 	memory_dbs    : Optional[List[MemoryDBConfig]]      = None
+# 	memories      : Optional[List[MemoryConfig]]        = None
+# 	storage_dbs   : Optional[List[StorageDBConfig]]     = None
+# 	storages      : Optional[List[StorageConfig]]       = None
+# 	options       : Optional[List[OptionsConfig]]       = None
+# 	data          : Optional[Any]                       = None
+
+
 class BackendConfig(BaseModel):
 	type    : str = DEFAULT_BACKEND_TYPE
 	version : str = DEFAULT_BACKEND_VERSION
