@@ -175,6 +175,10 @@
 	<div class="container">
 		<h1 class="centered"><span class="app-name">NumelAI</span> Playground</h1>
 
+		<div>
+			<canvas id="numelCanvas" width="758px" height="300px" style="border: 1px solid"></canvas>
+		</div>
+
 		<div class="config">
 			<table>
 				<tr>
@@ -214,10 +218,6 @@
 			</table>
 		</div>
 
-		<div>
-			<canvas id="numelCanvas" width="758px" height="300px" style="border: 1px solid"></canvas>
-		</div>
-
 		<div id="chatContainer" class="chat-container"></div>
 
 		<div class="input-group">
@@ -234,9 +234,8 @@
 		&copy; 2025 - Marco Di Benedetto
 	</div>
 
-	<!-- Include the bundled AG-UI client -->
-	<script src="./dist/agui-client.bundle.js"></script>
-	<script src="./numel.js"></script>
+	<script type="text/javascript" src="dist/agui-client.bundle.js"></script>
+	<script type="text/javascript" src="numel.js"></script>
 
 	<script>
 		const startMessage = "🤖 Hi, I am Numel, an AI playground. Ask me anything you want 🙂";
@@ -279,13 +278,13 @@
 		}
 
 		function checkAGUILoaded() {
-			if (typeof AGUI !== "undefined" && AGUI.HttpAgent) {
+			if (typeof NumelApp !== "undefined") {
 				loadingDiv.style.display = "none";
-				addMessage("system", "✅ AG-UI client loaded successfully");
+				addMessage("system", "✅ NumelApp loaded successfully");
 			} else {
 				loadingDiv.style.display = "block";
-				loadingDiv.textContent = "❌ Failed to load AG-UI client. Make sure agui-client.bundle.js is built and available.";
-				addMessage("system-error", "❌ Error: AG-UI client not found. Please build the bundle first.");
+				loadingDiv.textContent = "❌ Failed to load NumelApp.";
+				addMessage("system-error", "❌ Error: NumelApp not found.");
 			}
 		}
 
@@ -293,7 +292,7 @@
 			serverUrlInput  .disabled = !enable;
 			sessionIdInput  .disabled = !enable;
 			userIdInput     .disabled = !enable;
-			appAgentSelect  .disabled = !enable;
+			appAgentSelect  .disabled = enable;
 		}
 
 		async function connect() {
@@ -302,7 +301,7 @@
 				return;
 			}
 
-			const serverUrl = serverUrlInput .value.trim();
+			const serverUrl = serverUrlInput.value.trim();
 			if (!serverUrl) {
 				addMessage("system", "⚠️ Please enter a valid server URL");
 				return;
@@ -316,13 +315,156 @@
 			updateStatus("connecting", "Connecting...");
 
 			try {
-				const status = await getAppStatus();
-				if (status["error"]) {
-					throw "ERROR";
-				}
+				aguiApp = await NumelApp.connect(serverUrl, userId, sessionId, {
+					"version"     : "1.0.0",
+					"name"        : "Numel Playground",
+					"description" : "Numel AI Playground",
+					"author"      : "marco@numel.app",
+					"backend"     : 0,
+					"port"        : 8000,
+					"seed"        : 42,
+					"data"        : null,
 
-				aguiApp = await NumelApp.create(serverUrl, userId, sessionId,
-				{
+					"backends" : [
+						{
+							"type"    : "agno",
+							"version" : ""
+						}
+					],
+
+					"models" : [
+						{
+							"type" : "ollama",
+							"id"   : "mistral"
+						}
+					],
+
+					"embeddings" : [
+						{
+							"type" : "ollama",
+							"id"   : "mistral"
+						}
+					],
+
+					"knowledge_dbs" : [
+						{
+							"type"        : "lancedb",
+							"table_name"  : "knowledge",
+							"db_url"      : "storage/knowledge",
+							"search_type" : "hybrid"
+						}
+					],
+
+					"knowledges" : [
+						{
+							"type" : "knowledge",
+							"db"   : 0,
+							"urls" : []
+						}
+					],
+
+					"memory_dbs" : [
+						{
+							"type"       : "sqlite",
+							"table_name" : "memory",
+							"db_url"     : "storage/memory"
+						}
+					],
+
+					"memories" : [
+						{
+							"type"       : "memory",
+							"db"         : 0,
+							"model"      : 0,
+							"summarizer" : 0
+						}
+					],
+
+					"storage_dbs" : [
+						{
+							"type"       : "sqlite",
+							"table_name" : "session",
+							"db_url"     : "storage/session"
+						}
+					],
+
+					"storages" : [
+						{
+							"type"       : "storage",
+							"db"         : 0,
+							"model"      : 0,
+							"summarizer" : 0
+						}
+					],
+
+					"options" : [
+						{
+							"markdown"                         : true,
+							"search_knowledge"                 : true,
+							"enable_agentic_memory"            : true,
+							"add_history_to_messages"          : true,
+							"num_history_runs"                 : 3,
+							"enable_session_summaries"         : true,
+							"search_previous_sessions_history" : true,
+							"num_history_sessions"             : 2,
+							"show_tool_calls"                  : true,
+							"tool_call_limit"                  : 5,
+							"reasoning"                        : false
+						}
+					],
+
+					"agents" : [
+						{
+							"version" : "1.0.0",
+							"name"    : "Numel Assistant",
+							"author"  : "user@numel.app",
+							"data"    : null,
+
+							"description"  : "Numel AI Assistant",
+							"instructions" : [
+								"Be helpful and informative",
+								"Provide accurate and relevant information",
+								"Use markdown formatting when appropriate"
+							],
+
+							"backend"   : 0,
+							"model"     : 0,
+							"knowledge" : [ 0 ],
+							"memory"    : 0,
+							"storage"   : 0,
+							"options"   : 0,
+
+							"tools" : [
+								{
+									"type" : "reasoning",
+									"args" : null,
+									"ref"  : null
+								},
+								{
+									"type" : "web_search",
+									"args" : {
+										"max_results" : 5
+									},
+									"ref"  : null
+								}
+							]
+						},
+						{
+							"version" : "1.0.0",
+							"name"    : "Italian Assistant",
+							"author"  : "italian@numel.app",
+							"data"    : null,
+
+							"description"  : "Italian AI Assistant",
+							"instructions" : [
+								"Always answer in Italian"
+							],
+
+							"backend" : 0,
+							"model"   : 0
+						}
+					]
+				}, {
 					onEvent(params) { handleAGUIEvent(params.event); },
 				});
 
@@ -331,7 +473,7 @@
 
 				isConnected = true;
 
-				appAgentSelect.disabled = false;
+				setAppStatus();
 				clearChat();
 				updateStatus("connected", "AG-UI client ready");
 				enableInput(true);
@@ -347,8 +489,15 @@
 		}
 
 		function disconnect() {
-			aguiApp     = null;
+			if (aguiApp) {
+				aguiApp.disconnect();
+				aguiApp = null;
+			}
+
 			isConnected = false;
+
+			agentCurrIndex = -1;
+			appAgentSelect.innerHTML = "<option value='-1'> - None - </option>";
 
 			messageInput.value = "";
 
@@ -474,16 +623,10 @@
 			}
 		}
 
-		async function getAppStatus() {
-			// sendEnabled = !sendButton.disabled;
-			// enableInput    (false);
-			// enableAppInput (false);
-
-			const serverUrl = serverUrlInput.value.trim();
-			const status    = await NumelApp.getStatus(serverUrl);
-			const agents    = status["config"]["agents"];
-			let   content   = "";
-
+		async function setAppStatus() {
+			const status  = await aguiApp.getStatus();
+			const agents  = status["config"]["agents"];
+			let   content = "";
 			if (agents.length == 0) {
 				agentCurrIndex = -1;
 				content        = "<option value='-1'> - None - </option>";
@@ -495,24 +638,17 @@
 					content += `<option value="${i}"${selected}>${agents[i]["name"]}</option>`;
 				}
 			}
-
-			// enableInput    (true);
-			// enableAppInput (true);
-
-			appAgentSelect .innerHTML = content;
-			appAgentSelect .disabled  = false;
-			// connectButton  .disabled  = false;
-			// sendButton     .disabled  = !sendEnabled;
-
+			appAgentSelect.innerHTML = content;
+			appAgentSelect.disabled  = false;
 			return status;
 		}
 
-		async function getAppDefault() {
-			const serverUrl = serverUrlInput.value.trim();
-			const status    = await NumelApp.getDefault(serverUrl);
-			const message   = JSON.stringify(status);
-			alert(message);
-		}
+		// async function getAppDefault() {
+		// 	const serverUrl = serverUrlInput.value.trim();
+		// 	const status    = await NumelApp.getDefault(serverUrl);
+		// 	const message   = JSON.stringify(status);
+		// 	alert(message);
+		// }
 
 		appAgentSelect.disabled  = true;
 
@@ -532,10 +668,6 @@
 				e.preventDefault();
 				sendMessage();
 			}
-		});
-
-		document.addEventListener("DOMContentLoaded", () => {
-			checkAGUILoaded();
 		});
 
 		window.onload = () => {

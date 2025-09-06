@@ -8,73 +8,168 @@ from   fastapi                 import FastAPI
 from   fastapi.middleware.cors import CORSMiddleware
 
 
-from   numel                   import App, AppConfig, load_config, seed_everything, unroll_config
+from   numel                   import App, AppConfig, get_time_str, load_config, seed_everything
 
 
-parser = argparse.ArgumentParser(description="App configuration")
-parser .add_argument("--config_path", type=str, default="config.json", help="Path to configuration file")
-args   = parser.parse_args()
-
-config = load_config(args.config_path) or AppConfig()
-if config.seed is not None:
-	seed_everything(config.seed)
-
-impl_modules = [os.path.splitext(f)[0] for f in os.listdir(".") if f.endswith("_impl.py")]
-for module_name in impl_modules:
-	try:
-		__import__(module_name)
-	except Exception as e:
-		print(f"Error importing module '{module_name}': {e}")
-
-for i, agent in enumerate(config.agents):
-	agent.port = config.port + i + 1
-
-app = App(config)
-
-app_status = {
-	"config" : app.config,
-}
-
-ctrl_app = FastAPI(title="Status")
-
-ctrl_app.add_middleware(
-	CORSMiddleware,
-	allow_credentials = False,
-	allow_origins     = ["*"],
-	allow_methods     = ["*"],
-	allow_headers     = ["*"],
-)
+if True:
+	parser = argparse.ArgumentParser(description="App configuration")
+	parser .add_argument("--config_path", type=str, default="config.json", help="Path to configuration file")
+	args   = parser.parse_args()
 
 
-@ctrl_app.get("/status")
-async def get_status():
-	return app_status
+if True:
+	config = load_config(args.config_path) or AppConfig()
+	if config.seed is not None:
+		seed_everything(config.seed)
 
 
-@ctrl_app.get("/default")
-async def get_default():
-	def_value = {
-		"config" : unroll_config(),
+if True:
+	impl_modules = [os.path.splitext(f)[0] for f in os.listdir(".") if f.endswith("_impl.py")]
+	for module_name in impl_modules:
+		try:
+			__import__(module_name)
+		except Exception as e:
+			print(f"Error importing module '{module_name}': {e}")
+
+
+if True:
+	ctrl_server = None
+	ctrl_status = {
+		"config" : None,
+		"status" : "waiting",
 	}
-	return def_value
+
+	app = None
+	running_servers = []
+
+	ctrl_app = FastAPI(title="Status")
+
+	ctrl_app.add_middleware(
+		CORSMiddleware,
+		allow_credentials = False,
+		allow_headers     = ["*"],
+		allow_methods     = ["*"],
+		allow_origins     = ["*"],
+	)
 
 
-async def run_servers():
-	host = "0.0.0.0"
+@ctrl_app.post("/ping")
+async def ping():
+	timestamp = get_time_str()
+	result = {
+		"message"   : "pong",
+		"timestamp" : timestamp,
+	}
+	return result
 
-	ctrl_config = uvicorn.Config(ctrl_app, host=host, port=app.config.port)
+
+@ctrl_app.post("/import")
+async def import_config(cfg: dict):
+	global app, config, ctrl_status
+	if app is not None:
+		return {"error": "App is running"}
+	config = AppConfig(**cfg)
+	ctrl_status["status"] = "ready"
+	return config
+
+
+@ctrl_app.post("/export")
+async def export_config():
+	global config
+	return config
+
+
+@ctrl_app.post("/start")
+async def start_app():
+	global app, config, ctrl_status, running_servers
+	if app is not None:
+		return {"error": "App is already running"}
+	try:
+		if config.seed is not None:
+			seed_everything(config.seed)
+		for i, agent in enumerate(config.agents):
+			agent.port = config.port + i + 1
+		host            = "0.0.0.0"
+		app             = App(config)
+		running_servers = []
+		for agent in app.agents:
+			agent_app    = agent.generate_app()
+			agent_port   = app.config.agents[agent.agent_index].port
+			agent_config = uvicorn.Config(agent_app, host=host, port=agent_port)
+			agent_server = uvicorn.Server(agent_config)
+			agent_task   = asyncio.create_task(agent_server.serve())
+			item         = {
+				"server" : agent_server,
+				"task"   : agent_task,
+			}
+			running_servers.append(item)
+		ctrl_status["config"] = app.config
+		ctrl_status["status"] = "running"
+	except Exception as e:
+		return {"error": str(e)}
+	return ctrl_status
+
+
+@ctrl_app.post("/stop")
+async def stop_app():
+	global app, config, ctrl_status, running_servers
+	if app is None:
+		return {"error": "App is not running"}
+	try:
+		for item in running_servers:
+			server = item["server"]
+			task   = item["task"  ]
+			if server and server.should_exit is False:
+				server.should_exit = True
+			if task:
+				await task
+		running_servers       = []
+		app                   = None
+		ctrl_status["config"] = None
+		ctrl_status["status"] = "stopped"
+	except Exception as e:
+		return {"error": str(e)}
+	return ctrl_status
+
+
+@ctrl_app.post("/restart")
+async def restart_app():
+	global ctrl_status
+	await stop_app()
+	await asyncio.sleep(1)
+	await start_app()
+	return ctrl_status
+
+
+@ctrl_app.post("/status")
+async def server_status():
+	global ctrl_status
+	return ctrl_status
+
+
+@ctrl_app.post("/shutdown")
+async def shutdown_server():
+	global app, ctrl_app, ctrl_server, ctrl_status
+	if app is not None:
+		return {"error": "App is running"}
+	if ctrl_server and ctrl_server.should_exit is False:
+		ctrl_server.should_exit = True
+	ctrl_app    = None
+	ctrl_server = None
+	ctrl_status = None
+	return {"message": "Server shut down"}
+
+
+async def run_server():
+	global config, ctrl_app, ctrl_server
+
+	host        = "0.0.0.0"
+	ctrl_config = uvicorn.Config(ctrl_app, host=host, port=config.port)
 	ctrl_server = uvicorn.Server(ctrl_config)
-	servers     = [ctrl_server]
 
-	for agent in app.agents:
-		agent_app    = agent.generate_app()
-		agent_port   = app.config.agents[agent.agent_index].port
-		agent_config = uvicorn.Config(agent_app, host=host, port=agent_port)
-		agent_server = uvicorn.Server(agent_config)
-		servers.append(agent_server)
-
-	await asyncio.gather(*[server.serve() for server in servers])
+	await ctrl_server.serve()
 
 
 if __name__ == "__main__":
-	asyncio.run(run_servers())
+	asyncio.run(run_server())
+	print("Server shut down")

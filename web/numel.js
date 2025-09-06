@@ -6,57 +6,131 @@ class NumelApp {
 		return id;
 	}
 
-	static _defaultStatus() {
-		const status = {
-			"config" : {
-				"agents" : [],
-			},
-		};
-		return status;
+	static _randomMessageId() {
+		const id = `numel-message-${NumelApp._randomId()}`;
+		return id;
 	}
 
-	static async _get(url) {
+	static async _post(url, body) {
 		const res = await fetch(url, {
-			headers: {
+			method  : "POST",
+			headers : {
 				"Access-Control-Allow-Origin": "*",
+				"Content-Type": "application/json"
 			},
+			body    : body ? JSON.stringify(body) : null,
 		}).then(async response => {
 			if (!response.ok) {
-				throw new Error(`HTTP error: ${response.status}`);
+				throw new Error(response.statusText);
 			}
 			const result = await response.json();
-			result["error"] = null;
+			if (!("error" in result)) {
+				result["error"] = null;
+			}
 			return result;
 		})
 		.catch(error => {
 			console.error("Error fetching:", error);
-			const result = NumelApp._defaultStatus();
-			result["error"] = error;
+			const result = {
+				"error" : error,
+			}
 			return result;
 		});
 		return res;
 	}
 
-	static async getStatus(url) {
-		return NumelApp._get(url + "/status");
+	static async _ping(url) {
+		return NumelApp._post(url + "/ping");
 	}
 
-	static async getDefault(url) {
-		return NumelApp._get(url + "/default");
+	static async _getConfig(url) {
+		return NumelApp._post(url + "/export");
 	}
 
-	static async create(url, userId, sessionId, subscriber) {
+	static async _putConfig(url, config) {
+		return NumelApp._post(url + "/import", config);
+	}
+
+	static async _start(url) {
+		return NumelApp._post(url + "/start");
+	}
+
+	static async _stop(url) {
+		return NumelApp._post(url + "/stop");
+	}
+
+	static async _restart(url) {
+		return NumelApp._post(url + "/restart");
+	}
+
+	static async _getStatus(url) {
+		return NumelApp._post(url + "/status");
+	}
+
+	static async _shutdown(url) {
+		return NumelApp._post(url + "/shutdown");
+	}
+
+	static async connect(url, userId, sessionId, config, subscriber) {
+		let status = null;
+		await NumelApp._stop(url);
+		if (config) {
+			status = await NumelApp._putConfig(url, config);
+			if (!status || status.error) {
+				return null;
+			}
+		}
+		status = await NumelApp._start(url);
+		if (!status || status.error) {
+			return null;
+		}
 		const app = new NumelApp(url, userId, sessionId, subscriber);
-		await app.update();
+		status = await app._update();
+		if (!status || status.error) {
+			return null;
+		}
 		if (!app.isValid()) {
+			await NumelApp._stop(url);
 			return null;
 		}
 		return app;
 	}
 
+	constructor(url, userId, sessionId, subscriber) {
+		this.url        = url;
+		this.userId     = userId;
+		this.sessionId  = sessionId;
+		this.subscriber = subscriber;
+		this.status     = null;
+		this.valid      = false;
+		this.agents     = null;
+		this.agentIndex = -1;
+	}
+
+	async _update() {
+		try {
+			const status    = await NumelApp._getStatus(this.url);
+			this.valid      = true;
+			this.status     = status;
+			this.agents     = (("config" in status) && ("agents" in status["config"])) ? new Array(status["config"]["agents"].length) : [];
+			this.agentIndex = (this.agents.lenght > 0) ? 0 : -1;
+		}
+		catch (error) {
+			console.error("Error fetching status:", error);
+			this.valid      = false;
+			this.status     = null;
+			this.agents     = null;
+			this.agentIndex = -1;
+		}
+		return this.isValid();
+	}
+
 	_getAgent(index) {
 		if ((index == null) || (index < 0)) {
 			index = this.agentIdx;
+			if (index < 0) {
+				return null;
+			}
 		}
 
 		let agent = this.agents[index];
@@ -92,31 +166,8 @@ class NumelApp {
 		return agent;
 	}
 
-	constructor(url, userId, sessionId, subscriber) {
-		this.url        = url;
-		this.userId     = userId;
-		this.sessionId  = sessionId;
-		this.subscriber = subscriber;
-		this.status     = null;
-		this.valid      = false;
-		this.agents     = null;
-		this.agentIndex = -1;
-	}
-
 	isValid() {
 		return this.valid;
-	}
-
-	async update() {
-		this.status     = null;
-		this.agents     = null;
-		this.agentIndex = -1;
-		this.valid      = false;
-		this.status     = await NumelApp.getStatus(this.url);
-		this.agents     = new Array(this.status["config"]["agents"].length);
-		this.agentIndex = (this.agents.lenght > 0) ? 0 : -1;
-		this.valid      = true;
-		return this.status;
 	}
 
 	getDefaultAgentIndex() {
@@ -131,6 +182,45 @@ class NumelApp {
 		return true;
 	}
 
+	async disconnect() {
+		await this.stop();
+		this.valid  = false;
+		this.status = null;
+		this.agents = null;
+	}
+
+	async ping() {
+		return NumelApp._ping(this.url);
+	}
+
+	async getStatus() {
+		return NumelApp._getStatus(this.url);
+	}
+
+	async getConfig() {
+		return NumelApp._getConfig(this.url);
+	}
+
+	async putConfig(config) {
+		return NumelApp._putConfig(this.url, config);
+	}
+
+	async start() {
+		return NumelApp._start(this.url);
+	}
+
+	async stop() {
+		return NumelApp._stop(this.url);
+	}
+
+	async restart() {
+		return NumelApp._restart(this.url);
+	}
+
+	async shutdown() {
+		return NumelApp._shutdown(this.url);
+	}
+
 	async send(message, index = -1) {
 		if (!this.isValid()) {
 			return false;
@@ -139,7 +229,7 @@ class NumelApp {
 		if (!agent) {
 			return null;
 		}
-		const messageId   = `numel-message-${NumelApp._randomId()}`;
+		const messageId   = `${NumelApp._randomMessageId()}`;
 		const userMessage = {
 			id      : messageId,
 			role    : "user",

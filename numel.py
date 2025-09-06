@@ -8,6 +8,18 @@ from   pydantic        import BaseModel
 from   typing          import Any, Dict, List, Optional, Required, Tuple, Union
 
 
+BACKEND_TYPES             = ["agno"]
+MODEL_TYPES               = ["ollama", "openai"]
+EMBEDDING_TYPES           = ["ollama", "openai"]
+KNOWLEDGE_DB_TYPES        = ["lancedb"]
+KNOWLEDGE_DB_SEARCH_TYPES = ["hybrid"]
+KNOWLEDGE_TYPES           = ["knowledge"]
+MEMORY_DB_TYPES           = ["sqlite"]
+MEMORY_TYPES              = ["memory"]
+STORAGE_DB_TYPES          = ["sqlite"]
+STORAGE_TYPES             = ["storage"]
+
+
 DEFAULT_SEED                                      : int  = 42
 
 DEFAULT_API_KEY                                   : str  = None
@@ -202,6 +214,71 @@ def validate_config(config: AppConfig) -> bool:
 	return True
 
 
+# def unroll_config_mod(config: AppConfig) -> AppConfig:
+# 	config_copy = copy.deepcopy(config) if config is not None else AppConfig()
+
+# 	if True:
+# 		if not config_copy.backends      : config_copy.backends      = []
+# 		if not config_copy.models        : config_copy.models        = []
+# 		if not config_copy.embeddings    : config_copy.embeddings    = []
+# 		if not config_copy.knowledge_dbs : config_copy.knowledge_dbs = []
+# 		if not config_copy.knowledges    : config_copy.knowledges    = []
+# 		if not config_copy.memory_dbs    : config_copy.memory_dbs    = []
+# 		if not config_copy.memories      : config_copy.memories      = []
+# 		if not config_copy.storage_dbs   : config_copy.storage_dbs   = []
+# 		if not config_copy.storages      : config_copy.storages      = []
+# 		if not config_copy.options       : config_copy.options       = []
+# 		if not config_copy.agents        : config_copy.agents        = []
+
+
+# 	if True:
+# 		max_backends      = len(config_copy.backends)
+# 		max_models        = len(config_copy.models)
+# 		max_embeddings    = len(config_copy.embeddings)
+# 		max_knowledge_dbs = len(config_copy.knowledge_dbs)
+# 		max_knowledges    = len(config_copy.knowledges)
+# 		max_memory_dbs    = len(config_copy.memory_dbs)
+# 		max_memories      = len(config_copy.memories)
+# 		max_storage_dbs   = len(config_copy.storage_dbs)
+# 		max_storages      = len(config_copy.storages)
+# 		max_options       = len(config_copy.options)
+# 		max_agents        = len(config_copy.agents)
+
+
+# 	if True:
+# 		item = BackendConfig()
+# 		config_copy.backends.append(item)
+# 		shared_backend_index = len(config_copy.backends) - 1
+
+# 		item = ModelConfig()
+# 		config_copy.models.append(item)
+# 		shared_model_index = len(config_copy.models) - 1
+
+# 		item = EmbeddingConfig()
+# 		config_copy.embeddings.append(item)
+# 		shared_embedding_index = len(config_copy.embeddings) - 1
+
+# 		item = OptionsConfig()
+# 		config_copy.options.append(item)
+# 		shared_options_index = len(config_copy.options) - 1
+
+
+# 	if True:
+# 		if config_copy.backend is None:
+# 			config_copy.backend = shared_backend_index
+# 		elif isinstance(config_copy.backend, BackendConfig):
+# 			config_copy.backends.append(config_copy.backend)
+# 			config_copy.backend = len(config_copy.backends) - 1
+# 		elif isinstance(config_copy.backend, int):
+# 			if config_copy.backend >= max_backends:
+# 				raise ValueError("Invalid app backend")
+
+
+# 	if True:
+# 		# knowledge_dbs
+# 		pass
+
+
 def unroll_config(config: AppConfig) -> AppConfig:
 	config_copy = copy.deepcopy(config) if config is not None else AppConfig()
 
@@ -216,6 +293,18 @@ def unroll_config(config: AppConfig) -> AppConfig:
 	if not config_copy.storages      : config_copy.storages      = []
 	if not config_copy.options       : config_copy.options       = []
 	if not config_copy.agents        : config_copy.agents        = []
+
+	max_backends      = len(config_copy.backends)
+	max_models        = len(config_copy.models)
+	max_embeddings    = len(config_copy.embeddings)
+	max_knowledge_dbs = len(config_copy.knowledge_dbs)
+	max_knowledges    = len(config_copy.knowledges)
+	max_memory_dbs    = len(config_copy.memory_dbs)
+	max_memories      = len(config_copy.memories)
+	max_storage_dbs   = len(config_copy.storage_dbs)
+	max_storages      = len(config_copy.storages)
+	max_options       = len(config_copy.options)
+	max_agents        = len(config_copy.agents)
 
 	item = BackendConfig()
 	config_copy.backends.append(item)
@@ -377,7 +466,7 @@ def unroll_config(config: AppConfig) -> AppConfig:
 				raise ValueError("Invalid agent storage db")
 
 		if agent.options is None:
-			agent.options = OptionsConfig()
+			agent.options = shared_options
 		if isinstance(agent.options, OptionsConfig):
 			config_copy.options.append(agent.options)
 			agent.options = len(config_copy.options) - 1
@@ -423,6 +512,13 @@ def seed_everything(seed: int = DEFAULT_SEED):
 		torch .backends.cudnn.deterministic = True
 	except:
 		pass
+
+
+def get_time_str() -> str:
+	from datetime import datetime
+	now = datetime.now()
+	res = now.strftime("%Y-%m-%d %H:%M:%S")
+	return res
 
 
 def module_prop_str(file_path: str, property_name: str) -> str:
