@@ -1,0 +1,41 @@
+# requirements.txt
+
+# Core dependencies
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Async support
+asyncio==3.4.3
+aiofiles==23.2.1
+
+# Database and storage
+sqlalchemy==2.0.25
+lancedb==0.5.3
+sqlite3-api==2.0.1
+
+# AI/ML frameworks (adjust versions based on agno requirements)
+openai==1.10.0
+ollama==0.1.7
+
+# Vector operations
+numpy==1.26.3
+pandas==2.1.4
+
+# Web tools
+duckduckgo-search==4.1.1
+httpx==0.26.0
+
+# CORS and security
+python-multipart==0.0.6
+
+# Agno framework - you'll need to specify the correct package
+# Uncomment and adjust if it's available on PyPI:
+# agno==x.x.x
+
+# Or if it's a local/private package, you might need:
+# -e git+https://github.com/yourusername/agno.git#egg=agno
+
+# Additional utilities
+python-dotenv==1.0.0

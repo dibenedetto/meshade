@@ -1,0 +1,65 @@
+# Makefile
+.PHONY: help setup build up down dev logs shell clean rebuild
+
+help: ## Show this help message
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Available targets:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
+
+setup: ## Initial project setup
+	@bash setup.sh
+
+build: ## Build Docker images
+	docker-compose build
+
+up: ## Start all services
+	docker-compose up -d
+
+down: ## Stop all services
+	docker-compose down
+
+dev: ## Start in development mode with hot reload
+	docker-compose -f docker-compose.dev.yml up
+
+dev-build: ## Build development containers
+	docker-compose -f docker-compose.dev.yml build
+
+logs: ## View logs from all containers
+	docker-compose logs -f
+
+logs-app: ## View logs from app container only
+	docker-compose logs -f numel-app
+
+shell: ## Open shell in app container
+	docker-compose exec numel-app /bin/bash
+
+clean: ## Clean up containers, volumes, and networks
+	docker-compose down -v
+	docker system prune -f
+
+rebuild: ## Rebuild and restart all services
+	make down
+	make build
+	make up
+
+postgres-up: ## Start only PostgreSQL service
+	docker-compose up -d postgres
+
+postgres-shell: ## Open PostgreSQL shell
+	docker-compose exec postgres psql -U numel -d numel_db
+
+pgadmin: ## Start pgAdmin (requires tools profile)
+	docker-compose --profile tools up -d pgadmin
+
+redis: ## Start Redis cache (requires cache profile)
+	docker-compose --profile cache up -d redis
+
+test: ## Run tests (if you have any)
+	docker-compose exec numel-app python -m pytest /app/src/tests
+
+install-local: ## Install Python dependencies locally for IDE support
+	pip install -r requirements.txt
+
+status: ## Show status of all containers
+	docker-compose ps

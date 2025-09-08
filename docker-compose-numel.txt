@@ -1,0 +1,81 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  numel-app:
+    build: .
+    container_name: numel-ai
+    ports:
+      - "8000-8010:8000-8010"
+    volumes:
+      # Mount source code as volume for live editing
+      - ./src:/app/src:rw
+      # Mount storage directories for persistence
+      - ./storage:/app/storage:rw
+      # Mount config file
+      - ./config:/app/config:rw
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app/src
+      - DATABASE_URL=postgresql://numel:numel_password@postgres:5432/numel_db
+      - SQLITE_PATH=/app/storage/numel.db
+    networks:
+      - numel-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    command: python /app/src/launch.py --config_path /app/config/config.json
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: numel-postgres
+    environment:
+      - POSTGRES_USER=numel
+      - POSTGRES_PASSWORD=numel_password
+      - POSTGRES_DB=numel_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - numel-network
+    restart: unless-stopped
+
+  # Optional: pgAdmin for PostgreSQL management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: numel-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@numel.local
+      - PGADMIN_DEFAULT_PASSWORD=admin_password
+    ports:
+      - "5050:80"
+    networks:
+      - numel-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    profiles:
+      - tools
+
+  # Optional: Redis for caching (if needed)
+  redis:
+    image: redis:7-alpine
+    container_name: numel-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - numel-network
+    restart: unless-stopped
+    profiles:
+      - cache
+
+networks:
+  numel-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:

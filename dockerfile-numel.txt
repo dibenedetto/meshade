@@ -1,0 +1,32 @@
+# Dockerfile
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements file
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create directories for storage
+RUN mkdir -p /app/storage/knowledge /app/storage/memory /app/storage/session
+
+# Expose ports for the main app and agents
+EXPOSE 8000-8010
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/src:$PYTHONPATH
+
+# Default command (can be overridden in docker-compose)
+CMD ["python", "/app/src/launch.py", "--config_path", "/app/src/config.json"]

@@ -219,6 +219,9 @@ class AppConfig(BaseModel):
 		// Store reference to original menu function
 		this._originalGetCanvasMenuOptions = this.canvas.getCanvasMenuOptions;
 
+		// Add layout controls to right-click menu
+		this.addLayoutControls();
+
 		window.addEventListener("resize", () => canvas.resize());
 	}
 
@@ -716,6 +719,16 @@ class AppConfig(BaseModel):
 		// Handle nested relationships (like AgentConfig -> ModelConfig)
 		that._connectNestedReferences(nodeMap, inlineNodes, appConfig);
 		
+		setTimeout(() => {
+			// Use hierarchical layout by default for config graphs
+			that.layoutGraph('hierarchical', {
+				direction: 'LR',  // Left to right
+				layerSpacing: 450,  // Match your existing xSpacing
+				nodeSpacing: 200,
+				alignLayers: true
+			});
+		}, 100);  // Small delay to ensure all nodes are rendered
+
 		return nodeMap;
 	}
 
@@ -1270,6 +1283,483 @@ class AppConfig(BaseModel):
 		}
 
 		return false;
+	}
+
+	/**
+	 * Auto-layout graph nodes using various algorithms
+	 * @param {string} algorithm - Layout algorithm: 'hierarchical', 'force', 'circular', 'grid'
+	 * @param {object} options - Layout options
+	 */
+	layoutGraph(algorithm = 'hierarchical', options = {}) {
+		const nodes = this.graph._nodes;
+		if (!nodes || nodes.length === 0) return;
+
+		switch (algorithm) {
+			case 'hierarchical':
+				this._hierarchicalLayout(nodes, options);
+				break;
+			case 'force':
+				this._forceDirectedLayout(nodes, options);
+				break;
+			case 'circular':
+				this._circularLayout(nodes, options);
+				break;
+			case 'grid':
+				this._gridLayout(nodes, options);
+				break;
+			default:
+				this._hierarchicalLayout(nodes, options);
+		}
+
+		// Center the graph in view
+		this.centerGraph();
+	}
+
+	/**
+	 * Hierarchical layout - best for directed graphs with clear dependencies
+	 */
+	_hierarchicalLayout(nodes, options = {}) {
+		const {
+			layerSpacing = 250,
+			nodeSpacing = 150,
+			direction = 'LR', // 'TB' (top-bottom), 'LR' (left-right)
+			alignLayers = true
+		} = options;
+
+		// Build adjacency information
+		const nodeMap = new Map();
+		const inDegree = new Map();
+		const outEdges = new Map();
+		
+		nodes.forEach(node => {
+			nodeMap.set(node.id, node);
+			inDegree.set(node.id, 0);
+			outEdges.set(node.id, []);
+		});
+
+		// Count connections and build edge lists
+		nodes.forEach(node => {
+			if (node.outputs) {
+				node.outputs.forEach(output => {
+					if (output.links && output.links.length > 0) {
+						output.links.forEach(linkId => {
+							const link = this.graph.links[linkId];
+							if (link) {
+								const targetNode = this.graph.getNodeById(link.target_id);
+								if (targetNode) {
+									outEdges.get(node.id).push(targetNode.id);
+									inDegree.set(targetNode.id, inDegree.get(targetNode.id) + 1);
+								}
+							}
+						});
+					}
+				});
+			}
+		});
+
+		// Assign nodes to layers using topological sort
+		const layers = [];
+		const visited = new Set();
+		const nodeLayer = new Map();
+
+		// Find root nodes (no incoming edges)
+		const roots = [];
+		inDegree.forEach((degree, nodeId) => {
+			if (degree === 0) {
+				roots.push(nodeId);
+			}
+		});
+
+		// If no roots found, pick nodes with minimum in-degree
+		if (roots.length === 0) {
+			let minDegree = Infinity;
+			inDegree.forEach((degree, nodeId) => {
+				if (degree < minDegree) {
+					minDegree = degree;
+				}
+			});
+			inDegree.forEach((degree, nodeId) => {
+				if (degree === minDegree) {
+					roots.push(nodeId);
+				}
+			});
+		}
+
+		// BFS to assign layers
+		let currentLayer = 0;
+		let queue = [...roots];
+		
+		while (queue.length > 0) {
+			const nextQueue = [];
+			const currentLayerNodes = [];
+			
+			queue.forEach(nodeId => {
+				if (!visited.has(nodeId)) {
+					visited.add(nodeId);
+					nodeLayer.set(nodeId, currentLayer);
+					currentLayerNodes.push(nodeId);
+					
+					// Add connected nodes to next layer
+					const edges = outEdges.get(nodeId) || [];
+					edges.forEach(targetId => {
+						if (!visited.has(targetId)) {
+							nextQueue.push(targetId);
+						}
+					});
+				}
+			});
+			
+			if (currentLayerNodes.length > 0) {
+				layers[currentLayer] = currentLayerNodes;
+			}
+			
+			queue = [...new Set(nextQueue)];
+			currentLayer++;
+		}
+
+		// Handle any unvisited nodes
+		nodes.forEach(node => {
+			if (!visited.has(node.id)) {
+				nodeLayer.set(node.id, currentLayer);
+				if (!layers[currentLayer]) {
+					layers[currentLayer] = [];
+				}
+				layers[currentLayer].push(node.id);
+			}
+		});
+
+		// Position nodes
+		const isHorizontal = direction === 'LR' || direction === 'RL';
+		const startX = 50;
+		const startY = 50;
+
+		layers.forEach((layerNodes, layerIndex) => {
+			// Sort nodes in each layer to minimize crossings
+			if (layerIndex > 0) {
+				layerNodes.sort((a, b) => {
+					const aNode = nodeMap.get(a);
+					const bNode = nodeMap.get(b);
+					return this._getBarycenter(aNode, layers[layerIndex - 1], nodeMap) - 
+						this._getBarycenter(bNode, layers[layerIndex - 1], nodeMap);
+				});
+			}
+
+			// Position nodes in this layer
+			layerNodes.forEach((nodeId, nodeIndex) => {
+				const node = nodeMap.get(nodeId);
+				if (node) {
+					if (isHorizontal) {
+						node.pos[0] = startX + layerIndex * layerSpacing;
+						node.pos[1] = startY + nodeIndex * nodeSpacing;
+						
+						// Center the layer vertically if alignment is enabled
+						if (alignLayers) {
+							const layerHeight = layerNodes.length * nodeSpacing;
+							const offset = -layerHeight / 2;
+							node.pos[1] += offset + this.canvas.canvas.height / 2;
+						}
+					} else {
+						node.pos[0] = startX + nodeIndex * nodeSpacing;
+						node.pos[1] = startY + layerIndex * layerSpacing;
+						
+						// Center the layer horizontally if alignment is enabled
+						if (alignLayers) {
+							const layerWidth = layerNodes.length * nodeSpacing;
+							const offset = -layerWidth / 2;
+							node.pos[0] += offset + this.canvas.canvas.width / 2;
+						}
+					}
+				}
+			});
+		});
+
+		this.graph.setDirtyCanvas(true, true);
+	}
+
+	/**
+	 * Calculate barycenter for crossing minimization
+	 */
+	_getBarycenter(node, previousLayer, nodeMap) {
+		if (!node || !node.inputs) return 0;
+		
+		let sum = 0;
+		let count = 0;
+		
+		node.inputs.forEach(input => {
+			if (input.link) {
+				const link = this.graph.links[input.link];
+				if (link) {
+					const sourceNode = this.graph.getNodeById(link.origin_id);
+					if (sourceNode) {
+						const index = previousLayer.indexOf(sourceNode.id);
+						if (index !== -1) {
+							sum += index;
+							count++;
+						}
+					}
+				}
+			}
+		});
+		
+		return count > 0 ? sum / count : 0;
+	}
+
+	/**
+	 * Force-directed layout - good for general graphs
+	 */
+	_forceDirectedLayout(nodes, options = {}) {
+		const {
+			iterations = 100,
+			nodeRepulsion = 1000,
+			linkDistance = 200,
+			centerForce = 0.01,
+			damping = 0.9
+		} = options;
+
+		// Initialize node positions randomly if not set
+		const positions = new Map();
+		const velocities = new Map();
+		
+		nodes.forEach(node => {
+			positions.set(node.id, {
+				x: node.pos[0] || Math.random() * 800,
+				y: node.pos[1] || Math.random() * 600
+			});
+			velocities.set(node.id, { x: 0, y: 0 });
+		});
+
+		// Get canvas center
+		const centerX = this.canvas.canvas.width / 2;
+		const centerY = this.canvas.canvas.height / 2;
+
+		// Simulation loop
+		for (let iter = 0; iter < iterations; iter++) {
+			// Reset forces
+			const forces = new Map();
+			nodes.forEach(node => {
+				forces.set(node.id, { x: 0, y: 0 });
+			});
+
+			// Apply repulsion between all nodes
+			for (let i = 0; i < nodes.length; i++) {
+				for (let j = i + 1; j < nodes.length; j++) {
+					const node1 = nodes[i];
+					const node2 = nodes[j];
+					const pos1 = positions.get(node1.id);
+					const pos2 = positions.get(node2.id);
+					
+					const dx = pos2.x - pos1.x;
+					const dy = pos2.y - pos1.y;
+					const distance = Math.sqrt(dx * dx + dy * dy) + 0.01;
+					
+					const force = nodeRepulsion / (distance * distance);
+					const fx = (dx / distance) * force;
+					const fy = (dy / distance) * force;
+					
+					forces.get(node1.id).x -= fx;
+					forces.get(node1.id).y -= fy;
+					forces.get(node2.id).x += fx;
+					forces.get(node2.id).y += fy;
+				}
+			}
+
+			// Apply spring forces for connected nodes
+			nodes.forEach(node => {
+				if (node.outputs) {
+					node.outputs.forEach(output => {
+						if (output.links) {
+							output.links.forEach(linkId => {
+								const link = this.graph.links[linkId];
+								if (link) {
+									const targetNode = this.graph.getNodeById(link.target_id);
+									if (targetNode) {
+										const pos1 = positions.get(node.id);
+										const pos2 = positions.get(targetNode.id);
+										
+										const dx = pos2.x - pos1.x;
+										const dy = pos2.y - pos1.y;
+										const distance = Math.sqrt(dx * dx + dy * dy) + 0.01;
+										
+										const force = (distance - linkDistance) * 0.01;
+										const fx = (dx / distance) * force;
+										const fy = (dy / distance) * force;
+										
+										forces.get(node.id).x += fx;
+										forces.get(node.id).y += fy;
+										forces.get(targetNode.id).x -= fx;
+										forces.get(targetNode.id).y -= fy;
+									}
+								}
+							});
+						}
+					});
+				}
+			});
+
+			// Apply center force
+			nodes.forEach(node => {
+				const pos = positions.get(node.id);
+				const dx = centerX - pos.x;
+				const dy = centerY - pos.y;
+				
+				forces.get(node.id).x += dx * centerForce;
+				forces.get(node.id).y += dy * centerForce;
+			});
+
+			// Update velocities and positions
+			nodes.forEach(node => {
+				const force = forces.get(node.id);
+				const vel = velocities.get(node.id);
+				const pos = positions.get(node.id);
+				
+				vel.x = vel.x * damping + force.x;
+				vel.y = vel.y * damping + force.y;
+				
+				pos.x += vel.x;
+				pos.y += vel.y;
+			});
+		}
+
+		// Apply final positions
+		nodes.forEach(node => {
+			const pos = positions.get(node.id);
+			node.pos[0] = pos.x;
+			node.pos[1] = pos.y;
+		});
+
+		this.graph.setDirtyCanvas(true, true);
+	}
+
+	/**
+	 * Circular layout - good for showing all nodes equally
+	 */
+	_circularLayout(nodes, options = {}) {
+		const {
+			radius = Math.min(this.canvas.canvas.width, this.canvas.canvas.height) / 3,
+			startAngle = 0,
+			sweep = Math.PI * 2
+		} = options;
+
+		const centerX = this.canvas.canvas.width / 2;
+		const centerY = this.canvas.canvas.height / 2;
+		const angleStep = sweep / nodes.length;
+
+		nodes.forEach((node, index) => {
+			const angle = startAngle + index * angleStep;
+			node.pos[0] = centerX + Math.cos(angle) * radius;
+			node.pos[1] = centerY + Math.sin(angle) * radius;
+		});
+
+		this.graph.setDirtyCanvas(true, true);
+	}
+
+	/**
+	 * Grid layout - simple organization in a grid
+	 */
+	_gridLayout(nodes, options = {}) {
+		const {
+			columns = Math.ceil(Math.sqrt(nodes.length)),
+			cellWidth = 250,
+			cellHeight = 200,
+			startX = 50,
+			startY = 50
+		} = options;
+
+		nodes.forEach((node, index) => {
+			const row = Math.floor(index / columns);
+			const col = index % columns;
+			
+			node.pos[0] = startX + col * cellWidth;
+			node.pos[1] = startY + row * cellHeight;
+		});
+
+		this.graph.setDirtyCanvas(true, true);
+	}
+
+	/**
+	 * Center the graph view on all nodes
+	 */
+	centerGraph() {
+		if (!this.graph._nodes || this.graph._nodes.length === 0) return;
+
+		// Calculate bounding box
+		let minX = Infinity, minY = Infinity;
+		let maxX = -Infinity, maxY = -Infinity;
+		
+		this.graph._nodes.forEach(node => {
+			minX = Math.min(minX, node.pos[0]);
+			minY = Math.min(minY, node.pos[1]);
+			maxX = Math.max(maxX, node.pos[0] + node.size[0]);
+			maxY = Math.max(maxY, node.pos[1] + node.size[1]);
+		});
+
+		// Calculate center and size
+		const graphWidth = maxX - minX;
+		const graphHeight = maxY - minY;
+		const graphCenterX = minX + graphWidth / 2;
+		const graphCenterY = minY + graphHeight / 2;
+
+		// Calculate required scale to fit
+		const canvasWidth = this.canvas.canvas.width;
+		const canvasHeight = this.canvas.canvas.height;
+		const padding = 50;
+		
+		const scaleX = (canvasWidth - padding * 2) / graphWidth;
+		const scaleY = (canvasHeight - padding * 2) / graphHeight;
+		const scale = Math.min(scaleX, scaleY, 1.5); // Don't zoom in too much
+
+		// Apply scale and center
+		this.canvas.ds.scale = scale;
+		this.canvas.ds.offset[0] = canvasWidth / 2 - graphCenterX * scale;
+		this.canvas.ds.offset[1] = canvasHeight / 2 - graphCenterY * scale;
+
+		this.graph.setDirtyCanvas(true, true);
+	}
+
+	/**
+	 * Add layout button to canvas menu
+	 */
+	addLayoutControls() {
+		const that = this;
+		
+		// Override the canvas menu to add layout options
+		const originalGetCanvasMenuOptions = this.canvas.getCanvasMenuOptions;
+		this.canvas.getCanvasMenuOptions = function() {
+			const options = originalGetCanvasMenuOptions ? originalGetCanvasMenuOptions.call(this) : [];
+			
+			// Add separator
+			options.push(null);
+			
+			// Add layout options
+			options.push({
+				content: "Layout: Hierarchical",
+				callback: () => that.layoutGraph('hierarchical')
+			});
+			
+			options.push({
+				content: "Layout: Force-Directed",
+				callback: () => that.layoutGraph('force')
+			});
+			
+			options.push({
+				content: "Layout: Circular",
+				callback: () => that.layoutGraph('circular')
+			});
+			
+			options.push({
+				content: "Layout: Grid",
+				callback: () => that.layoutGraph('grid')
+			});
+			
+			options.push(null);
+			
+			options.push({
+				content: "Center View",
+				callback: () => that.centerGraph()
+			});
+			
+			return options;
+		};
 	}
 
 	exportJSON() {
