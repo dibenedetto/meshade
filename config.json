@@ -144,7 +144,10 @@
 			],
 
 			"backend" : 0,
-			"model"   : 0
+			"model"   : {
+				"type" : "openai",
+				"id"   : "gpt-4o"
+			}
 		}
 	]
 }

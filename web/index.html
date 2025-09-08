@@ -12,10 +12,10 @@
 			line-height: 1.6;
 			background: #f8f9fa;
 			background: #1F1E1D;
-			display: flex;
 			gap: 20px;
 			height: 100vh;
 			box-sizing: border-box;
+			display: flex;
 		}
 
 		.main-content {
@@ -121,13 +121,20 @@
 			font-size: 16px;
 		}
 
-		#numelCanvas {
+		/* Canvas wrapper to handle border separately */
+		.canvas-wrapper {
+			flex: 1;
 			border: 1px solid #555;
 			border-radius: 6px;
-			flex: 1;
-			width: 100%;
-			max-height: 100%;
+			overflow: hidden;
+			position: relative;
+			display: flex;
+		}
+
+		#numelCanvas {
 			display: block;
+			width: 100%;
+			height: 100%;
 		}
 
 		button {
@@ -148,21 +155,6 @@
 			background: #6c757d;
 			cursor: not-allowed;
 		}
-
-		/*
-		.status {
-			margin: 5px 0;
-			padding: 0px;
-			padding-left: 4px;
-			border-radius: 4px;
-			font-size: 0.9em;
-			border: 1px solid #555;
-		}
-
-		.status.connected { background: #d4edda; color: #155724; }
-		.status.connecting { background: #fff3cd; color: #856404; }
-		.status.disconnected { background: #f8d7da; color: #721c24; }
-		*/
 
 		.status.idle { color: #bea7ff; }
 		.status.connecting { color: #b18606; }
@@ -211,8 +203,8 @@
 			color: orange;
 		}
 	</style>
-	<link rel="stylesheet" type="text/css" href="litegraph.css">
-	<script type="text/javascript" src="litegraph.js"></script>
+	<link rel="stylesheet" type="text/css" href="https://unpkg.com/litegraph.js/css/litegraph.css">
+	<script type="text/javascript" src="https://unpkg.com/litegraph.js/build/litegraph.js"></script>
 </head>
 <body>
 	<div class="container">
@@ -243,15 +235,12 @@
 			<table>
 				<tr>
 					<td><label for="agents">Agent:</label></td>
-					<td><select id="appAgentSelect" disabled><option value="-1"> - None - </option></select>
-					<!-- <button id="usunne" onclick="buildAgent()">Create Agent (ask for locals, check, pay, give api keys, ...)</button> -->
-					</td>
+					<td><select id="appAgentSelect" disabled><option value="-1"> - None - </option></select></td>
 				</tr>
 				<tr>
 					<td><label for="debugMessage">Debug:</label></td>
 					<td>
 						<input type="checkbox" id="debugMessage" value="true" />
-						<!-- <button id="defaultConfigButton" onclick="getAppDefault()">Get</button> -->
 					</td>
 				</tr>
 			</table>
@@ -269,11 +258,11 @@
 		<div id="loading" class="loading">Loading AG-UI client...</div>
 	</div>
 
-	</div>
-
 	<div class="canvas-container">
 		<h2 class="centered">Graph Editor</h2>
-		<canvas id="numelCanvas"></canvas>
+		<div class="canvas-wrapper">
+			<canvas id="numelCanvas"></canvas>
+		</div>
 	</div>
 
 	<div class="footer">
@@ -431,7 +420,10 @@
 					],
 
 					"backend" : 0,
-					"model"   : 0
+					"model"   : {
+						"type" : "openai",
+						"id"   : "gpt-4o"
+					}
 				}
 			]
 		};
@@ -441,6 +433,7 @@
 
 		let aguiApp            = null;
 		let graph              = null;
+		let canvas             = null;
 		let isConnected        = false;
 		let agentPrevIndex     = -1;
 		let agentCurrIndex     = -1;
@@ -698,33 +691,49 @@
 		}
 
 		function resizeCanvas() {
-			const canvas = document.getElementById('numelCanvas');
-			const container = canvas.parentElement;
+			const canvasEl = document.getElementById('numelCanvas');
+			const wrapper = canvasEl.parentElement;
+			const container = wrapper.parentElement;
 			const header = container.querySelector('h2');
 			
-			// Calculate available space more precisely
+			// Calculate available space
 			const containerStyle = window.getComputedStyle(container);
 			const headerStyle = window.getComputedStyle(header);
+			const wrapperStyle = window.getComputedStyle(wrapper);
 			
 			const containerPadding = parseFloat(containerStyle.paddingTop) + parseFloat(containerStyle.paddingBottom);
 			const headerHeight = header.offsetHeight + parseFloat(headerStyle.marginTop) + parseFloat(headerStyle.marginBottom);
-			const containerBorder = parseFloat(containerStyle.borderTopWidth) + parseFloat(containerStyle.borderBottomWidth);
 			
-			const availableWidth = container.clientWidth - parseFloat(containerStyle.paddingLeft) - parseFloat(containerStyle.paddingRight);
-			const availableHeight = container.clientHeight - containerPadding - headerHeight - containerBorder;
+			// Get wrapper dimensions (which already accounts for borders)
+			const availableWidth = wrapper.clientWidth;
+			const availableHeight = wrapper.clientHeight;
 			
-			canvas.width = Math.max(availableWidth, 100);
-			canvas.height = Math.max(availableHeight, 100);
+			// Get device pixel ratio for high DPI displays
+			const dpr = window.devicePixelRatio || 1;
 			
-			// Set CSS dimensions to fill container exactly
-			canvas.style.width = availableWidth + 'px';
-			canvas.style.height = availableHeight + 'px';
-			canvas.style.maxWidth = '100%';
-			canvas.style.maxHeight = '100%';
+			// Set internal canvas dimensions (accounting for DPI)
+			canvasEl.width = availableWidth * dpr;
+			canvasEl.height = availableHeight * dpr;
 			
-			// Notify LiteGraph of canvas size change
+			// Set CSS dimensions to match the wrapper
+			canvasEl.style.width = availableWidth + 'px';
+			canvasEl.style.height = availableHeight + 'px';
+			
+			// Notify LiteGraph of canvas size change and DPI
 			if (graph && graph.canvas) {
+				// Scale the context for high DPI displays
+				const ctx = canvasEl.getContext('2d');
+				ctx.scale(dpr, dpr);
+				
+				// Update LiteGraph's internal dimensions
 				graph.canvas.resize();
+				
+				// Force LiteGraph to recalculate mouse coordinates with the correct canvas dimensions
+				graph.canvas.mouse = [0, 0];
+				graph.canvas.graph_mouse = [0, 0];
+				
+				// Trigger a redraw
+				graph.canvas.setDirty(true, true);
 			}
 		}
 
@@ -748,11 +757,54 @@
 
 		window.onload = () => {
 			changeSystemVisibility.call(systemMsgButton);
-			
-			// Initialize graph and resize canvas
+
+			// Initialize graph
 			graph = new NumelGraph("numelCanvas");
-			const nodeMap = graph.buildFromConfig(baseConfig);
 			
+			// Override LiteGraph's mouse coordinate calculation
+			if (graph && graph.canvas) {
+				const originalProcessMouseDown = graph.canvas.processMouseDown;
+				const originalProcessMouseMove = graph.canvas.processMouseMove;
+				const originalProcessMouseUp = graph.canvas.processMouseUp;
+				
+				// Helper function to adjust mouse coordinates
+				function adjustMouseEvent(e) {
+					const canvasEl = document.getElementById('numelCanvas');
+					const rect = canvasEl.getBoundingClientRect();
+					const dpr = window.devicePixelRatio || 1;
+					
+					// Calculate the actual mouse position relative to the canvas
+					e.canvasX = (e.clientX - rect.left) * dpr;
+					e.canvasY = (e.clientY - rect.top) * dpr;
+					e.localX = e.canvasX;
+					e.localY = e.canvasY;
+					
+					// Update the offset values that LiteGraph uses
+					e.offsetX = e.canvasX / dpr;
+					e.offsetY = e.canvasY / dpr;
+					
+					return e;
+				}
+				
+				// Override mouse event handlers
+				graph.canvas.processMouseDown = function(e) {
+					e = adjustMouseEvent(e);
+					return originalProcessMouseDown.call(this, e);
+				};
+				
+				graph.canvas.processMouseMove = function(e) {
+					e = adjustMouseEvent(e);
+					return originalProcessMouseMove.call(this, e);
+				};
+				
+				graph.canvas.processMouseUp = function(e) {
+					e = adjustMouseEvent(e);
+					return originalProcessMouseUp.call(this, e);
+				};
+			}
+			
+			const nodeMap = graph.buildFromConfig(baseConfig);
+
 			// Initial resize
 			resizeCanvas();
 		};
@@ -762,25 +814,6 @@
 		document.addEventListener("DOMContentLoaded", () => {
 			checkAGUILoaded();
 		});
-
-		// const graph  = new LGraph();
-		// const canvas = new LGraphCanvas("#numelCanvas", graph);
-
-		// const nodeConst = LiteGraph.createNode("basic/const");
-		// nodeConst.pos = [200,200];
-		// graph.add(nodeConst);
-		// nodeConst.setValue(4.5);
-
-		// const nodeWatch = LiteGraph.createNode("basic/watch");
-		// nodeWatch.pos = [700,200];
-		// graph.add(nodeWatch);
-
-		// nodeConst.connect(0, nodeWatch, 0 );
-
-		// graph.start()
-
-		// Graph initialization moved to window.onload
-
 	</script>
 </body>
 </html>

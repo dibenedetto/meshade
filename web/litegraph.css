@@ -15,13 +15,15 @@
 
 .litegraph.litecontextmenu {
     font-family: Tahoma, sans-serif;
-    position: fixed !important;
+    position: fixed;
+    top: 100px;
+    left: 100px;
     min-width: 100px;
     color: #aaf;
     padding: 0;
     box-shadow: 0 0 10px black !important;
     background-color: #2e2e2e !important;
-	z-index: 10000 !important;
+	z-index: 10;
 }
 
 .litegraph.litecontextmenu.dark {
@@ -81,22 +83,6 @@
     padding: 4px;
     border-bottom: 2px solid #aaf;
     z-index: 10;
-}
-
-/* Ensure context menus override the litemenubar-panel positioning */
-.litegraph.litecontextmenu.litemenubar-panel {
-    position: fixed !important;
-    top: auto !important;
-    left: auto !important;
-}
-
-/* Force context menu to ignore all parent positioning */
-.litegraph.litecontextmenu {
-    position: fixed !important;
-    z-index: 999999 !important;
-    transform: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
 }
 
 .litegraph .litemenu-entry,
@@ -690,210 +676,5 @@ height: 16px;
 padding: 4px 18px;
 border-radius: 20px;
 cursor: pointer;
-}
-
-/* Node display improvements to prevent text/label overlap */
-.litegraph .node {
-	min-width: 160px !important;
-}
-
-.litegraph .node input[type="text"],
-.litegraph .node select,
-.litegraph .node textarea {
-	max-width: 140px !important;
-	width: 140px !important;
-	font-size: 12px !important;
-	background: #444 !important;
-	color: white !important;
-	border: 1px solid #666 !important;
-	padding: 4px 8px !important;
-	box-sizing: border-box !important;
-	margin: 2px 0 !important;
-}
-
-.litegraph .node .widget {
-	margin: 4px 0 !important;
-	padding: 2px !important;
-}
-
-.litegraph .node .widget_text {
-	word-wrap: break-word !important;
-	overflow: hidden !important;
-	text-overflow: ellipsis !important;
-}
-
-.litegraph .node .widget_label {
-	display: inline-block !important;
-	min-width: 80px !important;
-	max-width: 120px !important;
-	overflow: hidden !important;
-	text-overflow: ellipsis !important;
-	vertical-align: top !important;
-	margin-right: 8px !important;
-}
-
-/* Additional node widget improvements */
-.litegraph .node .widget_title {
-	font-size: 11px !important;
-	color: #ccc !important;
-	margin-bottom: 2px !important;
-	white-space: nowrap !important;
-	overflow: hidden !important;
-	text-overflow: ellipsis !important;
-}
-
-.litegraph .node .widget_value {
-	font-size: 12px !important;
-	line-height: 1.4 !important;
-	min-height: 20px !important;
-}
-
-/* Improve node title display */
-.litegraph .node .title {
-	font-size: 14px !important;
-	font-weight: bold !important;
-	padding: 6px 8px !important;
-	margin-bottom: 4px !important;
-	overflow: hidden !important;
-	text-overflow: ellipsis !important;
-}
-
-/* Better spacing between node elements */
-.litegraph .node_slot {
-	margin: 3px 0 !important;
-	line-height: 1.2 !important;
-}
-
-.litegraph .node_slot.input,
-.litegraph .node_slot.output {
-	padding: 2px 0 !important;
-}
-
-/* Enhanced text wrapping and overflow handling */
-.litegraph .node {
-	word-wrap: break-word !important;
-	overflow-wrap: break-word !important;
-}
-
-.litegraph .node_slot_text {
-	max-width: 200px !important;
-	overflow: hidden !important;
-	text-overflow: ellipsis !important;
-	white-space: nowrap !important;
-	display: inline-block !important;
-}
-
-/* Long text field handling */
-.litegraph .node input[type="text"]:focus,
-.litegraph .node textarea:focus {
-	position: relative !important;
-	z-index: 100 !important;
-	background: #555 !important;
-	box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
-}
-
-/* Tooltip-like behavior for truncated text */
-.litegraph .node input[type="text"]:hover,
-.litegraph .node .widget_label:hover {
-	position: relative !important;
-	z-index: 50 !important;
-}
-
-/* Better handling of long node titles */
-.litegraph .node .title {
-	max-width: 300px !important;
-	white-space: nowrap !important;
-}
-
-/* Specific fixes for LiteGraph string widget overlaps */
-canvas .litegraph .node {
-	min-width: 160px !important;
-}
-
-/* Target actual LiteGraph widget elements */
-canvas .litegraph .node .widget,
-canvas .litegraph .node .widget_container {
-	display: flex !important;
-	flex-direction: row !important;
-	align-items: center !important;
-	margin: 4px 0 !important;
-	padding: 2px 4px !important;
-	min-height: 24px !important;
-}
-
-canvas .litegraph .node .widget .widget_name,
-canvas .litegraph .node .widget .property_name {
-	flex: 0 0 100px !important;
-	min-width: 100px !important;
-	max-width: 100px !important;
-	overflow: hidden !important;
-	text-overflow: ellipsis !important;
-	white-space: nowrap !important;
-	margin-right: 8px !important;
-	font-size: 11px !important;
-}
-
-canvas .litegraph .node .widget input[type="text"],
-canvas .litegraph .node .widget .widget_value {
-	flex: 1 1 auto !important;
-	min-width: 80px !important;
-	max-width: 100px !important;
-	margin-left: 8px !important;
-}
-
-/* Force proper spacing in canvas context */
-#numelCanvas .litegraph .node .widget,
-#mycanvas .litegraph .node .widget {
-	width: 100% !important;
-	box-sizing: border-box !important;
-	display: block !important;
-	clear: both !important;
-	margin: 8px 4px !important;
-	min-height: 26px !important;
-	position: relative !important;
-}
-
-#numelCanvas .litegraph .node .widget .widget_name,
-#mycanvas .litegraph .node .widget .widget_name {
-	display: inline-block !important;
-	float: left !important;
-	width: 120px !important;
-	font-size: 11px !important;
-	color: #ccc !important;
-	line-height: 20px !important;
-	overflow: hidden !important;
-	text-overflow: ellipsis !important;
-	white-space: nowrap !important;
-}
-
-#numelCanvas .litegraph .node input[type="text"],
-#mycanvas .litegraph .node input[type="text"] {
-	position: absolute !important;
-	right: 4px !important;
-	top: 0px !important;
-	width: 60% !important;
-	max-width: 90px !important;
-	float: none !important;
-	margin: 0 !important;
-}
-
-/* Additional spacing for better visibility */
-#numelCanvas .litegraph .node,
-#mycanvas .litegraph .node {
-	padding: 8px !important;
-}
-
-/* Responsive node width for extremely long content */
-@media (min-width: 1200px) {
-	.litegraph .node {
-		min-width: 380px !important;
-	}
-	
-	.litegraph .node input[type="text"],
-	.litegraph .node select,
-	.litegraph .node textarea {
-		max-width: 320px !important;
-		width: 320px !important;
-	}
 }
   
