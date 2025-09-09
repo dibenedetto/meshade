@@ -1,5 +1,11 @@
 version: '3.8'
 
+networks:
+
+  numel-network:
+    driver: bridge
+
+
 services:
 
   numel-postgres:
@@ -14,16 +20,15 @@ services:
     ports:
       - ${NUMEL_POSTGRES_PORT}:${NUMEL_POSTGRES_PORT}
     volumes:
-      - ${NUMEL_POSTGRES_PATH}/db:/var/lib/postgresql/data
+      - ${NUMEL_POSTGRES_PATH}:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${NUMEL_POSTGRES_USER} -d ${NUMEL_POSTGRES_DB} -h localhost -p ${NUMEL_POSTGRES_PORT}"]
       interval: 5s
       timeout: 5s
       retries: 20
     restart: unless-stopped
-    # restart: always
-    # networks:
-    #   - numel-network
+    networks:
+      - numel-network
 
   numel-app:
     build: .
@@ -36,21 +41,17 @@ services:
       - NUMEL_POSTGRES_PATH=${NUMEL_ENV_POSTGRES_PATH}
       - NUMEL_PORT_START=${NUMEL_ENV_PORT_START}
       - NUMEL_PORT_END=${NUMEL_ENV_PORT_END}
+      - NUMEL_DEBUG_PORT=${NUMEL_ENV_DEBUG_PORT}
+      - NUMEL_DEBUG=${NUMEL_ENV_DEBUG}
     ports:
       - ${NUMEL_PORT_START}-${NUMEL_PORT_END}:${NUMEL_PORT_START}-${NUMEL_PORT_END}
+      - ${NUMEL_DEBUG_PORT}:${NUMEL_DEBUG_PORT}
     volumes:
       - .:.
+    command: ["sh", "./start.sh", "${NUMEL_DEBUG}", "${NUMEL_DEBUG_PORT}", "${NUMEL_PORT_START}"]
     restart: unless-stopped
-    # restart: always
-    # networks:
-    #   - numel-network
+    networks:
+      - numel-network
     depends_on:
       numel-postgres:
         condition: service_healthy
-
-
-    # restart: always
-    # ports:
-    #   - ${HYPERVERSEXR_API_SERVICE_PORT}:${HYPERVERSEXR_API_SERVICE_PORT}
-    #   - ${HYPERVERSEXR_API_DEBUG_PORT}:${HYPERVERSEXR_API_DEBUG_PORT}
-    # command: ["sh", "./start.sh", "${HYPERVERSEXR_API_DEBUG}", "${HYPERVERSEXR_API_DEBUG_PORT}", "${HYPERVERSEXR_API_SERVICE_PORT}"]

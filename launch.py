@@ -4,11 +4,15 @@ import os
 import uvicorn
 
 
+from   dotenv                  import load_dotenv
 from   fastapi                 import FastAPI
 from   fastapi.middleware.cors import CORSMiddleware
 
 
-from   numel                   import App, AppConfig, get_time_str, load_config, seed_everything
+from   numel                   import DEFAULT_APP_PORT, App, AppConfig, get_time_str, load_config, seed_everything
+
+
+load_dotenv()
 
 
 def log_print(*args, **kwargs):
@@ -17,12 +21,14 @@ def log_print(*args, **kwargs):
 
 if True:
 	parser = argparse.ArgumentParser(description="App configuration")
+	parser .add_argument("--port", type=int, default=DEFAULT_APP_PORT, help="Listening port for control server")
 	parser .add_argument("--config_path", type=str, default="config.json", help="Path to configuration file")
 	args   = parser.parse_args()
 
 
 if True:
 	config = load_config(args.config_path) or AppConfig()
+	config.port = args.port
 	if config.seed is not None:
 		seed_everything(config.seed)
 

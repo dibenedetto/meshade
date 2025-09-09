@@ -2,12 +2,30 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name"       : "test",
+			"name"       : "Numel (launch)",
 			"python"     : "python",
 			"type"       : "debugpy",
 			"justMyCode" : false,
 			"request"    : "launch",
-			"program"    : "${file}"
+			"program"    : "${file}",
+			"args"       : ["--port=8000", "--config_path=config.json"],
+			"console"    : "internalConsole"
+		},
+		{
+			"name"       : "Numel (attach)",
+			"type"       : "debugpy",
+			"justMyCode" : false,
+			"request"    : "attach",
+			"connect"    : {
+				"host" : "localhost",
+				"port" : 5678
+			},
+			"pathMappings" : [
+				{
+					"localRoot"  : "${workspaceFolder}",
+					"remoteRoot" : "/app"
+				}
+			]
 		}
 	]
 }

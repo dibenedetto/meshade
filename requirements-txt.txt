@@ -1,41 +1,50 @@
 # requirements.txt
 
+# CUDA
+--index-url https://download.pytorch.org/whl/cu126
+
 # Core dependencies
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
+fastapi==0.116.1
+uvicorn==0.35.0
+pydantic==2.11.7
+pydantic-settings==2.10.1
+pillow==11.3.0
+pydicom==3.0.1
+pypdf==6.0.0
 
 # Async support
-asyncio==3.4.3
-aiofiles==23.2.1
+asyncio==4.0.0
+aiofiles==24.1.0
 
 # Database and storage
-sqlalchemy==2.0.25
-lancedb==0.5.3
-sqlite3-api==2.0.1
-
-# AI/ML frameworks (adjust versions based on agno requirements)
-openai==1.10.0
-ollama==0.1.7
+sqlalchemy==2.0.43
+lancedb==0.25.0
+sqlite3-api==2.0.4
 
 # Vector operations
-numpy==1.26.3
-pandas==2.1.4
+numpy==2.3.2
+pandas==2.3.2
 
 # Web tools
-duckduckgo-search==4.1.1
-httpx==0.26.0
+duckduckgo-search==8.1.1
+httpx==0.28.1
 
 # CORS and security
-python-multipart==0.0.6
-
-# Agno framework - you'll need to specify the correct package
-# Uncomment and adjust if it's available on PyPI:
-# agno==x.x.x
-
-# Or if it's a local/private package, you might need:
-# -e git+https://github.com/yourusername/agno.git#egg=agno
+python-multipart==0.0.20
 
 # Additional utilities
-python-dotenv==1.0.0
+python-dotenv==1.1.1
+
+# AI/ML frameworks
+transformers==4.56.1
+torch==2.8.0
+torchaudio==2.8.0
+torchvision==0.23.0
+
+openai==1.107.0
+ollama==0.5.3
+anthropic==0.66.0
+agno==1.8.2
+langchain=0.3.27
+langchain-text-splitters==0.3.11
+sentence-transformers==5.1.0
