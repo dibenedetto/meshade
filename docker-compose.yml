@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+
+  numel-postgres:
+    image: postgres:17-alpine
+    container_name: numel-postgres
+    environment:
+      - NUMEL_POSTGRES_USER=${NUMEL_ENV_POSTGRES_USER}
+      - NUMEL_POSTGRES_PASSWORD=${NUMEL_ENV_POSTGRES_PASSWORD}
+      - NUMEL_POSTGRES_DB=${NUMEL_ENV_POSTGRES_DB}
+      - NUMEL_POSTGRES_PORT=${NUMEL_ENV_POSTGRES_PORT}
+      - NUMEL_POSTGRES_PATH=${NUMEL_ENV_POSTGRES_PATH}
+    ports:
+      - ${NUMEL_POSTGRES_PORT}:${NUMEL_POSTGRES_PORT}
+    volumes:
+      - ${NUMEL_POSTGRES_PATH}/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${NUMEL_POSTGRES_USER} -d ${NUMEL_POSTGRES_DB} -h localhost -p ${NUMEL_POSTGRES_PORT}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    # restart: always
+    # networks:
+    #   - numel-network
+
+  numel-app:
+    build: .
+    container_name: numel-app
+    environment:
+      - NUMEL_POSTGRES_USER=${NUMEL_ENV_POSTGRES_USER}
+      - NUMEL_POSTGRES_PASSWORD=${NUMEL_ENV_POSTGRES_PASSWORD}
+      - NUMEL_POSTGRES_DB=${NUMEL_ENV_POSTGRES_DB}
+      - NUMEL_POSTGRES_PORT=${NUMEL_ENV_POSTGRES_PORT}
+      - NUMEL_POSTGRES_PATH=${NUMEL_ENV_POSTGRES_PATH}
+      - NUMEL_PORT_START=${NUMEL_ENV_PORT_START}
+      - NUMEL_PORT_END=${NUMEL_ENV_PORT_END}
+    ports:
+      - ${NUMEL_PORT_START}-${NUMEL_PORT_END}:${NUMEL_PORT_START}-${NUMEL_PORT_END}
+    volumes:
+      - .:.
+    restart: unless-stopped
+    # restart: always
+    # networks:
+    #   - numel-network
+    depends_on:
+      numel-postgres:
+        condition: service_healthy
+
+
+    # restart: always
+    # ports:
+    #   - ${HYPERVERSEXR_API_SERVICE_PORT}:${HYPERVERSEXR_API_SERVICE_PORT}
+    #   - ${HYPERVERSEXR_API_DEBUG_PORT}:${HYPERVERSEXR_API_DEBUG_PORT}
+    # command: ["sh", "./start.sh", "${HYPERVERSEXR_API_DEBUG}", "${HYPERVERSEXR_API_DEBUG_PORT}", "${HYPERVERSEXR_API_SERVICE_PORT}"]

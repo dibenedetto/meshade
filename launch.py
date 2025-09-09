@@ -11,6 +11,10 @@ from   fastapi.middleware.cors import CORSMiddleware
 from   numel                   import App, AppConfig, get_time_str, load_config, seed_everything
 
 
+def log_print(*args, **kwargs):
+	print("[launch]", *args, **kwargs)
+
+
 if True:
 	parser = argparse.ArgumentParser(description="App configuration")
 	parser .add_argument("--config_path", type=str, default="config.json", help="Path to configuration file")
@@ -29,7 +33,7 @@ if True:
 		try:
 			__import__(module_name)
 		except Exception as e:
-			print(f"Error importing module '{module_name}': {e}")
+			log_print(f"Error importing module '{module_name}': {e}")
 
 
 if True:
@@ -172,4 +176,4 @@ async def run_server():
 
 if __name__ == "__main__":
 	asyncio.run(run_server())
-	print("Server shut down")
+	log_print("Server shut down")
