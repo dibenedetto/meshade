@@ -21,13 +21,15 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Make directories
+RUN mkdir -p /app/storage/knowledge /app/storage/memory /app/storage/session
+
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
-
+# ENV PYTHONPATH=/app:$PYTHONPATH
 # ENV PYTHONDONTWRITEBYTECODE=1
 # ENV PYDEVD_DISABLE_FILE_VALIDATION=1
-# ENV PYTHONPATH=/app/src:$PYTHONPATH
 
 # Create directories for storage
 # RUN mkdir -p /app/storage/knowledge /app/storage/memory /app/storage/session
