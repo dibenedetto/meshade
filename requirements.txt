@@ -1,9 +1,7 @@
 # requirements.txt
 
-# CUDA
---index-url https://download.pytorch.org/whl/cu126
-
 # Core dependencies
+debugpy==1.8.16
 fastapi==0.116.1
 uvicorn==0.35.0
 pydantic==2.11.7
@@ -12,6 +10,7 @@ pillow==11.3.0
 pydicom==3.0.1
 pypdf==6.0.0
 python-dotenv==1.1.1
+matplotlib==3.10.6
 
 # Async support
 asyncio==4.0.0
@@ -24,7 +23,8 @@ sqlite3-api==2.0.4
 psycopg==3.2.10
 
 # Vector operations
-numpy==2.3.2
+# numpy==2.3.2
+numpy==2.2.6
 pandas==2.3.2
 
 # Web tools
@@ -36,14 +36,10 @@ python-multipart==0.0.20
 
 # AI/ML frameworks
 transformers==4.56.1
-torch==2.8.0
-torchaudio==2.8.0
-torchvision==0.23.0
-
 openai==1.107.0
 ollama==0.5.3
 anthropic==0.66.0
 agno==1.8.2
-langchain=0.3.27
+langchain==0.3.27
 langchain-text-splitters==0.3.11
 sentence-transformers==5.1.0

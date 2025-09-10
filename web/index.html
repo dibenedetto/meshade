@@ -486,11 +486,6 @@
 			}
 
 			async function connect() {
-				if (typeof AGUI === "undefined" || !AGUI.HttpAgent) {
-					addMessage("system", "⚠️ AG-UI client not loaded. Please build the bundle first.");
-					return;
-				}
-
 				const serverUrl = serverUrlInput.value.trim();
 				if (!serverUrl) {
 					addMessage("system", "⚠️ Please enter a valid server URL");
@@ -507,8 +502,11 @@
 				updateStatus("connecting", "Connecting...");
 
 				try {
-					aguiApp = await NumelApp.connect(serverUrl, userId, sessionId, baseConfig, {
-						onEvent(params) { handleAGUIEvent(params.event); },
+					aguiApp = await NumelApp.connect(serverUrl, {
+						userId     : userId,
+						sessionId  : sessionId,
+						config     : baseConfig,
+						subscriber : { onEvent(params) { handleAGUIEvent(params.event); }, },
 					});
 					if (!aguiApp) {
 						throw new Error("NumelApp initialization failed");
@@ -562,37 +560,37 @@
 				if (!event) return;
 
 				switch (event.type) {
-					case AGUI.EventType.TEXT_MESSAGE_CONTENT:
-					case AGUI.EventType.TEXT_MESSAGE_CHUNK:
+					case NumelApp.EventType.TEXT_MESSAGE_CONTENT:
+					case NumelApp.EventType.TEXT_MESSAGE_CHUNK:
 						const content = event.delta || "No content";
 						addMessage("agent", content);
 						break;
 
-					case AGUI.EventType.TEXT_MESSAGE_START:
+					case NumelApp.EventType.TEXT_MESSAGE_START:
 						addMessage("system", "🤖 Agent is responding...");
 						break;
 
-					case AGUI.EventType.TEXT_MESSAGE_END:
+					case NumelApp.EventType.TEXT_MESSAGE_END:
 						addMessage("system", "✅ Response complete");
 						break;
 
-					case AGUI.EventType.RUN_STARTED:
+					case NumelApp.EventType.RUN_STARTED:
 						addMessage("system", "🚀 Agent run started");
 						break;
 
-					case AGUI.EventType.RUN_FINISHED:
+					case NumelApp.EventType.RUN_FINISHED:
 						addMessage("system", "🏁 Agent run finished");
 						break;
 
-					case AGUI.EventType.RUN_ERROR:
+					case NumelApp.EventType.RUN_ERROR:
 						addMessage("system-error", `❌ Error: ${event.error || "Unknown error"}`);
 						break;
 
-					case AGUI.EventType.TOOL_CALL_START:
+					case NumelApp.EventType.TOOL_CALL_START:
 						addMessage("system", `🔧 Tool call: ${event.tool_name || "unknown"}`);
 						break;
 
-					case AGUI.EventType.TOOL_CALL_RESULT:
+					case NumelApp.EventType.TOOL_CALL_RESULT:
 						addMessage("system", `✅ Tool result received`);
 						break;
 

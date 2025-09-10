@@ -1,41 +1,20 @@
-# Dockerfile
-FROM python:3.13-slim
+FROM nvidia/cuda:12.6.2-cudnn-runtime-ubuntu22.04
 
-# Install system dependencies
-# and upgrade system packages to latest versions for security
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-    gcc \
-    g++ \
-    curl \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+    gcc g++ curl wget git \
+    python3 python3-pip python3-dev \
+    && ln -s /usr/bin/python3 /usr/bin/python \
+    && python3 -m pip install --upgrade pip setuptools wheel \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --root-user-action=ignore --upgrade pip
-
-# Set working directory
 WORKDIR /app
 
-# Copy requirements file
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Make directories
-RUN mkdir -p /app/storage/knowledge /app/storage/memory /app/storage/session
+RUN pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 \
+    --index-url https://download.pytorch.org/whl/cu126
 
-# Set environment variables
+RUN mkdir -p /app/storage/knowledge /app/storage/memory /app/storage/session /app/storage/external/postgres
+
 ENV PYTHONUNBUFFERED=1
-
-# ENV PYTHONPATH=/app:$PYTHONPATH
-# ENV PYTHONDONTWRITEBYTECODE=1
-# ENV PYDEVD_DISABLE_FILE_VALIDATION=1
-
-# Create directories for storage
-# RUN mkdir -p /app/storage/knowledge /app/storage/memory /app/storage/session
-
-# Expose ports for the main app and agents
-# EXPOSE 8000-8010
-
-# Default command (can be overridden in docker-compose)
-# CMD ["python", "/app/src/launch.py", "--config_path", "/app/src/config.json"]

@@ -1,10 +1,4 @@
-version: '3.8'
-
-networks:
-
-  numel-network:
-    driver: bridge
-
+# docker-compose.yml
 
 services:
 
@@ -12,11 +6,11 @@ services:
     image: postgres:17-alpine
     container_name: numel-postgres
     environment:
-      - NUMEL_POSTGRES_USER=${NUMEL_ENV_POSTGRES_USER}
-      - NUMEL_POSTGRES_PASSWORD=${NUMEL_ENV_POSTGRES_PASSWORD}
-      - NUMEL_POSTGRES_DB=${NUMEL_ENV_POSTGRES_DB}
-      - NUMEL_POSTGRES_PORT=${NUMEL_ENV_POSTGRES_PORT}
-      - NUMEL_POSTGRES_PATH=${NUMEL_ENV_POSTGRES_PATH}
+      - POSTGRES_USER=${NUMEL_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${NUMEL_POSTGRES_PASSWORD}
+      - POSTGRES_DB=${NUMEL_POSTGRES_DB}
+      - POSTGRES_PORT=${NUMEL_POSTGRES_PORT}
+      - NUMEL_POSTGRES_PATH=${NUMEL_POSTGRES_PATH}
     ports:
       - ${NUMEL_POSTGRES_PORT}:${NUMEL_POSTGRES_PORT}
     volumes:
@@ -27,31 +21,34 @@ services:
       timeout: 5s
       retries: 20
     restart: unless-stopped
-    networks:
-      - numel-network
 
   numel-app:
     build: .
     container_name: numel-app
     environment:
-      - NUMEL_POSTGRES_USER=${NUMEL_ENV_POSTGRES_USER}
-      - NUMEL_POSTGRES_PASSWORD=${NUMEL_ENV_POSTGRES_PASSWORD}
-      - NUMEL_POSTGRES_DB=${NUMEL_ENV_POSTGRES_DB}
-      - NUMEL_POSTGRES_PORT=${NUMEL_ENV_POSTGRES_PORT}
-      - NUMEL_POSTGRES_PATH=${NUMEL_ENV_POSTGRES_PATH}
-      - NUMEL_PORT_START=${NUMEL_ENV_PORT_START}
-      - NUMEL_PORT_END=${NUMEL_ENV_PORT_END}
-      - NUMEL_DEBUG_PORT=${NUMEL_ENV_DEBUG_PORT}
-      - NUMEL_DEBUG=${NUMEL_ENV_DEBUG}
+      - NUMEL_POSTGRES_USER=${NUMEL_POSTGRES_USER}
+      - NUMEL_POSTGRES_PASSWORD=${NUMEL_POSTGRES_PASSWORD}
+      - NUMEL_POSTGRES_DB=${NUMEL_POSTGRES_DB}
+      - NUMEL_POSTGRES_PORT=${NUMEL_POSTGRES_PORT}
+      - NUMEL_POSTGRES_PATH=${NUMEL_POSTGRES_PATH}
+      - NUMEL_PORT_START=${NUMEL_PORT_START}
+      - NUMEL_PORT_END=${NUMEL_PORT_END}
+      - NUMEL_DEBUG_PORT=${NUMEL_DEBUG_PORT}
+      - NUMEL_DEBUG=${NUMEL_DEBUG}
     ports:
       - ${NUMEL_PORT_START}-${NUMEL_PORT_END}:${NUMEL_PORT_START}-${NUMEL_PORT_END}
       - ${NUMEL_DEBUG_PORT}:${NUMEL_DEBUG_PORT}
     volumes:
-      - .:.
+      - .:/app
     command: ["sh", "./start.sh", "${NUMEL_DEBUG}", "${NUMEL_DEBUG_PORT}", "${NUMEL_PORT_START}"]
     restart: unless-stopped
-    networks:
-      - numel-network
     depends_on:
       numel-postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

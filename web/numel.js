@@ -1,9 +1,10 @@
 class NumelApp {
 
+	static EventType = AGUI.EventType;
+
 	static _randomId() {
-		const rmax = 1000000000.0;
-		const id   = Math.floor(Math.random() * rmax);
-		return id;
+		// https://gist.github.com/jed/982883?permalink_comment_id=852670#gistcomment-852670
+		return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,a=>(a^Math.random()*16>>a/4).toString(16));
 	}
 
 	static _randomMessageId() {
@@ -71,7 +72,18 @@ class NumelApp {
 		return NumelApp._post(url + "/shutdown");
 	}
 
-	static async connect(url, userId, sessionId, config, subscriber) {
+	static async connect(url, options = {}) {
+		if (!url || (url.length == 0)) {
+			console.error("Invalid URL");
+			return null;
+		}
+		if (!options) {
+			options = {};
+		}
+		const userId     = options["userId"    ];
+		const sessionId  = options["sessionId" ];
+		const config     = options["config"    ];
+		const subscriber = options["subscriber"];
 		try {
 			let status = null;
 			await NumelApp._stop(url);
@@ -172,6 +184,13 @@ class NumelApp {
 		return agent;
 	}
 
+	async disconnect() {
+		await this.stop();
+		this.valid  = false;
+		this.status = null;
+		this.agents = null;
+	}
+
 	isValid() {
 		return this.valid;
 	}
@@ -186,13 +205,6 @@ class NumelApp {
 		}
 		this.agentIdx = index;
 		return true;
-	}
-
-	async disconnect() {
-		await this.stop();
-		this.valid  = false;
-		this.status = null;
-		this.agents = null;
 	}
 
 	async ping() {

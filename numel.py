@@ -5,7 +5,7 @@ import os
 
 from   collections.abc import Callable
 from   pydantic        import BaseModel
-from   typing          import Any, Dict, List, Optional, Required, Tuple, Union
+from   typing          import Any, Dict, List, Optional, Tuple, Union
 
 
 BACKEND_TYPES             = ["agno"]
@@ -164,7 +164,7 @@ class StorageConfig(BaseModel):
 
 
 class ToolConfig(BaseModel):
-	type : str                      = Required
+	type : str
 	args : Optional[Dict[str, Any]] = None
 	ref  : Optional[str]            = None
 	data : Optional[Any]            = None
@@ -573,6 +573,7 @@ class AgentApp:
 class App:
 
 	_backends: Dict[Tuple[str, str], Callable] = dict()
+
 
 	@staticmethod
 	def register(name: str, version: str, backend: Callable) -> bool:
