@@ -288,4 +288,5 @@ class AgnoAgentApp(AgentApp):
 		self.agui_app.serve(app=app, port=self.config.port + self.port_offset, reload=self.config.reload)
 
 
-App.register("agno", "", AgnoAgentApp)
+def register() -> None:
+	App.register("agno", "", AgnoAgentApp)

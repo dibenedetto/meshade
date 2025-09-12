@@ -37,7 +37,8 @@ if True:
 	impl_modules = [os.path.splitext(f)[0] for f in os.listdir(".") if f.endswith("_impl.py")]
 	for module_name in impl_modules:
 		try:
-			__import__(module_name)
+			impl_module = __import__(module_name)
+			impl_module.register()
 		except Exception as e:
 			log_print(f"Error importing module '{module_name}': {e}")
 

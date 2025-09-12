@@ -15,6 +15,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 \
     --index-url https://download.pytorch.org/whl/cu126
 
-RUN mkdir -p /app/storage/knowledge /app/storage/memory /app/storage/session /app/storage/external/postgres
-
 ENV PYTHONUNBUFFERED=1

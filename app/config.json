@@ -17,15 +17,15 @@
 
 	"models" : [
 		{
-			"type" : "ollama",
-			"id"   : "mistral"
+			"type" : "openai",
+			"id"   : "gpt-4"
 		}
 	],
 
 	"embeddings" : [
 		{
-			"type" : "ollama",
-			"id"   : "mistral"
+			"type" : "openai",
+			"id"   : "gpt-4"
 		}
 	],
 
@@ -33,7 +33,7 @@
 		{
 			"type"        : "lancedb",
 			"table_name"  : "knowledge",
-			"db_url"      : "storage/knowledge",
+			"db_url"      : "../storage/knowledge/knowledge_lancedb_1",
 			"search_type" : "hybrid"
 		}
 	],
@@ -50,7 +50,7 @@
 		{
 			"type"       : "sqlite",
 			"table_name" : "memory",
-			"db_url"     : "storage/memory"
+			"db_url"     : "../storage/memory/memory_sqlite_1.db"
 		}
 	],
 
@@ -67,7 +67,7 @@
 		{
 			"type"       : "sqlite",
 			"table_name" : "session",
-			"db_url"     : "storage/session"
+			"db_url"     : "../storage/session/storage_sqlite_1.db"
 		}
 	],
 

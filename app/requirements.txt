@@ -29,6 +29,7 @@ pandas==2.3.2
 
 # Web tools
 duckduckgo-search==8.1.1
+ddgs==9.5.5
 httpx==0.28.1
 
 # CORS and security
@@ -36,6 +37,7 @@ python-multipart==0.0.20
 
 # AI/ML frameworks
 transformers==4.56.1
+ag-ui-protocol==0.1.8
 openai==1.107.0
 ollama==0.5.3
 anthropic==0.66.0
@@ -43,3 +45,4 @@ agno==1.8.2
 langchain==0.3.27
 langchain-text-splitters==0.3.11
 sentence-transformers==5.1.0
+tantivy==0.25.0
