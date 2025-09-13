@@ -51,6 +51,10 @@ DEFAULT_OPTIONS_REASONING                         : bool = True
 DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS         : bool = True
 DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS            : int  = 5
 
+
+DEFAULT_APP_KNOWLEDGE_PATH                        : str  = "../storage/knowledge"
+DEFAULT_APP_MEMORY_PATH                           : str  = "../storage/memory"
+DEFAULT_APP_SESSION_PATH                          : str  = "../storage/session"
 DEFAULT_APP_PORT                                  : int  = 8000
 DEFAULT_APP_RELOAD                                : bool = True
 
@@ -129,13 +133,13 @@ class StorageConfig(BaseModel):
 
 
 class ToolConfig(BaseModel):
-	type : str                      = Required
+	type : str
 	args : Optional[Dict[str, Any]] = None
 	ref  : Optional[str]            = None
 	data : Optional[Any]            = None
 
 
-class OptionsConfig(BaseModel):
+class AgentOptionsConfig(BaseModel):
 	markdown                         : bool          = DEFAULT_OPTIONS_MARKDOWN
 	search_knowledge                 : bool          = DEFAULT_OPTIONS_SEARCH_KNOWLEDGE
 	enable_agentic_memory            : bool          = DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY
@@ -155,7 +159,7 @@ class AgentConfig(BaseModel):
 	backend      : Optional[Union[BackendConfig, int]]         = None
 	model        : Optional[Union[ModelConfig, int]]           = None
 	embedding    : Optional[Union[EmbeddingConfig, int]]       = None
-	options      : Optional[Union[OptionsConfig, int]]         = None
+	options      : Optional[Union[AgentOptionsConfig, int]]    = None
 	version      : Optional[str]                               = None
 	name         : Optional[str]                               = None
 	author       : Optional[str]                               = None
@@ -169,9 +173,17 @@ class AgentConfig(BaseModel):
 	data         : Optional[Any]                               = None
 
 
+class AppOptionsConfig(BaseModel):
+	knowledge_path : str           = DEFAULT_APP_KNOWLEDGE_PATH
+	memory_path    : str           = DEFAULT_APP_MEMORY_PATH
+	session_path   : str           = DEFAULT_APP_SESSION_PATH
+	port           : int           = DEFAULT_APP_PORT
+	reload         : bool          = DEFAULT_APP_RELOAD
+	seed           : Optional[int] = None
+
+
 class AppConfig(BaseModel):
-	port          : int                                 = DEFAULT_APP_PORT
-	reload        : bool                                = DEFAULT_APP_RELOAD
+	options       : AppOptionsConfig                    = AppOptionsConfig()
 	backend       : Optional[Union[BackendConfig, int]] = None
 	version       : Optional[str]                       = None
 	name          : Optional[str]                       = None
@@ -186,9 +198,8 @@ class AppConfig(BaseModel):
 	memories      : Optional[List[MemoryConfig]]        = None
 	storage_dbs   : Optional[List[StorageDBConfig]]     = None
 	storages      : Optional[List[StorageConfig]]       = None
-	options       : Optional[List[OptionsConfig]]       = None
+	agent_options : Optional[List[AgentOptionsConfig]]  = None
 	agents        : Optional[List[AgentConfig]]         = None
-	seed          : Optional[int]                       = None
 	data          : Optional[Any]                       = None
 	`;
 
@@ -670,7 +681,6 @@ class AppConfig(BaseModel):
 
 		// Create referenced config nodes
 		const configTypes = [
-			{ key: 'backend', type: 'BackendConfig' },
 			{ key: 'backends', type: 'BackendConfig', isList: true },
 			{ key: 'models', type: 'ModelConfig', isList: true },
 			{ key: 'embeddings', type: 'EmbeddingConfig', isList: true },
@@ -680,7 +690,8 @@ class AppConfig(BaseModel):
 			{ key: 'memories', type: 'MemoryConfig', isList: true },
 			{ key: 'storage_dbs', type: 'StorageDBConfig', isList: true },
 			{ key: 'storages', type: 'StorageConfig', isList: true },
-			{ key: 'options', type: 'OptionsConfig', isList: true },
+			{ key: 'options', type: 'AppOptionsConfig' }, // Fixed: AppOptionsConfig, not a list
+			{ key: 'agent_options', type: 'AgentOptionsConfig', isList: true }, // Added: agent_options
 			{ key: 'agents', type: 'AgentConfig', isList: true }
 		];
 
@@ -776,9 +787,9 @@ class AppConfig(BaseModel):
 					inlineNodes.set(`storage_for_agent_${agentIndex}`, node);
 				}
 
-				// Check for inline options config
+				// Check for inline options config - Fixed: AgentOptionsConfig
 				if (agent.options && typeof agent.options === 'object' && !Array.isArray(agent.options)) {
-					const { node, nodeKey } = createInlineNode(agent.options, 'OptionsConfig', 'agents', agentIndex);
+					const { node, nodeKey } = createInlineNode(agent.options, 'AgentOptionsConfig', 'agents', agentIndex);
 					inlineNodes.set(`options_for_agent_${agentIndex}`, node);
 				}
 
@@ -905,7 +916,15 @@ class AppConfig(BaseModel):
 				const refTypes = ['memory', 'storage', 'backend', 'options'];
 				refTypes.forEach(refType => {
 					if (typeof agent[refType] === 'number') {
-						const refKey = refType === 'backend' ? 'backends' : `${refType}s`;
+						let refKey;
+						if (refType === 'backend') {
+							refKey = 'backends';
+						} else if (refType === 'options') {
+							refKey = 'agent_options'; // Fixed: use agent_options for AgentOptionsConfig
+						} else {
+							refKey = `${refType}s`;
+						}
+						
 						const refArray = appConfig[refKey];
 						if (refArray && refArray[agent[refType]]) {
 							const refNode = nodeMap.get(`${refKey}[${agent[refType]}]`);
@@ -1056,7 +1075,8 @@ class AppConfig(BaseModel):
 			'KnowledgeConfig': 'knowledges',
 			'StorageConfig': 'storages',
 			'BackendConfig': 'backends',
-			'OptionsConfig': 'options',
+			'AgentOptionsConfig': 'agent_options', // Fixed: AgentOptionsConfig -> agent_options
+			'AppOptionsConfig': 'options', // Added: AppOptionsConfig -> options
 			'MemoryDBConfig': 'memory_dbs',
 			'KnowledgeDBConfig': 'knowledge_dbs',
 			'StorageDBConfig': 'storage_dbs'
@@ -1064,13 +1084,17 @@ class AppConfig(BaseModel):
 
 		const arrayKey = arrayKeys[node._modelName];
 		if (arrayKey) {
-			if (!this.currentConfig[arrayKey]) {
-				this.currentConfig[arrayKey] = [];
+			// Handle AppOptionsConfig as single object, not array
+			if (node._modelName === 'AppOptionsConfig') {
+				this.currentConfig[arrayKey] = { ...node.properties };
+			} else {
+				if (!this.currentConfig[arrayKey]) {
+					this.currentConfig[arrayKey] = [];
+				}
+				// Create new config object from node properties
+				const newConfig = { ...node.properties };
+				this.currentConfig[arrayKey].push(newConfig);
 			}
-
-			// Create new config object from node properties
-			const newConfig = { ...node.properties };
-			this.currentConfig[arrayKey].push(newConfig);
 		}
 	}
 
@@ -1092,7 +1116,8 @@ class AppConfig(BaseModel):
 			'KnowledgeConfig': 'knowledges',
 			'StorageConfig': 'storages',
 			'BackendConfig': 'backends',
-			'OptionsConfig': 'options',
+			'AgentOptionsConfig': 'agent_options', // Fixed: AgentOptionsConfig -> agent_options
+			'AppOptionsConfig': 'options', // Added: AppOptionsConfig -> options
 			'MemoryDBConfig': 'memory_dbs',
 			'KnowledgeDBConfig': 'knowledge_dbs',
 			'StorageDBConfig': 'storage_dbs'
@@ -1100,11 +1125,16 @@ class AppConfig(BaseModel):
 
 		const arrayKey = arrayKeys[node._modelName];
 		if (arrayKey && this.currentConfig[arrayKey]) {
-			const index = this.currentConfig[arrayKey].findIndex(item => 
-				this._nodeMatchesConfig(node, item)
-			);
-			if (index >= 0) {
-				this.currentConfig[arrayKey].splice(index, 1);
+			// Handle AppOptionsConfig as single object
+			if (node._modelName === 'AppOptionsConfig') {
+				delete this.currentConfig[arrayKey];
+			} else {
+				const index = this.currentConfig[arrayKey].findIndex(item => 
+					this._nodeMatchesConfig(node, item)
+				);
+				if (index >= 0) {
+					this.currentConfig[arrayKey].splice(index, 1);
+				}
 			}
 		}
 	}
@@ -1135,7 +1165,8 @@ class AppConfig(BaseModel):
 			'MemoryConfig': ['memory'],
 			'KnowledgeConfig': ['knowledge'],
 			'StorageConfig': ['storage'],
-			'OptionsConfig': ['options'],
+			'AgentOptionsConfig': ['options'], // Fixed: AgentOptionsConfig
+			'AppOptionsConfig': ['options'], // Added: AppOptionsConfig
 			'AgentConfig': ['agents']
 		};
 
@@ -1152,7 +1183,7 @@ class AppConfig(BaseModel):
 
 		// Clear existing array references
 		['agents', 'models', 'embeddings', 'memories', 'knowledges', 'storages', 
-		 'backends', 'options', 'memory_dbs', 'knowledge_dbs', 'storage_dbs'].forEach(key => {
+		 'backends', 'agent_options', 'memory_dbs', 'knowledge_dbs', 'storage_dbs'].forEach(key => {
 			if (updatedConfig[key]) {
 				updatedConfig[key].forEach((item, index) => {
 					if (typeof item === 'object') {
@@ -1227,7 +1258,8 @@ class AppConfig(BaseModel):
 			'KnowledgeConfig': 'knowledges',
 			'StorageConfig': 'storages',
 			'BackendConfig': 'backends',
-			'OptionsConfig': 'options',
+			'AgentOptionsConfig': 'agent_options', // Fixed: AgentOptionsConfig -> agent_options
+			'AppOptionsConfig': 'options', // Added: AppOptionsConfig -> options (but it's not an array)
 			'MemoryDBConfig': 'memory_dbs',
 			'KnowledgeDBConfig': 'knowledge_dbs',
 			'StorageDBConfig': 'storage_dbs'
@@ -1235,10 +1267,15 @@ class AppConfig(BaseModel):
 
 		const arrayKey = arrayKeys[modelName];
 		if (arrayKey && config[arrayKey]) {
-			return config[arrayKey].find((item, index) => {
-				// Match by properties or position
-				return this._nodeMatchesConfig(node, item);
-			});
+			// Handle AppOptionsConfig as single object
+			if (modelName === 'AppOptionsConfig') {
+				return config[arrayKey];
+			} else {
+				return config[arrayKey].find((item, index) => {
+					// Match by properties or position
+					return this._nodeMatchesConfig(node, item);
+				});
+			}
 		}
 
 		return null;
@@ -1255,7 +1292,8 @@ class AppConfig(BaseModel):
 			'KnowledgeConfig': 'knowledges',
 			'StorageConfig': 'storages',
 			'BackendConfig': 'backends',
-			'OptionsConfig': 'options',
+			'AgentOptionsConfig': 'agent_options', // Fixed: AgentOptionsConfig -> agent_options
+			'AppOptionsConfig': 'options', // Added: AppOptionsConfig -> options (but it's not an array, so return -1)
 			'MemoryDBConfig': 'memory_dbs',
 			'KnowledgeDBConfig': 'knowledge_dbs',
 			'StorageDBConfig': 'storage_dbs'
@@ -1263,7 +1301,12 @@ class AppConfig(BaseModel):
 
 		const arrayKey = arrayKeys[modelName];
 		if (arrayKey && config[arrayKey]) {
-			return config[arrayKey].findIndex(item => this._nodeMatchesConfig(node, item));
+			// AppOptionsConfig is not an array, so return -1
+			if (modelName === 'AppOptionsConfig') {
+				return -1;
+			} else {
+				return config[arrayKey].findIndex(item => this._nodeMatchesConfig(node, item));
+			}
 		}
 
 		return -1;

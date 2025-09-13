@@ -66,6 +66,10 @@ DEFAULT_OPTIONS_REASONING                         : bool = True
 DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS         : bool = True
 DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS            : int  = 5
 
+
+DEFAULT_APP_KNOWLEDGE_PATH                        : str  = "../storage/knowledge"
+DEFAULT_APP_MEMORY_PATH                           : str  = "../storage/memory"
+DEFAULT_APP_SESSION_PATH                          : str  = "../storage/session"
 DEFAULT_APP_PORT                                  : int  = 8000
 DEFAULT_APP_RELOAD                                : bool = True
 
@@ -170,7 +174,7 @@ class ToolConfig(BaseModel):
 	data : Optional[Any]            = None
 
 
-class OptionsConfig(BaseModel):
+class AgentOptionsConfig(BaseModel):
 	markdown                         : bool          = DEFAULT_OPTIONS_MARKDOWN
 	search_knowledge                 : bool          = DEFAULT_OPTIONS_SEARCH_KNOWLEDGE
 	enable_agentic_memory            : bool          = DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY
@@ -190,7 +194,7 @@ class AgentConfig(BaseModel):
 	backend      : Optional[Union[BackendConfig, int]]         = None
 	model        : Optional[Union[ModelConfig, int]]           = None
 	embedding    : Optional[Union[EmbeddingConfig, int]]       = None
-	options      : Optional[Union[OptionsConfig, int]]         = None
+	options      : Optional[Union[AgentOptionsConfig, int]]    = None
 	version      : Optional[str]                               = None
 	name         : Optional[str]                               = None
 	author       : Optional[str]                               = None
@@ -204,10 +208,17 @@ class AgentConfig(BaseModel):
 	data         : Optional[Any]                               = None
 
 
+class AppOptionsConfig(BaseModel):
+	knowledge_path : str           = DEFAULT_APP_KNOWLEDGE_PATH
+	memory_path    : str           = DEFAULT_APP_MEMORY_PATH
+	session_path   : str           = DEFAULT_APP_SESSION_PATH
+	port           : int           = DEFAULT_APP_PORT
+	reload         : bool          = DEFAULT_APP_RELOAD
+	seed           : Optional[int] = None
+
+
 class AppConfig(BaseModel):
-	port          : int                                 = DEFAULT_APP_PORT
-	reload        : bool                                = DEFAULT_APP_RELOAD
-	backend       : Optional[Union[BackendConfig, int]] = None
+	options       : AppOptionsConfig                    = AppOptionsConfig()
 	version       : Optional[str]                       = None
 	name          : Optional[str]                       = None
 	author        : Optional[str]                       = None
@@ -221,9 +232,8 @@ class AppConfig(BaseModel):
 	memories      : Optional[List[MemoryConfig]]        = None
 	storage_dbs   : Optional[List[StorageDBConfig]]     = None
 	storages      : Optional[List[StorageConfig]]       = None
-	options       : Optional[List[OptionsConfig]]       = None
+	agent_options : Optional[List[AgentOptionsConfig]]  = None
 	agents        : Optional[List[AgentConfig]]         = None
-	seed          : Optional[int]                       = None
 	data          : Optional[Any]                       = None
 
 
@@ -247,6 +257,7 @@ def validate_config(config: AppConfig) -> bool:
 # 		if not config_copy.memories      : config_copy.memories      = []
 # 		if not config_copy.storage_dbs   : config_copy.storage_dbs   = []
 # 		if not config_copy.storages      : config_copy.storages      = []
+# 		if not config_copy.agent_options : config_copy.agent_options = []
 # 		if not config_copy.options       : config_copy.options       = []
 # 		if not config_copy.agents        : config_copy.agents        = []
 
@@ -261,6 +272,7 @@ def validate_config(config: AppConfig) -> bool:
 # 		max_memories      = len(config_copy.memories)
 # 		max_storage_dbs   = len(config_copy.storage_dbs)
 # 		max_storages      = len(config_copy.storages)
+#       max_agent_options = len(config_copy.agent_options)
 # 		max_options       = len(config_copy.options)
 # 		max_agents        = len(config_copy.agents)
 
@@ -278,7 +290,7 @@ def validate_config(config: AppConfig) -> bool:
 # 		config_copy.embeddings.append(item)
 # 		shared_embedding_index = len(config_copy.embeddings) - 1
 
-# 		item = OptionsConfig()
+# 		item = AgentOptionsConfig()
 # 		config_copy.options.append(item)
 # 		shared_options_index = len(config_copy.options) - 1
 
@@ -311,20 +323,20 @@ def unroll_config(config: AppConfig) -> AppConfig:
 	if not config_copy.memories      : config_copy.memories      = []
 	if not config_copy.storage_dbs   : config_copy.storage_dbs   = []
 	if not config_copy.storages      : config_copy.storages      = []
-	if not config_copy.options       : config_copy.options       = []
+	if not config_copy.agent_options : config_copy.agent_options = []
 	if not config_copy.agents        : config_copy.agents        = []
 
-	max_backends      = len(config_copy.backends)
-	max_models        = len(config_copy.models)
-	max_embeddings    = len(config_copy.embeddings)
-	max_knowledge_dbs = len(config_copy.knowledge_dbs)
-	max_knowledges    = len(config_copy.knowledges)
-	max_memory_dbs    = len(config_copy.memory_dbs)
-	max_memories      = len(config_copy.memories)
-	max_storage_dbs   = len(config_copy.storage_dbs)
-	max_storages      = len(config_copy.storages)
-	max_options       = len(config_copy.options)
-	max_agents        = len(config_copy.agents)
+	# max_backends      = len(config_copy.backends)
+	# max_models        = len(config_copy.models)
+	# max_embeddings    = len(config_copy.embeddings)
+	# max_knowledge_dbs = len(config_copy.knowledge_dbs)
+	# max_knowledges    = len(config_copy.knowledges)
+	# max_memory_dbs    = len(config_copy.memory_dbs)
+	# max_memories      = len(config_copy.memories)
+	# max_storage_dbs   = len(config_copy.storage_dbs)
+	# max_storages      = len(config_copy.storages)
+	# max_agent_options = len(config_copy.agent_options)
+	# max_agents        = len(config_copy.agents)
 
 	item = BackendConfig()
 	config_copy.backends.append(item)
@@ -338,9 +350,9 @@ def unroll_config(config: AppConfig) -> AppConfig:
 	config_copy.embeddings.append(item)
 	shared_embedding = len(config_copy.embeddings) - 1
 
-	item = OptionsConfig()
-	config_copy.options.append(item)
-	shared_options = len(config_copy.options) - 1
+	item = AgentOptionsConfig()
+	config_copy.agent_options.append(item)
+	shared_agent_options = len(config_copy.agent_options) - 1
 
 	if not config_copy.agents:
 		config_copy.agents.append(AgentConfig())
@@ -350,7 +362,7 @@ def unroll_config(config: AppConfig) -> AppConfig:
 	if True:
 		db_url_len = 0
 		for db in config_copy.knowledge_dbs:
-			if getattr(db, "_counter", 0) != 0 and db.db_url:
+			if db.db_url:
 				db_url_len = max(db_url_len, len(db.db_url))
 		knowledge_db_url_base = "default_" + ("_" * db_url_len)
 
@@ -359,7 +371,7 @@ def unroll_config(config: AppConfig) -> AppConfig:
 	if True:
 		db_url_len = 0
 		for db in config_copy.memory_dbs:
-			if getattr(db, "_counter", 0) != 0 and db.db_url:
+			if db.db_url:
 				db_url_len = max(db_url_len, len(db.db_url))
 		memory_db_url_base = "default_" + ("_" * db_url_len)
 
@@ -368,21 +380,11 @@ def unroll_config(config: AppConfig) -> AppConfig:
 	if True:
 		db_url_len = 0
 		for db in config_copy.storage_dbs:
-			if getattr(db, "_counter", 0) != 0 and db.db_url:
+			if db.db_url:
 				db_url_len = max(db_url_len, len(db.db_url))
 		storage_db_url_base = "default_" + ("_" * db_url_len)
 
-	if config_copy.backend is None:
-		config_copy.backend = shared_backend
-	elif isinstance(config_copy.backend, BackendConfig):
-		config_copy.backends.append(config_copy.backend)
-		config_copy.backend = len(config_copy.backends) - 1
-	if not isinstance(config_copy.backend, int) or config_copy.backend >= len(config_copy.backends):
-		raise ValueError("Invalid app backend")
-
 	for agent in config_copy.agents:
-		agent.port = None
-
 		if agent.backend is None:
 			agent.backend = shared_backend
 		elif isinstance(agent.backend, BackendConfig):
@@ -486,11 +488,11 @@ def unroll_config(config: AppConfig) -> AppConfig:
 				raise ValueError("Invalid agent storage db")
 
 		if agent.options is None:
-			agent.options = shared_options
-		if isinstance(agent.options, OptionsConfig):
-			config_copy.options.append(agent.options)
-			agent.options = len(config_copy.options) - 1
-		if not isinstance(agent.options, int) or agent.options >= len(config_copy.options):
+			agent.options = shared_agent_options
+		if isinstance(agent.options, AgentOptionsConfig):
+			config_copy.agent_options.append(agent.agent_options)
+			agent.options = len(config_copy.agent_options) - 1
+		if not isinstance(agent.options, int) or agent.options >= len(config_copy.agent_options):
 			raise ValueError("Invalid agent options")
 
 		if not agent.tools:
@@ -585,17 +587,20 @@ class App:
 		if not validate_config(config):
 			raise ValueError("Invalid app configuration")
 
-		config_copy = unroll_config(config)
+		try:
+			config_copy = unroll_config(config)
+		except Exception as e:
+			raise ValueError(f"Error unrolling config: {e}")
 
 		agents = []
-		for i, agent in enumerate(config.agents):
+		for i, agent in enumerate(config_copy.agents):
 			backend = config_copy.backends[agent.backend]
 			agent   = App._backends[(backend.type, backend.version)](config_copy, i, i + 1)
 			if agent.is_valid():
 				agents.append(agent)
 
 		self.agents = agents
-		self.config = config
+		self.config = config_copy
 
 
 	def is_valid(self) -> bool:

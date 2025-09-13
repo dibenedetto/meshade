@@ -1,9 +1,11 @@
+import os
+
 from   typing                    import Any
-  
-  
+
+
 from   agno.agent                import Agent
 from   agno.app.agui.app         import AGUIApp
-from   agno.knowledge.combined   import CombinedKnowledgeBase
+# from   agno.knowledge.combined   import CombinedKnowledgeBase
 from   agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
 from   agno.memory.v2.db.sqlite  import SqliteMemoryDb
 from   agno.memory.v2.memory     import Memory
@@ -20,9 +22,10 @@ from   agno.vectordb.search      import SearchType
 from   numel                     import (
 	App,
 	AppConfig,
+	AppOptionsConfig,
 	AgentApp,
 	ModelConfig,
-	OptionsConfig,
+	AgentOptionsConfig,
 	DEFAULT_KNOWLEDGE_DB_TYPE,
 	DEFAULT_KNOWLEDGE_TYPE,
 	DEFAULT_MEMORY_DB_TYPE,
@@ -48,7 +51,7 @@ class AgnoAgentApp(AgentApp):
 			raise ValueError("Invalid Agno app configuration")
 
 		agent_config = self.config.agents[self.agent_index]
-		if not agent_config or not compatible_backends(config.backends[config.backend], config.backends[agent_config.backend]):
+		if not agent_config:  # or not compatible_backends(config.backends[config.backend], config.backends[agent_config.backend]):
 			raise ValueError("Agno agent configuration not found")
 
 		def get_model(model_config: ModelConfig, do_raise: bool) -> Any:
@@ -61,7 +64,7 @@ class AgnoAgentApp(AgentApp):
 				raise ValueError(f"Unsupported Agno model")
 			return None
 
-		def get_options(options_config: OptionsConfig, do_raise: bool) -> Any:
+		def get_options(options_config: AgentOptionsConfig, do_raise: bool) -> Any:
 			if options_config:
 				options = dict(options_config)
 				del options["data"]
@@ -89,12 +92,12 @@ class AgnoAgentApp(AgentApp):
 		memories      = [0] * len(self.config.memories)
 		storage_dbs   = [0] * len(self.config.storage_dbs)
 		storages      = [0] * len(self.config.storages)
-		options       = [0] * len(self.config.options)
+		agent_options = [0] * len(self.config.agent_options)
 		tools         = []
 
-		models     [agent_config.model    ] += 1
-		embeddings [agent_config.embedding] += 1
-		options    [agent_config.options  ] += 1
+		models        [agent_config.model    ] += 1
+		embeddings    [agent_config.embedding] += 1
+		agent_options [agent_config.options  ] += 1
 
 		if agent_config.knowledge is not None:
 			for index in agent_config.knowledge:
@@ -130,19 +133,21 @@ class AgnoAgentApp(AgentApp):
 			item = get_model(item_config, True)
 			embeddings[i] = item
 
-		for i, (enabled, item_config) in enumerate(zip(options, self.config.options)):
+		for i, (enabled, item_config) in enumerate(zip(agent_options, self.config.agent_options)):
 			if not enabled:
 				continue
 			item = get_options(item_config, True)
-			options[i] = item
+			agent_options[i] = item
 
+		knowledge_base_path = config.options.knowledge_path or "."
 		for i, (enabled, item_config) in enumerate(zip(knowledge_dbs, self.config.knowledge_dbs)):
 			if not enabled:
 				continue
 			if item_config.type == DEFAULT_KNOWLEDGE_DB_TYPE:
+				db_url = os.path.join(knowledge_base_path, item_config.db_url) if not os.path.isabs(item_config.db_url) else item_config.db_url
 				item = LanceDb(
 					table_name  = item_config.table_name,
-					uri         = item_config.db_url,
+					uri         = db_url,
 					search_type = get_search_type(item_config.search_type, True),
 				)
 			else:
@@ -161,13 +166,15 @@ class AgnoAgentApp(AgentApp):
 				raise ValueError("Invalid Agno knowledge type")
 			knowledges[i] = item
 
+		memory_base_path = config.options.memory_path or "."
 		for i, (enabled, item_config) in enumerate(zip(memory_dbs, self.config.memory_dbs)):
 			if not enabled:
 				continue
 			if item_config.type == DEFAULT_MEMORY_DB_TYPE:
+				db_url = os.path.join(memory_base_path, item_config.db_url) if not os.path.isabs(item_config.db_url) else item_config.db_url
 				item = SqliteMemoryDb(
 					table_name = item_config.table_name,
-					db_file    = item_config.db_url,
+					db_file    = db_url,
 				)
 			else:
 				raise ValueError("Invalid Agno memory db type")
@@ -188,13 +195,15 @@ class AgnoAgentApp(AgentApp):
 				raise ValueError("Invalid Agno memory type")
 			memories[i] = item
 
+		session_base_path = config.options.session_path or "."
 		for i, (enabled, item_config) in enumerate(zip(storage_dbs, self.config.storage_dbs)):
 			if not enabled:
 				continue
 			if item_config.type == DEFAULT_STORAGE_DB_TYPE:
+				db_url = os.path.join(session_base_path, item_config.db_url) if not os.path.isabs(item_config.db_url) else item_config.db_url
 				item = SqliteStorage(
 					table_name = item_config.table_name,
-					db_file    = item_config.db_url,
+					db_file    = db_url,
 				)
 			else:
 				raise ValueError("Invalid Agno storage db type")
@@ -233,8 +242,8 @@ class AgnoAgentApp(AgentApp):
 			if not tools:
 				tools = None
 
-		model = models  [agent_config.model  ]
-		opts  = options [agent_config.options]
+		model = models        [agent_config.model  ]
+		opts  = agent_options [agent_config.options]
 
 		knowledge = None
 		if agent_config.knowledge is not None:
@@ -285,7 +294,7 @@ class AgnoAgentApp(AgentApp):
 
 
 	def launch(self, app: str) -> None:
-		self.agui_app.serve(app=app, port=self.config.port + self.port_offset, reload=self.config.reload)
+		self.agui_app.serve(app=app, port=self.config.options.port + self.port_offset, reload=self.config.options.reload)
 
 
 def register() -> None:

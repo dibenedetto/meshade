@@ -3,10 +3,12 @@
 	"name"        : "Numel Playground",
 	"description" : "Numel AI Playground",
 	"author"      : "marco@numel.app",
-	"backend"     : 0,
-	"port"        : 8000,
-	"seed"        : 42,
 	"data"        : null,
+
+	"options" : {
+		"seed" : 7,
+		"port" : 8000
+	},
 
 	"backends" : [
 		{
@@ -33,7 +35,7 @@
 		{
 			"type"        : "lancedb",
 			"table_name"  : "knowledge",
-			"db_url"      : "../storage/knowledge/knowledge_lancedb_1",
+			"db_url"      : "storage/knowledge/knowledge_lancedb_1",
 			"search_type" : "hybrid"
 		}
 	],
@@ -50,7 +52,7 @@
 		{
 			"type"       : "sqlite",
 			"table_name" : "memory",
-			"db_url"     : "../storage/memory/memory_sqlite_1.db"
+			"db_url"     : "storage/memory/memory_sqlite_1.db"
 		}
 	],
 
@@ -67,7 +69,7 @@
 		{
 			"type"       : "sqlite",
 			"table_name" : "session",
-			"db_url"     : "../storage/session/storage_sqlite_1.db"
+			"db_url"     : "storage/session/storage_sqlite_1.db"
 		}
 	],
 
@@ -80,7 +82,7 @@
 		}
 	],
 
-	"options" : [
+	"agent_options" : [
 		{
 			"markdown"                         : true,
 			"search_knowledge"                 : true,

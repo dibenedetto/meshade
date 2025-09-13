@@ -22,19 +22,20 @@ def log_print(*args, **kwargs):
 if True:
 	parser = argparse.ArgumentParser(description="App configuration")
 	parser .add_argument("--port", type=int, default=DEFAULT_APP_PORT, help="Listening port for control server")
-	parser .add_argument("--config_path", type=str, default="config.json", help="Path to configuration file")
+	parser .add_argument("--config_path", type=str, default="app/config.json", help="Path to configuration file")
 	args   = parser.parse_args()
 
 
 if True:
 	config = load_config(args.config_path) or AppConfig()
-	config.port = args.port
-	if config.seed is not None:
-		seed_everything(config.seed)
+	config.options.port = args.port
+	if config.options.seed is not None:
+		seed_everything(config.options.seed)
 
 
 if True:
-	impl_modules = [os.path.splitext(f)[0] for f in os.listdir(".") if f.endswith("_impl.py")]
+	curr_dir     = os.path.dirname(os.path.abspath(__file__))
+	impl_modules = [os.path.splitext(f)[0] for f in os.listdir(curr_dir) if f.endswith("_impl.py")]
 	for module_name in impl_modules:
 		try:
 			impl_module = __import__(module_name)
@@ -96,10 +97,10 @@ async def start_app():
 	if app is not None:
 		return {"error": "App is already running"}
 	try:
-		if config.seed is not None:
-			seed_everything(config.seed)
+		if config.options.seed is not None:
+			seed_everything(config.options.seed)
 		for i, agent in enumerate(config.agents):
-			agent.port = config.port + i + 1
+			agent.port = config.options.port + i + 1
 		host            = "0.0.0.0"
 		app             = App(config)
 		running_servers = []
@@ -175,7 +176,7 @@ async def run_server():
 	global config, ctrl_app, ctrl_server
 
 	host        = "0.0.0.0"
-	ctrl_config = uvicorn.Config(ctrl_app, host=host, port=config.port)
+	ctrl_config = uvicorn.Config(ctrl_app, host=host, port=config.options.port)
 	ctrl_server = uvicorn.Server(ctrl_config)
 
 	await ctrl_server.serve()
