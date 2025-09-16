@@ -271,8 +271,7 @@
 
 		<script type="text/javascript" src="dist/agui-client.bundle.js"></script>
 		<script type="text/javascript" src="numel.js"></script>
-		<!-- <script type="text/javascript" src="graph.js"></script> -->
-		<script type="text/javascript" src="fixed_numel_graph.js"></script>
+		<script type="text/javascript" src="graph.js"></script>
 
 		<script>
 			const baseConfig = {
@@ -296,15 +295,15 @@
 
 				"models" : [
 					{
-						"type" : "openai",
-						"id"   : "gpt-4"
+						"type" : "ollama",
+						"id"   : "mistral"
 					}
 				],
 
 				"embeddings" : [
 					{
-						"type" : "openai",
-						"id"   : "gpt-4"
+						"type" : "ollama",
+						"id"   : "mistral"
 					}
 				],
 

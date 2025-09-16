@@ -23,8 +23,8 @@ sqlite3-api==2.0.4
 psycopg==3.2.10
 
 # Vector operations
-# numpy==2.3.2
-numpy==2.2.6
+numpy==2.3.3
+# numpy==2.2.6
 pandas==2.3.2
 
 # Web tools
@@ -41,7 +41,8 @@ ag-ui-protocol==0.1.8
 openai==1.107.0
 ollama==0.5.3
 anthropic==0.66.0
-agno==1.8.2
+# agno==1.8.2
+agno==2.0.4
 langchain==0.3.27
 langchain-text-splitters==0.3.11
 sentence-transformers==5.1.0
