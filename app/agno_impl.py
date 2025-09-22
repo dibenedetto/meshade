@@ -22,7 +22,6 @@ from   agno.vectordb.search      import SearchType
 from   numel                     import (
 	App,
 	AppConfig,
-	AppOptionsConfig,
 	AgentApp,
 	ModelConfig,
 	AgentOptionsConfig,
@@ -33,7 +32,6 @@ from   numel                     import (
 	DEFAULT_STORAGE_DB_TYPE,
 	DEFAULT_STORAGE_TYPE,
 	DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS,
-	compatible_backends,
 )
 
 
@@ -51,7 +49,7 @@ class AgnoAgentApp(AgentApp):
 			raise ValueError("Invalid Agno app configuration")
 
 		agent_config = self.config.agents[self.agent_index]
-		if not agent_config:  # or not compatible_backends(config.backends[config.backend], config.backends[agent_config.backend]):
+		if not agent_config:
 			raise ValueError("Agno agent configuration not found")
 
 		def get_model(model_config: ModelConfig, do_raise: bool) -> Any:
