@@ -1,12 +1,15 @@
+# numel
+
 import copy
 import json
-import os
 
 
 from   collections.abc import Callable
-from   datetime        import datetime
 from   pydantic        import BaseModel
 from   typing          import Any, Dict, List, Optional, Tuple, Union
+
+
+from   utils           import log_print
 
 
 DEFAULT_SEED                                      : int  = 42
@@ -116,8 +119,8 @@ class ContentDBConfig(ConfigModel):
 
 
 class IndexDBConfig(ConfigModel):
-	engine      : str = DEFAULT_INDEX_DB_ENGINE       # db engine name (eg. lancedb)
-	url         : str = DEFAULT_INDEX_DB_URL          # db url (eg. lancedb folder path)
+	engine      : str = DEFAULT_CONTENT_DB_ENGINE                      # db engine name (eg. sqlite)
+	url         : str = DEFAULT_CONTENT_DB_URL                         # db url (eg. sqlite file path)
 	search_type : str = DEFAULT_INDEX_DB_SEARCH_TYPE  # search type (eg. hybrid)
 
 
@@ -157,7 +160,6 @@ class ToolConfig(ConfigModel):
 
 
 class AgentOptionsConfig(ConfigModel):
-	port                      : int  = 0
 	markdown                  : bool = DEFAULT_OPTIONS_MARKDOWN
 	show_tool_calls           : bool = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
 	tool_call_limit           : int  = DEFAULT_OPTIONS_TOOL_CALL_LIMIT
@@ -562,63 +564,18 @@ def load_config(file_path: str) -> AppConfig:
 		return None
 
 
-def seed_everything(seed: int = DEFAULT_SEED):
-	if seed is None:
-		seed = DEFAULT_SEED
-	elif seed < 0:
-		seed = int(datetime.now()) % (2**32)
-
-	os.environ['PYTHONHASHSEED'] = str(seed)
-
-	try:
-		import numpy
-		numpy.random.seed(seed)
-	except:
-		pass
-
-	try:
-		import torch
-		torch .manual_seed(seed)
-		torch .cuda.manual_seed(seed)
-		torch .cuda.manual_seed_all(seed)
-		torch .backends.cudnn.deterministic = True
-	except:
-		pass
-
-
-def get_time_str() -> str:
-	now = datetime.now()
-	res = now.strftime("%Y-%m-%d %H:%M:%S")
-	return res
-
-
-def module_prop_str(file_path: str, property_name: str) -> str:
-	module_name = os.path.splitext(os.path.basename(file_path))[0]
-	res         = f"{module_name}:{property_name}"
-	return res
-
-
 class AgentApp:
 
-	def __init__(self, config: AppConfig, agent_index: int, port_offset: int):
-		if agent_index < 0 or agent_index >= len(config.agents) or port_offset <= 0:
-			raise ValueError("Invalid Agno app configuration")
+	def __init__(self, config: AppConfig, agent_index: int):
+		if agent_index < 0 or agent_index >= len(config.agents):
+			raise ValueError("Invalid agent index")
 
 		self.config      = copy.deepcopy(config)
 		self.agent_index = agent_index
-		self.port_offset = port_offset
-
-
-	def is_valid(self) -> bool:
-		raise NotImplementedError("Subclasses must implement the is_valid method.")
 
 
 	def generate_app(self) -> Any:
 		raise NotImplementedError("Subclasses must implement the generate_app method.")
-
-
-	def launch(self, app: str) -> None:
-		raise NotImplementedError("Subclasses must implement the launch method.")
 
 
 class App:
@@ -627,9 +584,19 @@ class App:
 
 
 	@staticmethod
-	def register(name: str, version: str, backend: Callable) -> bool:
-		App._backends[(name, version)] = backend
+	def register(backend: BackendConfig, ctor: Callable) -> bool:
+		key = (backend.type, backend.version)
+		App._backends[key] = ctor
 		return True
+
+
+	@staticmethod
+	def instantiate(backend: BackendConfig, config: AppConfig, agent_index: int) -> AgentApp:
+		key = (backend.type, backend.version)
+		if key not in App._backends:
+			raise ValueError(f"Unsupported backend: {backend.type} {backend.version}")
+		agent = App._backends[key](config, agent_index)
+		return agent
 
 
 	def __init__(self, config: AppConfig):
@@ -643,13 +610,11 @@ class App:
 		agents = []
 		for i, agent in enumerate(config_copy.agents):
 			backend = config_copy.backends[agent.backend]
-			agent   = App._backends[(backend.type, backend.version)](config_copy, i, i + 1)
-			if agent.is_valid():
-				agents.append(agent)
+			try:
+				agent = App.instantiate[(backend.type, backend.version)](config_copy, i)
+			except Exception as e:
+				log_print(f"Error creating agent {i}: {e}")
+			agents.append(agent)
 
 		self.agents = agents
 		self.config = config_copy
-
-
-	def is_valid(self) -> bool:
-		return len(self.agents) != 0

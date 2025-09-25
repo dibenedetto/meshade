@@ -1,8 +1,18 @@
-from   typing     import Any, Dict
+# tools
 
-
-from   agno.tools import tool
-
-
-def geometry_processing(geometry_base64: str, op: str, params: Dict[str, Any]) -> Dict[str, Any]:
-	pass
+def square_tool(n: int) -> int:
+	"""
+	Return the square of a number.
+	Args:
+		n (int): The number to be squared.
+	Returns:
+		int: The square of the number.
+	Examples:
+		>>> square_tool(3)
+		9
+		>>> square_tool(-4)
+		16
+		>>> square_tool(0)
+		0
+	"""
+	return n**2

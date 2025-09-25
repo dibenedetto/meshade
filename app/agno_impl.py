@@ -1,3 +1,5 @@
+# agno_impl
+
 import os
 
 from   typing                    import Any
@@ -23,6 +25,7 @@ from   numel                     import (
 	App,
 	AppConfig,
 	AgentApp,
+	BackendConfig,
 	ModelConfig,
 	AgentOptionsConfig,
 	DEFAULT_KNOWLEDGE_DB_TYPE,
@@ -42,8 +45,8 @@ def _validate_config(config: AppConfig) -> bool:
 
 class _AgnoAgentApp(AgentApp):
 
-	def __init__(self, config: AppConfig, agent_index: int, port_offset: int):
-		super().__init__(config, agent_index, port_offset)
+	def __init__(self, config: AppConfig, agent_index: int):
+		super().__init__(config, agent_index)
 
 		if not _validate_config(self.config):
 			raise ValueError("Invalid Agno app configuration")
@@ -274,10 +277,6 @@ class _AgnoAgentApp(AgentApp):
 		self.d = agent
 
 
-	def is_valid(self) -> bool:
-		return self.d is not None
-
-
 	def generate_app(self) -> Any:
 		app_id   = "platform_agno_" + self.config.name.replace(" ", "_").lower()
 		agui_app = AGUIApp(
@@ -291,9 +290,9 @@ class _AgnoAgentApp(AgentApp):
 		return app
 
 
-	def launch(self, app: str) -> None:
-		self.agui_app.serve(app=app, port=self.config.options.port + self.port_offset, reload=self.config.options.reload)
-
-
 def register() -> None:
-	App.register("agno", "", _AgnoAgentApp)
+	backend = BackendConfig(
+		type    = "agno",
+		version = "",
+	)
+	App.register(backend, _AgnoAgentApp)

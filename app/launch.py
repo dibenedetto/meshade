@@ -1,3 +1,5 @@
+# launch
+
 import argparse
 import asyncio
 import os
@@ -10,13 +12,10 @@ from   fastapi.middleware.cors import CORSMiddleware
 
 
 from   numel                   import DEFAULT_APP_PORT, App, AppConfig, get_time_str, load_config, seed_everything
+from   utils                   import log_print
 
 
 load_dotenv()
-
-
-def log_print(*args, **kwargs):
-	print("[launch]", *args, **kwargs)
 
 
 if True:
@@ -99,14 +98,12 @@ async def start_app():
 	try:
 		if config.options.seed is not None:
 			seed_everything(config.options.seed)
-		for i, agent in enumerate(config.agents):
-			agent.port = config.options.port + i + 1
 		host            = "0.0.0.0"
 		app             = App(config)
 		running_servers = []
-		for agent in app.agents:
+		for i, agent in enumerate(app.agents):
 			agent_app    = agent.generate_app()
-			agent_port   = app.config.agents[agent.agent_index].port
+			agent_port   = config.options.port + i + 1
 			agent_config = uvicorn.Config(agent_app, host=host, port=agent_port)
 			agent_server = uvicorn.Server(agent_config)
 			agent_task   = asyncio.create_task(agent_server.serve())
