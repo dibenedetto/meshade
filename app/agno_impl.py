@@ -35,17 +35,17 @@ from   numel                     import (
 )
 
 
-def agno_validate_config(config: AppConfig) -> bool:
+def _validate_config(config: AppConfig) -> bool:
 	# TODO: Implement validation logic for the Agno app configuration
 	return config is not None
 
 
-class AgnoAgentApp(AgentApp):
+class _AgnoAgentApp(AgentApp):
 
 	def __init__(self, config: AppConfig, agent_index: int, port_offset: int):
 		super().__init__(config, agent_index, port_offset)
 
-		if not agno_validate_config(self.config):
+		if not _validate_config(self.config):
 			raise ValueError("Invalid Agno app configuration")
 
 		agent_config = self.config.agents[self.agent_index]
@@ -296,4 +296,4 @@ class AgnoAgentApp(AgentApp):
 
 
 def register() -> None:
-	App.register("agno", "", AgnoAgentApp)
+	App.register("agno", "", _AgnoAgentApp)

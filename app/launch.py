@@ -183,5 +183,6 @@ async def run_server():
 
 
 if __name__ == "__main__":
+	log_print("Server starting...")
 	asyncio.run(run_server())
 	log_print("Server shut down")
