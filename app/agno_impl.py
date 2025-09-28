@@ -22,12 +22,6 @@ from   agno.vectordb.search      import SearchType
 
 
 from   numel                     import (
-	App,
-	AppConfig,
-	AgentApp,
-	BackendConfig,
-	ModelConfig,
-	AgentOptionsConfig,
 	DEFAULT_KNOWLEDGE_DB_TYPE,
 	DEFAULT_KNOWLEDGE_TYPE,
 	DEFAULT_MEMORY_DB_TYPE,
@@ -35,6 +29,12 @@ from   numel                     import (
 	DEFAULT_STORAGE_DB_TYPE,
 	DEFAULT_STORAGE_TYPE,
 	DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS,
+	AppConfig,
+	AgentApp,
+	BackendConfig,
+	ModelConfig,
+	AgentOptionsConfig,
+	register_backend
 )
 
 
@@ -44,6 +44,126 @@ def _validate_config(config: AppConfig) -> bool:
 
 
 class _AgnoAgentApp(AgentApp):
+
+	def _build_model(self, config: AppConfig, agent_index: int, index: int) -> Any:
+		# class ModelConfig(ConfigModel):
+		# 	type : str = DEFAULT_MODEL_TYPE  # model provider name
+		# 	id   : str = DEFAULT_MODEL_ID    # model name (relative to llm)
+		return None
+
+
+	def _build_embedding(self, config: AppConfig, agent_index: int, index: int) -> Any:
+		# class ModelConfig(ConfigModel):
+		#	type : str = DEFAULT_EMBEDDING_TYPE  # embedding provider name
+		#	id   : str = DEFAULT_EMBEDDING_TYPE  # embedding name (relative to embedder)
+		return None
+
+
+	def _build_prompt(self, config: AppConfig, agent_index: int, index: int) -> Any:
+		# class PromptConfig(ConfigModel):
+		# 	model        : Optional[Union[ModelConfig    , int]] = None  # model to use for agentic knowledge processing
+		# 	embedding    : Optional[Union[EmbeddingConfig, int]] = None  # embedding to use for agentic knowledge processing
+		# 	description  : Optional[str]                         = None
+		# 	instructions : Optional[List[str]]                   = None
+		# 	override     : Optional[str]                         = None  # override prompt template
+		return None
+
+
+	def _build_content_db(self, config: AppConfig, agent_index: int, index: int) -> Any:
+		# class ContentDBConfig(ConfigModel):
+		# 	engine               : str = DEFAULT_CONTENT_DB_ENGINE                      # db engine name (eg. sqlite)
+		# 	url                  : str = DEFAULT_CONTENT_DB_URL                         # db url (eg. sqlite file path)
+		# 	memory_table_name    : str = DEFAULT_MEMORY_MANAGER_CONTENT_DB_TABLE_NAME   # name of the table to store memory content
+		# 	session_table_name   : str = DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME  # name of the table to store session content
+		# 	knowledge_table_name : str = DEFAULT_KNOWLEDGE_BASE_CONTENT_DB_TABLE_NAME   # name of the table to store knowledge base content
+		return None
+
+
+	def _build_index_db(self, config: AppConfig, agent_index: int, index: int) -> Any:
+		# class IndexDBConfig(ConfigModel):
+		# 	engine      : str = DEFAULT_CONTENT_DB_ENGINE                      # db engine name (eg. sqlite)
+		# 	url         : str = DEFAULT_CONTENT_DB_URL                         # db url (eg. sqlite file path)
+		# 	search_type : str = DEFAULT_INDEX_DB_SEARCH_TYPE  # search type (eg. hybrid)
+		return None
+
+
+	def _build_memory_manager(self, config: AppConfig, agent_index: int, index: int) -> Any:
+		# class MemoryManagerConfig(ConfigModel):
+		# 	prompt : Optional[Union[PromptConfig, int]] = None  # prompt for memory processing
+		# 	store  : bool                               = False
+		# 	use    : bool                               = False
+		return None
+
+
+	def _build_session_manager(self, config: AppConfig, agent_index: int, index: int) -> Any:
+		# class SessionManagerConfig(ConfigModel):
+		# 	prompt       : Optional[Union[PromptConfig, int]] = None  # prompt for session processing
+		# 	store        : bool                               = False
+		# 	use          : bool                               = False
+		# 	history_size : int                                = 10
+		# 	# summary      : session_summary_manager,
+		# 	# read_chat_history=True
+		# 	# add_session_summary_to_context = True
+		# 	# enable_session_summaries=True
+		return None
+
+
+	def _build_knowledge_base(self, config: AppConfig, agent_index: int, index: int) -> Any:
+		# class KnowledgeBaseConfig(ConfigModel):
+		# 	content_db : Optional [Union [ContentDBConfig, int]] = None  # where to store knowledge content
+		# 	index_db   : Union    [IndexDBConfig, int          ] = None  # where to store knowledge index
+		# 	urls       : Optional [List  [str                 ]] = None  # urls to fetch knowledge from
+		return None
+
+
+	def _build_knowledge_manager(self, config: AppConfig, agent_index: int, index: int) -> Any:
+		# class KnowledgeManagerConfig(ConfigModel):
+		# 	prompt : Optional [Union[PromptConfig, int]]              = None  # prompt for knowledge processing
+		# 	bases  : Optional [List[Union[KnowledgeBaseConfig, int]]] = None
+		# 	use    : bool                                             = False
+		return None
+
+
+	def _build_tool(self, config: AppConfig, agent_index: int, index: int) -> Any:
+		# class ToolConfig(ConfigModel):
+		# 	type : str
+		# 	args : Optional[Dict[str, Any]] = None
+		# 	ref  : Optional[str           ] = None
+		return None
+
+
+	def _build_agent(self, config: AppConfig, agent_index: int, index: int) -> Any:
+		# class AgentOptionsConfig(ConfigModel):
+		# 	markdown                  : bool = DEFAULT_OPTIONS_MARKDOWN
+		# 	show_tool_calls           : bool = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
+		# 	tool_call_limit           : int  = DEFAULT_OPTIONS_TOOL_CALL_LIMIT
+		# 	reasoning                 : bool = DEFAULT_OPTIONS_REASONING
+		# 	stream_intermediate_steps : bool = DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS
+
+		# 	# search_knowledge                 : bool = DEFAULT_OPTIONS_SEARCH_KNOWLEDGE
+		# 	# enable_agentic_memory            : bool = DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY
+		# 	# add_history_to_messages          : bool = DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES
+		# 	# num_history_runs                 : int  = DEFAULT_OPTIONS_NUM_HISTORY_RUNS
+		# 	# enable_session_summaries         : bool = DEFAULT_OPTIONS_ENABLE_SESSION_SUMMARIES
+		# 	# search_previous_sessions_history : bool = DEFAULT_OPTIONS_SEARCH_PREVIOUS_SESSIONS_HISTORY
+		# 	# num_history_sessions             : int  = DEFAULT_OPTIONS_NUM_HISTORY_SESSIONS
+		# 	# show_tool_calls                  : bool = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
+		# 	# tool_call_limit                  : int  = DEFAULT_OPTIONS_TOOL_CALL_LIMIT
+		# 	# reasoning                        : bool = DEFAULT_OPTIONS_REASONING
+		# 	# stream_intermediate_steps        : bool = DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS
+
+		# class AgentConfig(ConfigModel):
+		# 	backend       : Optional [Union [BackendConfig         , int ]] = None
+		# 	name          : Optional [str                                 ] = None
+		# 	options       : Optional [Union [AgentOptionsConfig    , int ]] = None
+		# 	prompt        : Optional [Union [PromptConfig          , int ]] = None
+		# 	content_db    : Optional [Union [ContentDBConfig       , int ]] = None
+		# 	memory_mgr    : Optional [Union [MemoryManagerConfig   , int ]] = None
+		# 	session_mgr   : Optional [Union [SessionManagerConfig  , int ]] = None
+		# 	knowledge_mgr : Optional [Union [KnowledgeManagerConfig, int ]] = None
+		# 	tools         : Optional [List  [Union[ToolConfig      , int]]] = None
+		return None
+
 
 	def __init__(self, config: AppConfig, agent_index: int):
 		super().__init__(config, agent_index)
@@ -290,9 +410,9 @@ class _AgnoAgentApp(AgentApp):
 		return app
 
 
-def register() -> None:
+def register() -> bool:
 	backend = BackendConfig(
 		type    = "agno",
 		version = "",
 	)
-	App.register(backend, _AgnoAgentApp)
+	return register_backend(backend, _AgnoAgentApp)

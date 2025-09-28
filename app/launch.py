@@ -11,8 +11,15 @@ from   fastapi                 import FastAPI
 from   fastapi.middleware.cors import CORSMiddleware
 
 
-from   numel                   import DEFAULT_APP_PORT, App, AppConfig, get_time_str, load_config, seed_everything
-from   utils                   import log_print
+from   utils                   import get_time_str, log_print, seed_everything
+from   numel                   import (
+	DEFAULT_APP_PORT,
+	AppConfig,
+	get_backend,
+	load_config,
+	unroll_config,
+	validate_config,
+)
 
 
 load_dotenv()
@@ -50,7 +57,7 @@ if True:
 		"status" : "waiting",
 	}
 
-	app = None
+	apps = None
 	running_servers = []
 
 	ctrl_app = FastAPI(title="Status")
@@ -76,10 +83,14 @@ async def ping():
 
 @ctrl_app.post("/import")
 async def import_config(cfg: dict):
-	global app, config, ctrl_status
-	if app is not None:
+	global apps, config, ctrl_status
+	if apps is not None:
 		return {"error": "App is running"}
-	config = AppConfig(**cfg)
+	new_config = AppConfig(**cfg)
+	new_config = unroll_config(new_config)
+	if not validate_config(new_config):
+		return {"error": "Invalid app configuration"}
+	config = new_config
 	ctrl_status["status"] = "ready"
 	return config
 
@@ -92,27 +103,49 @@ async def export_config():
 
 @ctrl_app.post("/start")
 async def start_app():
-	global app, config, ctrl_status, running_servers
-	if app is not None:
+	global apps, config, ctrl_status, running_servers
+	if apps is not None:
 		return {"error": "App is already running"}
 	try:
 		if config.options.seed is not None:
 			seed_everything(config.options.seed)
-		host            = "0.0.0.0"
-		app             = App(config)
-		running_servers = []
-		for i, agent in enumerate(app.agents):
-			agent_app    = agent.generate_app()
-			agent_port   = config.options.port + i + 1
-			agent_config = uvicorn.Config(agent_app, host=host, port=agent_port)
-			agent_server = uvicorn.Server(agent_config)
-			agent_task   = asyncio.create_task(agent_server.serve())
-			item         = {
-				"server" : agent_server,
-				"task"   : agent_task,
-			}
-			running_servers.append(item)
-		ctrl_status["config"] = app.config
+
+		apps = dict()
+		for i, agent in enumerate(config.agents):
+			backend = config.backends[agent.backend]
+			if backend not in apps:
+				cbk = get_backend(backend)
+				if cbk is None:
+					log_print(f"Unsupported backend: {backend.type} {backend.version}")
+					continue
+				apps[backend] = {
+					"backend" : cbk,
+					"agents"  : [],
+				}
+			apps[backend][1].append(i)
+
+		host = "0.0.0.0"
+		port = config.options.port + 1
+
+		for info in apps.values():
+			backend = info["backend"]
+			if backend is None:
+				continue
+			backend = backend(config, info["agents"])
+			info["backend"] = backend
+			for i, j in enumerate(info["agents"]):
+				agent_app    = backend.generate_app(i)
+				agent_port   = port + j
+				agent_config = uvicorn.Config(agent_app, host=host, port=agent_port)
+				agent_server = uvicorn.Server(agent_config)
+				agent_task   = asyncio.create_task(agent_server.serve())
+				item         = {
+					"server" : agent_server,
+					"task"   : agent_task,
+				}
+				running_servers.append(item)
+
+		ctrl_status["config"] = config
 		ctrl_status["status"] = "running"
 	except Exception as e:
 		return {"error": str(e)}
@@ -121,8 +154,8 @@ async def start_app():
 
 @ctrl_app.post("/stop")
 async def stop_app():
-	global app, config, ctrl_status, running_servers
-	if app is None:
+	global apps, config, ctrl_status, running_servers
+	if apps is None:
 		return {"error": "App is not running"}
 	try:
 		for item in running_servers:
@@ -132,8 +165,12 @@ async def stop_app():
 				server.should_exit = True
 			if task:
 				await task
+		for info in apps.values():
+			backend = info["backend"]
+			if backend is not None:
+				backend.close()
+		apps                  = None
 		running_servers       = []
-		app                   = None
 		ctrl_status["config"] = None
 		ctrl_status["status"] = "stopped"
 	except Exception as e:
@@ -158,8 +195,8 @@ async def server_status():
 
 @ctrl_app.post("/shutdown")
 async def shutdown_server():
-	global app, ctrl_app, ctrl_server, ctrl_status
-	if app is not None:
+	global apps, ctrl_app, ctrl_server, ctrl_status
+	if apps is not None:
 		return {"error": "App is running"}
 	if ctrl_server and ctrl_server.should_exit is False:
 		ctrl_server.should_exit = True

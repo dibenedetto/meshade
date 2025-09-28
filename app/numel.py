@@ -5,6 +5,7 @@ import json
 
 
 from   collections.abc import Callable
+from   fastapi         import FastAPI
 from   pydantic        import BaseModel
 from   typing          import Any, Dict, List, Optional, Tuple, Union
 
@@ -98,8 +99,8 @@ class ModelConfig(ConfigModel):
 
 
 class EmbeddingConfig(ConfigModel):
-	type : str = DEFAULT_MODEL_TYPE  # model provider name
-	id   : str = DEFAULT_MODEL_ID    # model name (relative to embedder)
+	type : str = DEFAULT_EMBEDDING_TYPE  # embedding provider name
+	id   : str = DEFAULT_EMBEDDING_TYPE  # embedding name (relative to embedder)
 
 
 class PromptConfig(ConfigModel):
@@ -119,8 +120,8 @@ class ContentDBConfig(ConfigModel):
 
 
 class IndexDBConfig(ConfigModel):
-	engine      : str = DEFAULT_CONTENT_DB_ENGINE                      # db engine name (eg. sqlite)
-	url         : str = DEFAULT_CONTENT_DB_URL                         # db url (eg. sqlite file path)
+	engine      : str = DEFAULT_INDEX_DB_ENGINE       # db engine name (eg. sqlite)
+	url         : str = DEFAULT_INDEX_DB_URL          # db url (eg. sqlite file path)
 	search_type : str = DEFAULT_INDEX_DB_SEARCH_TYPE  # search type (eg. hybrid)
 
 
@@ -180,10 +181,10 @@ class AgentOptionsConfig(ConfigModel):
 
 
 class AgentConfig(ConfigModel):
+	backend       : Union    [BackendConfig, int                  ]
+	prompt        : Union    [PromptConfig , int                  ]
 	name          : Optional [str                                 ] = None
 	options       : Optional [Union [AgentOptionsConfig    , int ]] = None
-	backend       : Optional [Union [BackendConfig         , int ]] = None
-	prompt        : Optional [Union [PromptConfig          , int ]] = None
 	content_db    : Optional [Union [ContentDBConfig       , int ]] = None
 	memory_mgr    : Optional [Union [MemoryManagerConfig   , int ]] = None
 	session_mgr   : Optional [Union [SessionManagerConfig  , int ]] = None
@@ -566,16 +567,44 @@ def load_config(file_path: str) -> AppConfig:
 
 class AgentApp:
 
-	def __init__(self, config: AppConfig, agent_index: int):
-		if agent_index < 0 or agent_index >= len(config.agents):
-			raise ValueError("Invalid agent index")
+	def __init__(self, config: AppConfig, active_agent_indices: List[bool]):
+		if len(active_agent_indices) != len(config.agents):
+			raise ValueError("Invalid active_agent_indices length")
 
-		self.config      = copy.deepcopy(config)
-		self.agent_index = agent_index
+		self.config = copy.deepcopy(config)
 
 
-	def generate_app(self) -> Any:
+	def generate_app(self, agent_index: int) -> FastAPI:
 		raise NotImplementedError("Subclasses must implement the generate_app method.")
+
+
+	def close(self) -> bool:
+		return True
+
+
+_backends: Dict[Tuple[str, str], Callable] = dict()
+
+
+def register_backend(backend: BackendConfig, ctor: Callable) -> bool:
+	global _backends
+	key = (backend.type, backend.version)
+	_backends[key] = ctor
+	return True
+
+
+def get_backend(backend: BackendConfig) -> Callable:
+	global _backends
+	key = (backend.type, backend.version)
+	return _backends.get(key, None)
+
+
+def instantiate(backend: BackendConfig, config: AppConfig) -> AgentApp:
+	global _backends
+	key = (backend.type, backend.version)
+	if key not in _backends:
+		raise ValueError(f"Unsupported backend: {backend.type} {backend.version}")
+	agent = App._backends[key](config, agent_index)
+	return agent
 
 
 class App:
@@ -607,6 +636,13 @@ class App:
 		except Exception as e:
 			raise ValueError(f"Error in config: {e}")
 
+		apps = dict()
+		for i, agent in enumerate(config_copy.agents):
+			backend = config_copy.backends[agent.backend]
+			if backend not in apps:
+				apps[backend] = []
+			apps[backend].append(i)
+
 		agents = []
 		for i, agent in enumerate(config_copy.agents):
 			backend = config_copy.backends[agent.backend]
@@ -616,5 +652,5 @@ class App:
 				log_print(f"Error creating agent {i}: {e}")
 			agents.append(agent)
 
-		self.agents = agents
 		self.config = config_copy
+		self.agents = agents
