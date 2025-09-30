@@ -10,9 +10,6 @@ from   pydantic        import BaseModel
 from   typing          import Any, Dict, List, Optional, Tuple, Union
 
 
-from   utils           import log_print
-
-
 DEFAULT_SEED                                      : int  = 42
 
 DEFAULT_API_KEY                                   : str  = None
@@ -211,18 +208,18 @@ class WorkflowConfig(ConfigModel):
 	options : Optional[Union[TeamOptionsConfig, int]] = None
 
 
-class AppOptionsConfig(ConfigModel):
-	port   : int           = DEFAULT_APP_PORT
-	reload : bool          = DEFAULT_APP_RELOAD
-	seed   : Optional[int] = None
+class AppInfoConfig(ConfigModel):
+	version     : Optional[str] = None
+	name        : Optional[str] = None
+	author      : Optional[str] = None
+	description : Optional[str] = None
+	seed        : Optional[int] = None
+	port        : int           = DEFAULT_APP_PORT
+	reload      : bool          = DEFAULT_APP_RELOAD
 
 
 class AppConfig(ConfigModel):
-	version          : Optional[str                         ] = None
-	name             : Optional[str                         ] = None
-	author           : Optional[str                         ] = None
-	description      : Optional[str                         ] = None
-	options          : Optional[AppOptionsConfig            ] = None
+	info             : Optional[AppInfoConfig               ] = None
 	backends         : Optional[List[BackendConfig         ]] = None
 	models           : Optional[List[ModelConfig           ]] = None
 	embeddings       : Optional[List[EmbeddingConfig       ]] = None
@@ -242,12 +239,17 @@ class AppConfig(ConfigModel):
 	workflows        : Optional[List[WorkflowConfig        ]] = None
 
 
+def compatible_backends(a: BackendConfig, b: BackendConfig) -> bool:
+	# TODO: improve compatibility check
+	return a.type == b.type and (a.version == b.version or not a.version or not b.version)
+
+
 def unroll_config(config: AppConfig) -> AppConfig:
 	config_copy = copy.deepcopy(config) if config is not None else AppConfig()
 
 	if True:
-		if not config_copy.options:
-			raise ValueError("Invalid app options")
+		if not config_copy.info:
+			raise ValueError("Invalid app info")
 
 	if True:
 		if not config_copy.backends         : config_copy.backends         = []
@@ -459,11 +461,7 @@ def validate_config(config: AppConfig) -> bool:
 		return False
 
 	if True:
-		# TODO: check base fields
-		pass
-
-	if True:
-		# TODO: check options
+		# TODO: check app info
 		pass
 
 	if True:
@@ -554,6 +552,281 @@ def validate_config(config: AppConfig) -> bool:
 	return True
 
 
+def compact_config(config: AppConfig) -> AppConfig:
+	# TODO: compact pydantic models
+	config_copy = copy.deepcopy(config) if config is not None else AppConfig()
+	return config_copy
+
+
+def extract_config(config: AppConfig, backend: BackendConfig, active_agents: List[bool]) -> AppConfig:
+	if config is None or backend is None or len(active_agents) != len(config.agents):
+		return None
+
+	extracted = AppConfig()
+
+	extracted.backends         = []
+	extracted.models           = []
+	extracted.embeddings       = []
+	extracted.prompts          = []
+	extracted.content_dbs      = []
+	extracted.index_dbs        = []
+	extracted.memory_mgrs      = []
+	extracted.session_mgrs     = []
+	extracted.knowledge_bases  = []
+	extracted.knowledge_mgrs   = []
+	extracted.tools            = []
+	extracted.agent_options    = []
+	extracted.agents           = []
+	extracted.team_options     = []
+	extracted.teams            = []
+	extracted.workflow_options = []
+	extracted.workflows        = []
+
+	model_remap                = {None: None}
+	embedding_remap            = {None: None}
+	prompt_remap               = {None: None}
+	content_db_remap           = {None: None}
+	index_db_remap             = {None: None}
+	memory_mgr_remap           = {None: None}
+	session_mgr_remap          = {None: None}
+	knowledge_base_remap       = {None: None}
+	knowledge_mgr_remap        = {None: None}
+	tool_remap                 = {None: None}
+	agent_options_remap        = {None: None}
+	agent_remap                = {None: None}
+
+	for i, agent in enumerate(config.agents):
+		if not active_agents[i] or not compatible_backends(config.backends[agent.backend], backend):
+			continue
+
+		active_agents[i] = False
+
+		agent_remap[i] = len(extracted.agents)
+		extracted.agents.append(None)
+
+		if True:
+			if agent.prompt is not None:
+				if agent.prompt not in prompt_remap:
+					prompt_remap[agent.prompt] = len(extracted.prompts)
+					extracted.prompts.append(None)
+					prompt = config.prompts[agent.prompt]
+					if True:
+						if prompt.model is not None:
+							if prompt.model not in model_remap:
+								model_remap[prompt.model] = len(extracted.models)
+								extracted.models.append(None)
+					if True:
+						if prompt.embedding is not None:
+							if prompt.embedding not in embedding_remap:
+								embedding_remap[prompt.embedding] = len(extracted.embeddings)
+								extracted.embeddings.append(None)
+
+		if True:
+			if agent.options is not None:
+				if agent.options not in agent_options_remap:
+					agent_options_remap[agent.options] = len(extracted.agent_options)
+					extracted.agent_options.append(None)
+
+		if True:
+			if agent.content_db is not None:
+				if agent.content_db not in content_db_remap:
+					content_db_remap[agent.content_db] = len(extracted.content_dbs)
+					extracted.content_dbs.append(None)
+
+		if True:
+			if agent.index_db is not None:
+				if agent.index_db not in index_db_remap:
+					index_db_remap[agent.index_db] = len(extracted.index_dbs)
+					extracted.index_dbs.append(None)
+
+		if True:
+			if agent.memory_mgr is not None:
+				if agent.memory_mgr not in memory_mgr_remap:
+					memory_mgr_remap[agent.memory_mgr] = len(extracted.memory_mgrs)
+					extracted.memory_mgrs.append(None)
+					memory_mgr = config.memory_mgrs[agent.memory_mgr]
+					if True:
+						if memory_mgr.prompt is not None:
+							if memory_mgr.prompt not in prompt_remap:
+								prompt_remap[memory_mgr.prompt] = len(extracted.prompts)
+								extracted.prompts.append(None)
+								prompt = config.prompts[memory_mgr.prompt]
+								if True:
+									if prompt.model is not None:
+										if prompt.model not in model_remap:
+											model_remap[prompt.model] = len(extracted.models)
+											extracted.models.append(None)
+								if True:
+									if prompt.embedding is not None:
+										if prompt.embedding not in embedding_remap:
+											embedding_remap[prompt.embedding] = len(extracted.embeddings)
+											extracted.embeddings.append(None)
+
+		if True:
+			if agent.session_mgr is not None:
+				if agent.session_mgr not in session_mgr_remap:
+					session_mgr_remap[agent.session_mgr] = len(extracted.session_mgrs)
+					extracted.session_mgrs.append(None)
+					session_mgr = config.session_mgrs[agent.session_mgr]
+					if True:
+						if session_mgr.prompt is not None:
+							if session_mgr.prompt not in prompt_remap:
+								prompt_remap[session_mgr.prompt] = len(extracted.prompts)
+								extracted.prompts.append(None)
+								prompt = config.prompts[session_mgr.prompt]
+								if True:
+									if prompt.model is not None:
+										if prompt.model not in model_remap:
+											model_remap[prompt.model] = len(extracted.models)
+											extracted.models.append(None)
+								if True:
+									if prompt.embedding is not None:
+										if prompt.embedding not in embedding_remap:
+											embedding_remap[prompt.embedding] = len(extracted.embeddings)
+											extracted.embeddings.append(None)
+
+		if True:
+			if agent.knowledge_mgr is not None:
+				if agent.knowledge_mgr not in knowledge_mgr_remap:
+					knowledge_mgr_remap[agent.knowledge_mgr] = len(extracted.knowledge_mgrs)
+					extracted.knowledge_mgrs.append(None)
+					knowledge_mgr = config.knowledge_mgrs[agent.knowledge_mgr]
+					if True:
+						if knowledge_mgr.prompt is not None:
+							if knowledge_mgr.prompt not in prompt_remap:
+								prompt_remap[knowledge_mgr.prompt] = len(extracted.prompts)
+								extracted.prompts.append(None)
+								prompt = config.prompts[knowledge_mgr.prompt]
+								if True:
+									if prompt.model is not None:
+										if prompt.model not in model_remap:
+											model_remap[prompt.model] = len(extracted.models)
+											extracted.models.append(None)
+								if True:
+									if prompt.embedding is not None:
+										if prompt.embedding not in embedding_remap:
+											embedding_remap[prompt.embedding] = len(extracted.embeddings)
+											extracted.embeddings.append(None)
+					if True:
+						if knowledge_mgr.bases is not None:
+							for knowledge_base in knowledge_mgr.bases:
+								if knowledge_base not in knowledge_base_remap:
+									knowledge_base_remap[knowledge_base] = len(extracted.knowledge_bases)
+									extracted.knowledge_bases.append(None)
+									knowledge_base = config.knowledge_bases[knowledge_base]
+									if True:
+										if knowledge_base.content_db is not None:
+											if knowledge_base.content_db not in content_db_remap:
+												content_db_remap[knowledge_base.content_db] = len(extracted.content_dbs)
+												extracted.content_dbs.append(None)
+									if True:
+										if knowledge_base.index_db is not None:
+											if knowledge_base.index_db not in index_db_remap:
+												index_db_remap[knowledge_base.index_db] = len(extracted.index_dbs)
+												extracted.index_dbs.append(None)
+
+		if True:
+			if agent.tools is not None:
+				for tool in agent.tools:
+					if tool not in tool_remap:
+						tool_remap[tool] = len(extracted.tools)
+						extracted.tools.append(None)
+
+	if True:
+		src_item = config.info
+		dst_item = copy.deepcopy(src_item)
+		extracted.info = dst_item
+
+	if True:
+		src_item = backend
+		dst_item = copy.deepcopy(src_item)
+		extracted.backends = [dst_item]
+
+	for src, dst in model_remap:
+		src_item = config.models[src]
+		dst_item = copy.deepcopy(src_item)
+		extracted.models[dst] = dst_item
+
+	for src, dst in embedding_remap:
+		src_item = config.embeddings[src]
+		dst_item = copy.deepcopy(src_item)
+		extracted.embeddings[dst] = dst_item
+
+	for src, dst in prompt_remap:
+		src_item = config.prompts[src]
+		dst_item = copy.deepcopy(src_item)
+		dst_item.model     = model_remap     [src_item.model    ]
+		dst_item.embedding = embedding_remap [src_item.embedding]
+		extracted.prompts[dst] = dst_item
+
+	for src, dst in content_db_remap:
+		src_item = config.content_dbs[src]
+		dst_item = copy.deepcopy(src_item)
+		extracted.content_dbs[dst] = dst_item
+
+	for src, dst in index_db_remap:
+		src_item = config.index_dbs[src]
+		dst_item = copy.deepcopy(src_item)
+		extracted.index_dbs[dst] = dst_item
+
+	for src, dst in memory_mgr_remap:
+		src_item = config.memory_mgrs[src]
+		dst_item = copy.deepcopy(src_item)
+		dst_item.prompt = prompt_remap[src_item.prompt]
+		extracted.memory_mgrs[dst] = dst_item
+
+	for src, dst in session_mgr_remap:
+		src_item = config.session_mgrs[src]
+		dst_item = copy.deepcopy(src_item)
+		dst_item.prompt = prompt_remap[src_item.prompt]
+		extracted.session_mgrs[dst] = dst_item
+
+	for src, dst in knowledge_base_remap:
+		src_item = config.knowledge_bases[src]
+		dst_item = copy.deepcopy(src_item)
+		dst_item.content_db = content_db_remap [src_item.content_db]
+		dst_item.index_db   = index_db_remap   [src_item.index_db  ]
+		extracted.knowledge_bases[dst] = dst_item
+
+	for src, dst in knowledge_mgr_remap:
+		src_item = config.knowledge_mgrs[src]
+		dst_item = copy.deepcopy(src_item)
+		dst_item.prompt = prompt_remap[src_item.prompt]
+		dst_item.bases  = []
+		if src_item.bases is not None:
+			for src_kb in src_item.bases:
+				dst_kb = knowledge_base_remap[src_kb]
+				dst_item.bases.append(dst_kb)
+		extracted.knowledge_mgrs[dst] = dst_item
+
+	for src, dst in tool_remap:
+		src_item = config.tools[src]
+		dst_item = copy.deepcopy(src_item)
+		extracted.tools[dst] = dst_item
+
+	for src, dst in agent_options_remap:
+		src_item = config.agent_options[src]
+		dst_item = copy.deepcopy(src_item)
+		extracted.agent_options[dst] = dst_item
+
+	for src, dst in agent_remap:
+		src_item = config.agents[src]
+		dst_item = copy.deepcopy(src_item)
+		dst_item.backend       = 0
+		dst_item.prompt        = prompt_remap[src_item.prompt]
+		dst_item.options       = agent_options_remap[src_item.options]
+		dst_item.content_db    = content_db_remap[src_item.content_db]
+		dst_item.memory_mgr    = memory_mgr_remap[src_item.memory_mgr]
+		dst_item.session_mgr   = session_mgr_remap[src_item.session_mgr]
+		dst_item.knowledge_mgr = knowledge_mgr_remap[src_item.knowledge_mgr]
+		dst_item.tools         = []
+		for src_tool in src_item.tools:
+			dst_tool = tool_remap[src_tool]
+			dst_item.tools.append(dst_tool)
+
+	return extracted
+
+
 def load_config(file_path: str) -> AppConfig:
 	try:
 		with open(file_path, "r") as f:
@@ -567,19 +840,19 @@ def load_config(file_path: str) -> AppConfig:
 
 class AgentApp:
 
-	def __init__(self, config: AppConfig, active_agent_indices: List[bool]):
-		if len(active_agent_indices) != len(config.agents):
-			raise ValueError("Invalid active_agent_indices length")
-
-		self.config = copy.deepcopy(config)
+	def __init__(self, config: AppConfig, agent_indices: List[int]):
+		if len(agent_indices) > len(config.agents):
+			raise ValueError("Invalid agent_indices length")
+		self.config        = copy.deepcopy(config)
+		self.agent_indices = copy.deepcopy(agent_indices)
 
 
 	def generate_app(self, agent_index: int) -> FastAPI:
-		raise NotImplementedError("Subclasses must implement the generate_app method.")
+		raise NotImplementedError("Subclasses must implement the generate_app method")
 
 
 	def close(self) -> bool:
-		return True
+		raise NotImplementedError("Subclasses must implement the close method")
 
 
 _backends: Dict[Tuple[str, str], Callable] = dict()
@@ -596,61 +869,3 @@ def get_backend(backend: BackendConfig) -> Callable:
 	global _backends
 	key = (backend.type, backend.version)
 	return _backends.get(key, None)
-
-
-def instantiate(backend: BackendConfig, config: AppConfig) -> AgentApp:
-	global _backends
-	key = (backend.type, backend.version)
-	if key not in _backends:
-		raise ValueError(f"Unsupported backend: {backend.type} {backend.version}")
-	agent = App._backends[key](config, agent_index)
-	return agent
-
-
-class App:
-
-	_backends: Dict[Tuple[str, str], Callable] = dict()
-
-
-	@staticmethod
-	def register(backend: BackendConfig, ctor: Callable) -> bool:
-		key = (backend.type, backend.version)
-		App._backends[key] = ctor
-		return True
-
-
-	@staticmethod
-	def instantiate(backend: BackendConfig, config: AppConfig, agent_index: int) -> AgentApp:
-		key = (backend.type, backend.version)
-		if key not in App._backends:
-			raise ValueError(f"Unsupported backend: {backend.type} {backend.version}")
-		agent = App._backends[key](config, agent_index)
-		return agent
-
-
-	def __init__(self, config: AppConfig):
-		try:
-			config_copy = unroll_config(config)
-			if not validate_config(config_copy):
-				raise ValueError("Invalid app configuration")
-		except Exception as e:
-			raise ValueError(f"Error in config: {e}")
-
-		apps = dict()
-		for i, agent in enumerate(config_copy.agents):
-			backend = config_copy.backends[agent.backend]
-			if backend not in apps:
-				apps[backend] = []
-			apps[backend].append(i)
-
-		agents = []
-		for i, agent in enumerate(config_copy.agents):
-			backend = config_copy.backends[agent.backend]
-			try:
-				agent = App.instantiate[(backend.type, backend.version)](config_copy, i)
-			except Exception as e:
-				log_print(f"Error creating agent {i}: {e}")
-			agents.append(agent)
-
-		self.config = config_copy
-		self.agents = agents

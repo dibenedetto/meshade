@@ -2,19 +2,21 @@
 
 import os
 
-from   typing                    import Any
+
+from   fastapi                   import FastAPI
+from   typing                    import Any, List
 
 
 from   agno.agent                import Agent
-from   agno.app.agui.app         import AGUIApp
-# from   agno.knowledge.combined   import CombinedKnowledgeBase
-from   agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
-from   agno.memory.v2.db.sqlite  import SqliteMemoryDb
-from   agno.memory.v2.memory     import Memory
-from   agno.memory.v2.summarizer import SessionSummarizer
-from   agno.models.ollama        import Ollama
-from   agno.models.openai        import OpenAIChat
-from   agno.storage.sqlite       import SqliteStorage
+# from   agno.app.agui.app         import AGUIApp
+# # from   agno.knowledge.combined   import CombinedKnowledgeBase
+# from   agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
+# from   agno.memory.v2.db.sqlite  import SqliteMemoryDb
+# from   agno.memory.v2.memory     import Memory
+# from   agno.memory.v2.summarizer import SessionSummarizer
+# from   agno.models.ollama        import Ollama
+# from   agno.models.openai        import OpenAIChat
+# from   agno.storage.sqlite       import SqliteStorage
 from   agno.tools.duckduckgo     import DuckDuckGoTools
 from   agno.tools.reasoning      import ReasoningTools
 from   agno.vectordb.lancedb     import LanceDb
@@ -165,8 +167,8 @@ class _AgnoAgentApp(AgentApp):
 		return None
 
 
-	def __init__(self, config: AppConfig, agent_index: int):
-		super().__init__(config, agent_index)
+	def __init__(self, config: AppConfig, agent_indices: List[int]):
+		super().__init__(config, agent_indices)
 
 		if not _validate_config(self.config):
 			raise ValueError("Invalid Agno app configuration")
@@ -397,7 +399,7 @@ class _AgnoAgentApp(AgentApp):
 		self.d = agent
 
 
-	def generate_app(self) -> Any:
+	def generate_app(self, agent_index: int) -> FastAPI:
 		app_id   = "platform_agno_" + self.config.name.replace(" ", "_").lower()
 		agui_app = AGUIApp(
 			agent       = self.d,
@@ -408,6 +410,10 @@ class _AgnoAgentApp(AgentApp):
 		app = agui_app.get_app()
 		self.agui_app = agui_app
 		return app
+
+
+	def close(self) -> bool:
+		return True
 
 
 def register() -> bool:

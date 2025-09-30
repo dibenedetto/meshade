@@ -15,4 +15,5 @@ def square_tool(n: int) -> int:
 		>>> square_tool(0)
 		0
 	"""
-	return n**2
+	result = n**2
+	return result

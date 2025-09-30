@@ -15,6 +15,7 @@ from   utils                   import get_time_str, log_print, seed_everything
 from   numel                   import (
 	DEFAULT_APP_PORT,
 	AppConfig,
+	compact_config,
 	get_backend,
 	load_config,
 	unroll_config,
@@ -90,7 +91,7 @@ async def import_config(cfg: dict):
 	new_config = unroll_config(new_config)
 	if not validate_config(new_config):
 		return {"error": "Invalid app configuration"}
-	config = new_config
+	config = compact_config(new_config)
 	ctrl_status["status"] = "ready"
 	return config
 
