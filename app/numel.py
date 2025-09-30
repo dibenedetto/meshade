@@ -10,6 +10,7 @@ from   pydantic        import BaseModel
 from   typing          import Any, Dict, List, Optional, Tuple, Union
 
 
+DEFAULT_APP_MAX_AGENTS                            : int  = 100
 DEFAULT_APP_PORT                                  : int  = 8000
 DEFAULT_APP_RELOAD                                : bool = True
 DEFAULT_APP_SEED                                  : int  = 42
@@ -250,6 +251,11 @@ def compatible_backends(a: BackendConfig, b: BackendConfig) -> bool:
 
 def unroll_config(config: AppConfig) -> AppConfig:
 	config_copy = copy.deepcopy(config) if config is not None else AppConfig()
+
+	if DEFAULT_APP_MAX_AGENTS is not None and DEFAULT_APP_MAX_AGENTS > 0:
+		if config_copy.agents is not None:
+			if len(config_copy.agents) > DEFAULT_APP_MAX_AGENTS:
+				config_copy.agents = config_copy.agents[:DEFAULT_APP_MAX_AGENTS]
 
 	if True:
 		if not config_copy.info             : config_copy.info             = InfoConfig()

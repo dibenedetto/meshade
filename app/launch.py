@@ -125,6 +125,7 @@ async def start_app():
 			bkd_cfg = extract_config(config, backend, active_agents)
 			if not bkd_cfg.agents:
 				continue
+
 			app = cll(bkd_cfg)
 			apps.append(app)
 
