@@ -15,8 +15,10 @@ from   utils                   import get_time_str, log_print, seed_everything
 from   numel                   import (
 	DEFAULT_APP_PORT,
 	AppConfig,
+	BackendConfig,
 	compact_config,
-	get_backend,
+	extract_config,
+	get_backends,
 	load_config,
 	unroll_config,
 	validate_config,
@@ -108,35 +110,27 @@ async def start_app():
 	if apps is not None:
 		return {"error": "App is already running"}
 	try:
-		if config.options.seed is not None:
-			seed_everything(config.options.seed)
-
-		apps = dict()
-		for i, agent in enumerate(config.agents):
-			backend = config.backends[agent.backend]
-			if backend not in apps:
-				cbk = get_backend(backend)
-				if cbk is None:
-					log_print(f"Unsupported backend: {backend.type} {backend.version}")
-					continue
-				apps[backend] = {
-					"backend" : cbk,
-					"agents"  : [],
-				}
-			apps[backend][1].append(i)
-
 		host = "0.0.0.0"
 		port = config.options.port + 1
 
-		for info in apps.values():
-			backend = info["backend"]
-			if backend is None:
+		if config.options.seed is not None:
+			seed_everything(config.options.seed)
+
+		active_agents = [True] * len(config.agents)
+		backends      = get_backends()
+		apps          = []
+
+		for bkd, cll in backends:
+			backend = BackendConfig(**bkd)
+			bkd_cfg = extract_config(config, backend, active_agents)
+			if not bkd_cfg.agents:
 				continue
-			backend = backend(config, info["agents"])
-			info["backend"] = backend
-			for i, j in enumerate(info["agents"]):
-				agent_app    = backend.generate_app(i)
-				agent_port   = port + j
+			app = cll(bkd_cfg)
+			apps.append(app)
+
+			for i in range(app.config.agents):
+				agent_app    = app.generate_app(i)
+				agent_port   = port + i
 				agent_config = uvicorn.Config(agent_app, host=host, port=agent_port)
 				agent_server = uvicorn.Server(agent_config)
 				agent_task   = asyncio.create_task(agent_server.serve())

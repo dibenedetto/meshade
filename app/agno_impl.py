@@ -47,6 +47,10 @@ def _validate_config(config: AppConfig) -> bool:
 
 class _AgnoAgentApp(AgentApp):
 
+	def _build_app_options(self, config: AppConfig) -> Any:
+		return None
+
+
 	def _build_model(self, config: AppConfig, agent_index: int, index: int) -> Any:
 		# class ModelConfig(ConfigModel):
 		# 	type : str = DEFAULT_MODEL_TYPE  # model provider name
@@ -134,7 +138,7 @@ class _AgnoAgentApp(AgentApp):
 		return None
 
 
-	def _build_agent(self, config: AppConfig, agent_index: int, index: int) -> Any:
+	def _build_agent_options(self, config: AppConfig, agent_index: int, index: int) -> Any:
 		# class AgentOptionsConfig(ConfigModel):
 		# 	markdown                  : bool = DEFAULT_OPTIONS_MARKDOWN
 		# 	show_tool_calls           : bool = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
@@ -153,7 +157,9 @@ class _AgnoAgentApp(AgentApp):
 		# 	# tool_call_limit                  : int  = DEFAULT_OPTIONS_TOOL_CALL_LIMIT
 		# 	# reasoning                        : bool = DEFAULT_OPTIONS_REASONING
 		# 	# stream_intermediate_steps        : bool = DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS
+		return None
 
+	def _build_agent(self, config: AppConfig, agent_index: int, index: int) -> Any:
 		# class AgentConfig(ConfigModel):
 		# 	backend       : Optional [Union [BackendConfig         , int ]] = None
 		# 	name          : Optional [str                                 ] = None

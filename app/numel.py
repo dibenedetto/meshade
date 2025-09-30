@@ -10,9 +10,10 @@ from   pydantic        import BaseModel
 from   typing          import Any, Dict, List, Optional, Tuple, Union
 
 
-DEFAULT_SEED                                      : int  = 42
-
-DEFAULT_API_KEY                                   : str  = None
+DEFAULT_APP_PORT                                  : int  = 8000
+DEFAULT_APP_RELOAD                                : bool = True
+DEFAULT_APP_SEED                                  : int  = 42
+DEFAULT_APP_API_KEY                               : str  = None
 
 DEFAULT_BACKEND_TYPE                              : str  = "agno"
 DEFAULT_BACKEND_VERSION                           : str  = ""
@@ -35,23 +36,19 @@ DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME     : str  = "session_manager_cont
 DEFAULT_KNOWLEDGE_BASE_CONTENT_DB_TABLE_NAME      : str  = "knowledge_base_content_db_table"
 DEFAULT_KNOWLEDGE_BASE_INDEX_DB_TABLE_NAME        : str  = "knowledge_base_index_db_table"
 
-DEFAULT_OPTIONS_MARKDOWN                          : bool = True
-DEFAULT_OPTIONS_SEARCH_KNOWLEDGE                  : bool = True
-DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY             : bool = True
-DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES           : bool = True
-DEFAULT_OPTIONS_NUM_HISTORY_RUNS                  : int  = 3
-DEFAULT_OPTIONS_ENABLE_SESSION_SUMMARIES          : bool = True
-DEFAULT_OPTIONS_SEARCH_PREVIOUS_SESSIONS_HISTORY  : bool = True
-DEFAULT_OPTIONS_NUM_HISTORY_SESSIONS              : int  = 2
-DEFAULT_OPTIONS_SHOW_TOOL_CALLS                   : bool = True
-DEFAULT_OPTIONS_TOOL_CALL_LIMIT                   : int  = 5
-DEFAULT_OPTIONS_REASONING                         : bool = True
-DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS         : bool = True
-DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS            : int  = 5
-
-DEFAULT_APP_PORT                                  : int  = 8000
-DEFAULT_APP_RELOAD                                : bool = True
-
+DEFAULT_AGENT_OPTIONS_MARKDOWN                    : bool = True
+# DEFAULT_OPTIONS_SEARCH_KNOWLEDGE                  : bool = True
+# DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY             : bool = True
+# DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES           : bool = True
+# DEFAULT_OPTIONS_NUM_HISTORY_RUNS                  : int  = 3
+# DEFAULT_OPTIONS_ENABLE_SESSION_SUMMARIES          : bool = True
+# DEFAULT_OPTIONS_SEARCH_PREVIOUS_SESSIONS_HISTORY  : bool = True
+# DEFAULT_OPTIONS_NUM_HISTORY_SESSIONS              : int  = 2
+# DEFAULT_OPTIONS_SHOW_TOOL_CALLS                   : bool = True
+# DEFAULT_OPTIONS_TOOL_CALL_LIMIT                   : int  = 5
+# DEFAULT_OPTIONS_REASONING                         : bool = True
+# DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS         : bool = True
+# DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS            : int  = 5
 
 # BACKEND_TYPES             = ["agno"]
 # MODEL_TYPES               = ["ollama", "openai"]
@@ -83,6 +80,13 @@ DEFAULT_APP_RELOAD                                : bool = True
 
 class ConfigModel(BaseModel):
 	data : Optional[Any] = None  # custom data
+
+
+class InfoConfig(ConfigModel):
+	version     : Optional[str] = None
+	name        : Optional[str] = None
+	author      : Optional[str] = None
+	description : Optional[str] = None
 
 
 class BackendConfig(ConfigModel):
@@ -158,11 +162,12 @@ class ToolConfig(ConfigModel):
 
 
 class AgentOptionsConfig(ConfigModel):
-	markdown                  : bool = DEFAULT_OPTIONS_MARKDOWN
-	show_tool_calls           : bool = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
-	tool_call_limit           : int  = DEFAULT_OPTIONS_TOOL_CALL_LIMIT
-	reasoning                 : bool = DEFAULT_OPTIONS_REASONING
-	stream_intermediate_steps : bool = DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS
+	markdown                  : bool = DEFAULT_AGENT_OPTIONS_MARKDOWN
+
+	# show_tool_calls           : bool = DEFAULT_AGENT_OPTIONS_SHOW_TOOL_CALLS
+	# tool_call_limit           : int  = DEFAULT_AGENT_OPTIONS_TOOL_CALL_LIMIT
+	# reasoning                 : bool = DEFAULT_AGENT_OPTIONS_REASONING
+	# stream_intermediate_steps : bool = DEFAULT_AGENT_OPTIONS_STREAM_INTERMEDIATE_STEPS
 
 	# search_knowledge                 : bool = DEFAULT_OPTIONS_SEARCH_KNOWLEDGE
 	# enable_agentic_memory            : bool = DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY
@@ -178,10 +183,10 @@ class AgentOptionsConfig(ConfigModel):
 
 
 class AgentConfig(ConfigModel):
+	info          : Optional [InfoConfig                          ] = None
+	options       : Optional [Union [AgentOptionsConfig    , int ]] = None
 	backend       : Union    [BackendConfig, int                  ]
 	prompt        : Union    [PromptConfig , int                  ]
-	name          : Optional [str                                 ] = None
-	options       : Optional [Union [AgentOptionsConfig    , int ]] = None
 	content_db    : Optional [Union [ContentDBConfig       , int ]] = None
 	memory_mgr    : Optional [Union [MemoryManagerConfig   , int ]] = None
 	session_mgr   : Optional [Union [SessionManagerConfig  , int ]] = None
@@ -194,8 +199,9 @@ class TeamOptionsConfig(ConfigModel):
 
 
 class TeamConfig(ConfigModel):
-	agents  : List[AgentConfig, int]
+	info    : Optional[InfoConfig] = None
 	options : Optional[Union[TeamOptionsConfig, int]] = None
+	agents  : List[AgentConfig, int]
 
 
 class WorkflowOptionsConfig(ConfigModel):
@@ -203,23 +209,21 @@ class WorkflowOptionsConfig(ConfigModel):
 
 
 class WorkflowConfig(ConfigModel):
+	info    : Optional[InfoConfig] = None
+	options : Optional[Union[TeamOptionsConfig, int]] = None
 	agents  : List[AgentConfig, int]
 	teams   : List[TeamConfig, int]
-	options : Optional[Union[TeamOptionsConfig, int]] = None
 
 
-class AppInfoConfig(ConfigModel):
-	version     : Optional[str] = None
-	name        : Optional[str] = None
-	author      : Optional[str] = None
-	description : Optional[str] = None
+class AppOptionsConfig(ConfigModel):
 	seed        : Optional[int] = None
 	port        : int           = DEFAULT_APP_PORT
 	reload      : bool          = DEFAULT_APP_RELOAD
 
 
 class AppConfig(ConfigModel):
-	info             : Optional[AppInfoConfig               ] = None
+	info             : Optional[InfoConfig                  ] = None
+	options          : Optional[AppOptionsConfig            ] = None
 	backends         : Optional[List[BackendConfig         ]] = None
 	models           : Optional[List[ModelConfig           ]] = None
 	embeddings       : Optional[List[EmbeddingConfig       ]] = None
@@ -248,10 +252,8 @@ def unroll_config(config: AppConfig) -> AppConfig:
 	config_copy = copy.deepcopy(config) if config is not None else AppConfig()
 
 	if True:
-		if not config_copy.info:
-			raise ValueError("Invalid app info")
-
-	if True:
+		if not config_copy.info             : config_copy.info             = InfoConfig()
+		if not config_copy.options          : config_copy.options          = AppOptionsConfig()
 		if not config_copy.backends         : config_copy.backends         = []
 		if not config_copy.models           : config_copy.models           = []
 		if not config_copy.embeddings       : config_copy.embeddings       = []
@@ -738,6 +740,11 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 		extracted.info = dst_item
 
 	if True:
+		src_item = config.options
+		dst_item = copy.deepcopy(src_item)
+		extracted.options = dst_item
+
+	if True:
 		src_item = backend
 		dst_item = copy.deepcopy(src_item)
 		extracted.backends = [dst_item]
@@ -838,6 +845,22 @@ def load_config(file_path: str) -> AppConfig:
 		return None
 
 
+_backends: Dict[Tuple[str, str], Callable] = dict()
+
+
+def register_backend(backend: BackendConfig, ctor: Callable) -> bool:
+	global _backends
+	key = (backend.type, backend.version)
+	_backends[key] = ctor
+	return True
+
+
+def get_backends() -> Dict[Tuple[str, str], Callable]:
+	global _backends
+	result = copy.deepcopy(_backends)
+	return result
+
+
 class AgentApp:
 
 	def __init__(self, config: AppConfig, agent_indices: List[int]):
@@ -853,19 +876,3 @@ class AgentApp:
 
 	def close(self) -> bool:
 		raise NotImplementedError("Subclasses must implement the close method")
-
-
-_backends: Dict[Tuple[str, str], Callable] = dict()
-
-
-def register_backend(backend: BackendConfig, ctor: Callable) -> bool:
-	global _backends
-	key = (backend.type, backend.version)
-	_backends[key] = ctor
-	return True
-
-
-def get_backend(backend: BackendConfig) -> Callable:
-	global _backends
-	key = (backend.type, backend.version)
-	return _backends.get(key, None)
