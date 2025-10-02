@@ -45,7 +45,7 @@ DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME     : str  = "session_manager_cont
 DEFAULT_KNOWLEDGE_BASE_CONTENT_DB_TABLE_NAME      : str  = "knowledge_base_content_db_table"
 DEFAULT_KNOWLEDGE_BASE_INDEX_DB_TABLE_NAME        : str  = "knowledge_base_index_db_table"
 
-DEFAULT_KNOWLEDGE_MANAGER_QUERY                   : bool = False
+DEFAULT_KNOWLEDGE_MANAGER_QUERY                   : bool = True
 
 DEFAULT_AGENT_OPTIONS_MARKDOWN                    : bool = True
 
