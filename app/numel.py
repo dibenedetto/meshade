@@ -32,13 +32,30 @@ DEFAULT_INDEX_DB_SEARCH_TYPE                      : str  = "hybrid"
 DEFAULT_CONTENT_DB_ENGINE                         : str  = "sqlite"
 DEFAULT_CONTENT_DB_URL                            : str  = "storage/content"
 
+DEFAULT_MEMORY_MANAGER_QUERY                      : bool = False
+DEFAULT_MEMORY_MANAGER_UPDATE                     : bool = False
 DEFAULT_MEMORY_MANAGER_CONTENT_DB_TABLE_NAME      : str  = "memory_manager_content_db_table"
+
+DEFAULT_SESSION_MANAGER_QUERY                     : bool = False
+DEFAULT_SESSION_MANAGER_UPDATE                    : bool = False
+DEFAULT_SESSION_MANAGER_HISTORY_SIZE              : int  = 10
+DEFAULT_SESSION_MANAGER_SUMMARIZE                 : bool = False
 DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME     : str  = "session_manager_content_db_table"
+
 DEFAULT_KNOWLEDGE_BASE_CONTENT_DB_TABLE_NAME      : str  = "knowledge_base_content_db_table"
 DEFAULT_KNOWLEDGE_BASE_INDEX_DB_TABLE_NAME        : str  = "knowledge_base_index_db_table"
 
+DEFAULT_KNOWLEDGE_MANAGER_QUERY                   : bool = False
+
 DEFAULT_AGENT_OPTIONS_MARKDOWN                    : bool = True
-# DEFAULT_OPTIONS_SEARCH_KNOWLEDGE                  : bool = True
+
+
+DEFAULT_AGENT_OPTIONS_USE_SESSION                 : bool = False
+DEFAULT_AGENT_OPTIONS_SESSION_HISTORY_SIZE        : int  = 10
+DEFAULT_AGENT_OPTIONS_SUMMARIZE_SESSIONS          : bool = False
+
+DEFAULT_AGENT_OPTIONS_USE_KNOWLEDGE               : bool = False
+
 # DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY             : bool = True
 # DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES           : bool = True
 # DEFAULT_OPTIONS_NUM_HISTORY_RUNS                  : int  = 3
@@ -128,20 +145,17 @@ class IndexDBConfig(ConfigModel):
 
 
 class MemoryManagerConfig(ConfigModel):
+	query  : bool                               = DEFAULT_MEMORY_MANAGER_QUERY
+	update : bool                               = DEFAULT_MEMORY_MANAGER_UPDATE
 	prompt : Optional[Union[PromptConfig, int]] = None  # prompt for memory processing
-	store  : bool                               = False
-	use    : bool                               = False
 
 
 class SessionManagerConfig(ConfigModel):
+	query        : bool                               = DEFAULT_SESSION_MANAGER_QUERY
+	update       : bool                               = DEFAULT_SESSION_MANAGER_UPDATE
 	prompt       : Optional[Union[PromptConfig, int]] = None  # prompt for session processing
-	store        : bool                               = False
-	use          : bool                               = False
-	history_size : int                                = 10
-	# summary      : session_summary_manager,
-	# read_chat_history=True
-	# add_session_summary_to_context = True
-	# enable_session_summaries=True
+	history_size : int                                = DEFAULT_SESSION_MANAGER_HISTORY_SIZE
+	summarize    : bool                               = DEFAULT_SESSION_MANAGER_SUMMARIZE
 
 
 class KnowledgeBaseConfig(ConfigModel):
@@ -151,9 +165,9 @@ class KnowledgeBaseConfig(ConfigModel):
 
 
 class KnowledgeManagerConfig(ConfigModel):
-	prompt : Optional [Union[PromptConfig, int]]              = None  # prompt for knowledge processing
-	bases  : Optional [List[Union[KnowledgeBaseConfig, int]]] = None
-	use    : bool                                             = False
+	query  : bool                                            = DEFAULT_KNOWLEDGE_MANAGER_QUERY
+	prompt : Optional[Union[PromptConfig, int]]              = None  # prompt for knowledge processing
+	bases  : Optional[List[Union[KnowledgeBaseConfig, int]]] = None
 
 
 class ToolConfig(ConfigModel):
@@ -169,7 +183,6 @@ class AgentOptionsConfig(ConfigModel):
 	# tool_call_limit           : int  = DEFAULT_AGENT_OPTIONS_TOOL_CALL_LIMIT
 	# reasoning                 : bool = DEFAULT_AGENT_OPTIONS_REASONING
 	# stream_intermediate_steps : bool = DEFAULT_AGENT_OPTIONS_STREAM_INTERMEDIATE_STEPS
-
 	# search_knowledge                 : bool = DEFAULT_OPTIONS_SEARCH_KNOWLEDGE
 	# enable_agentic_memory            : bool = DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY
 	# add_history_to_messages          : bool = DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES

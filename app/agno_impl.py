@@ -1,5 +1,6 @@
 # agno_impl
 
+import copy
 import os
 
 
@@ -14,9 +15,12 @@ from   agno.agent                import Agent
 # from   agno.memory.v2.db.sqlite  import SqliteMemoryDb
 # from   agno.memory.v2.memory     import Memory
 # from   agno.memory.v2.summarizer import SessionSummarizer
-# from   agno.models.ollama        import Ollama
-# from   agno.models.openai        import OpenAIChat
+from   agno.db.sqlite            import SqliteDb
+from   agno.models.ollama        import Ollama
+from   agno.models.openai        import OpenAIChat
 # from   agno.storage.sqlite       import SqliteStorage
+from   agno.os                   import AgentOS
+from   agno.os.interfaces.agui   import AGUI
 from   agno.tools.duckduckgo     import DuckDuckGoTools
 from   agno.tools.reasoning      import ReasoningTools
 from   agno.vectordb.lancedb     import LanceDb
@@ -47,53 +51,81 @@ def _validate_config(config: AppConfig) -> bool:
 
 class _AgnoAgentApp(AgentApp):
 
-	def _build_app_options(self, config: AppConfig) -> Any:
-		return None
+	def _get_search_type(self, value: str) -> SearchType:
+		if value == "hybrid":
+			return SearchType.hybrid
+		if value == "keyword":
+			return SearchType.keyword
+		if value == "vector":
+			return SearchType.vector
+		raise ValueError(f"Invalid Agno db search type: {value}")
 
 
-	def _build_model(self, config: AppConfig, agent_index: int, index: int) -> Any:
-		# class ModelConfig(ConfigModel):
-		# 	type : str = DEFAULT_MODEL_TYPE  # model provider name
-		# 	id   : str = DEFAULT_MODEL_ID    # model name (relative to llm)
-		return None
+	def _build_model(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
+		item_config = config.models[index]
+		if item_config:
+			if item_config.type == "openai":
+				item = OpenAIChat(id=item_config.id)
+				return item
+			if item_config.type == "ollama":
+				item = Ollama(id=item_config.id)
+				return item
+		raise ValueError(f"Unsupported Agno model")
 
 
-	def _build_embedding(self, config: AppConfig, agent_index: int, index: int) -> Any:
-		# class ModelConfig(ConfigModel):
-		#	type : str = DEFAULT_EMBEDDING_TYPE  # embedding provider name
-		#	id   : str = DEFAULT_EMBEDDING_TYPE  # embedding name (relative to embedder)
-		return None
+	def _build_embedding(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
+		item_config = config.embeddings[index]
+		if item_config:
+			if item_config.type == "openai":
+				item = OpenAIChat(id=item_config.id)
+				return item
+			if item_config.type == "ollama":
+				item = Ollama(id=item_config.id)
+				return item
+		raise ValueError(f"Unsupported Agno embdding")
 
 
-	def _build_prompt(self, config: AppConfig, agent_index: int, index: int) -> Any:
-		# class PromptConfig(ConfigModel):
-		# 	model        : Optional[Union[ModelConfig    , int]] = None  # model to use for agentic knowledge processing
-		# 	embedding    : Optional[Union[EmbeddingConfig, int]] = None  # embedding to use for agentic knowledge processing
-		# 	description  : Optional[str]                         = None
-		# 	instructions : Optional[List[str]]                   = None
-		# 	override     : Optional[str]                         = None  # override prompt template
-		return None
+	def _build_prompt(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
+		item_config = config.prompts[index]
+		item        = copy.deepcopy(item_config)
+		return item
 
 
-	def _build_content_db(self, config: AppConfig, agent_index: int, index: int) -> Any:
-		# class ContentDBConfig(ConfigModel):
-		# 	engine               : str = DEFAULT_CONTENT_DB_ENGINE                      # db engine name (eg. sqlite)
-		# 	url                  : str = DEFAULT_CONTENT_DB_URL                         # db url (eg. sqlite file path)
-		# 	memory_table_name    : str = DEFAULT_MEMORY_MANAGER_CONTENT_DB_TABLE_NAME   # name of the table to store memory content
-		# 	session_table_name   : str = DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME  # name of the table to store session content
-		# 	knowledge_table_name : str = DEFAULT_KNOWLEDGE_BASE_CONTENT_DB_TABLE_NAME   # name of the table to store knowledge base content
-		return None
+	def _build_content_db(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
+		item_config = config.content_dbs[index]
+		if item_config:
+			if item_config.engine == "sqlite":
+				db = SqliteDb(
+					db_file         = item_config.url,
+					memory_table    = item_config.memory_table_name,
+					session_table   = item_config.session_table_name,
+					knowledge_table = item_config.knowledge_table_name,
+
+					# # Table to store all metrics aggregations
+					# metrics_table="your_metrics_table_name",
+					# # Table to store all your evaluation data
+					# eval_table="your_evals_table_name",
+					# # Table to store all your knowledge content
+				)
+				return db
+		raise ValueError(f"Unsupported Agno content db")
 
 
-	def _build_index_db(self, config: AppConfig, agent_index: int, index: int) -> Any:
-		# class IndexDBConfig(ConfigModel):
-		# 	engine      : str = DEFAULT_CONTENT_DB_ENGINE                      # db engine name (eg. sqlite)
-		# 	url         : str = DEFAULT_CONTENT_DB_URL                         # db url (eg. sqlite file path)
-		# 	search_type : str = DEFAULT_INDEX_DB_SEARCH_TYPE  # search type (eg. hybrid)
-		return None
+	def _build_index_db(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
+		item_config = config.index_dbs[index]
+		if item_config:
+			if item_config.engine == "lancedb":
+				search_type = self._get_search_type(item_config.search_type)
+				item = LanceDb(
+					uri         = item_config.url,
+					search_type = search_type,
+					# table_name  = item_config.table_name,
+				)
+				return item
+		raise ValueError(f"Unsupported Agno index db")
 
 
-	def _build_memory_manager(self, config: AppConfig, agent_index: int, index: int) -> Any:
+	def _build_memory_manager(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
 		# class MemoryManagerConfig(ConfigModel):
 		# 	prompt : Optional[Union[PromptConfig, int]] = None  # prompt for memory processing
 		# 	store  : bool                               = False
@@ -101,7 +133,7 @@ class _AgnoAgentApp(AgentApp):
 		return None
 
 
-	def _build_session_manager(self, config: AppConfig, agent_index: int, index: int) -> Any:
+	def _build_session_manager(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
 		# class SessionManagerConfig(ConfigModel):
 		# 	prompt       : Optional[Union[PromptConfig, int]] = None  # prompt for session processing
 		# 	store        : bool                               = False
@@ -114,7 +146,7 @@ class _AgnoAgentApp(AgentApp):
 		return None
 
 
-	def _build_knowledge_base(self, config: AppConfig, agent_index: int, index: int) -> Any:
+	def _build_knowledge_base(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
 		# class KnowledgeBaseConfig(ConfigModel):
 		# 	content_db : Optional [Union [ContentDBConfig, int]] = None  # where to store knowledge content
 		# 	index_db   : Union    [IndexDBConfig, int          ] = None  # where to store knowledge index
@@ -122,7 +154,7 @@ class _AgnoAgentApp(AgentApp):
 		return None
 
 
-	def _build_knowledge_manager(self, config: AppConfig, agent_index: int, index: int) -> Any:
+	def _build_knowledge_manager(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
 		# class KnowledgeManagerConfig(ConfigModel):
 		# 	prompt : Optional [Union[PromptConfig, int]]              = None  # prompt for knowledge processing
 		# 	bases  : Optional [List[Union[KnowledgeBaseConfig, int]]] = None
@@ -130,7 +162,7 @@ class _AgnoAgentApp(AgentApp):
 		return None
 
 
-	def _build_tool(self, config: AppConfig, agent_index: int, index: int) -> Any:
+	def _build_tool(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
 		# class ToolConfig(ConfigModel):
 		# 	type : str
 		# 	args : Optional[Dict[str, Any]] = None
@@ -138,7 +170,7 @@ class _AgnoAgentApp(AgentApp):
 		return None
 
 
-	def _build_agent_options(self, config: AppConfig, agent_index: int, index: int) -> Any:
+	def _build_agent_options(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
 		# class AgentOptionsConfig(ConfigModel):
 		# 	markdown                  : bool = DEFAULT_OPTIONS_MARKDOWN
 		# 	show_tool_calls           : bool = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
@@ -159,7 +191,7 @@ class _AgnoAgentApp(AgentApp):
 		# 	# stream_intermediate_steps        : bool = DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS
 		return None
 
-	def _build_agent(self, config: AppConfig, agent_index: int, index: int) -> Any:
+	def _build_agent(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
 		# class AgentConfig(ConfigModel):
 		# 	backend       : Optional [Union [BackendConfig         , int ]] = None
 		# 	name          : Optional [str                                 ] = None
@@ -178,6 +210,22 @@ class _AgnoAgentApp(AgentApp):
 
 		if not _validate_config(self.config):
 			raise ValueError("Invalid Agno app configuration")
+
+		config_impl = copy.deepcopy(self.config)
+
+		config_impl.models          = [self._build_model             (self.config, config_impl, i) for i in range(len(self.config.models         ))]
+		config_impl.embeddings      = [self._build_embedding         (self.config, config_impl, i) for i in range(len(self.config.embeddings     ))]
+		config_impl.content_dbs     = [self._build_content_db        (self.config, config_impl, i) for i in range(len(self.config.content_dbs    ))]
+		config_impl.index_dbs       = [self._build_index_db          (self.config, config_impl, i) for i in range(len(self.config.index_dbs      ))]
+		config_impl.tools           = [self._build_tool              (self.config, config_impl, i) for i in range(len(self.config.tools          ))]
+
+		config_impl.prompts         = [self._build_prompt            (self.config, config_impl, i) for i in range(len(self.config.prompts        ))]
+		config_impl.memory_mgrs     = [self._build_memory_manager    (self.config, config_impl, i) for i in range(len(self.config.memory_mgrs    ))]
+		config_impl.session_mgrs    = [self._build_session_manager   (self.config, config_impl, i) for i in range(len(self.config.session_mgrs   ))]
+		config_impl.knowledge_bases = [self._build_knowledge_base    (self.config, config_impl, i) for i in range(len(self.config.knowledge_bases))]
+		config_impl.knowledge_mgrs  = [self._build_knowledge_manager (self.config, config_impl, i) for i in range(len(self.config.knowledge_mgrs ))]
+
+		config_impl.agents          = [self._build_agent             (self.config, config_impl, i) for i in range(len(self.config.agents         ))]
 
 		agent_config = self.config.agents[self.agent_index]
 		if not agent_config:
@@ -402,23 +450,22 @@ class _AgnoAgentApp(AgentApp):
 			stream=True,
 		)
 
-		self.d = agent
+		self.config_impl = config_impl
 
 
 	def generate_app(self, agent_index: int) -> FastAPI:
-		app_id   = "platform_agno_" + self.config.name.replace(" ", "_").lower()
-		agui_app = AGUIApp(
-			agent       = self.d,
-			name        = self.config.name,
-			app_id      = app_id,
-			description = self.config.description,
+		agent    = self.config_impl.agents[agent_index]
+		agent_os = AgentOS(
+			agents     = [agent],
+			interfaces = [AGUI(agent=agent)]
 		)
-		app = agui_app.get_app()
-		self.agui_app = agui_app
+		app = agent_os.get_app()
+		agent.agent_os = agent_os
 		return app
 
 
 	def close(self) -> bool:
+		self.config_impl = None
 		return True
 
 
