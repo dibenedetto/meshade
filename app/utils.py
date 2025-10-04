@@ -3,15 +3,15 @@
 import os
 
 
-from   datetime        import datetime
-from   typing          import Optional
+from   datetime  import datetime
+from   typing    import Optional
 
 
-def log_print(*args, **kwargs):
+def log_print(*args, **kwargs) -> None:
 	print("[log]", *args, **kwargs)
 
 
-def seed_everything(seed: Optional[int] = None):
+def seed_everything(seed: Optional[int] = None) -> None:
 	if not isinstance(seed, int):
 		seed = int(datetime.now()) % (2**32)
 
