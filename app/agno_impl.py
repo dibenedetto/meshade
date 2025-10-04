@@ -5,22 +5,18 @@ import os
 
 
 from   fastapi                   import FastAPI
-from   typing                    import Any, List
+from   typing                    import Any
 
 
 from   agno.agent                import Agent
-# from   agno.app.agui.app         import AGUIApp
-# # from   agno.knowledge.combined   import CombinedKnowledgeBase
-# from   agno.knowledge.pdf_url    import PDFUrlKnowledgeBase
-# from   agno.memory.v2.db.sqlite  import SqliteMemoryDb
-# from   agno.memory.v2.memory     import Memory
-# from   agno.memory.v2.summarizer import SessionSummarizer
 from   agno.db.sqlite            import SqliteDb
+from   agno.knowledge.knowledge  import Knowledge
+from   agno.memory.manager       import MemoryManager
 from   agno.models.ollama        import Ollama
 from   agno.models.openai        import OpenAIChat
-# from   agno.storage.sqlite       import SqliteStorage
 from   agno.os                   import AgentOS
 from   agno.os.interfaces.agui   import AGUI
+from   agno.session.summary      import SessionSummaryManager
 from   agno.tools.duckduckgo     import DuckDuckGoTools
 from   agno.tools.reasoning      import ReasoningTools
 from   agno.vectordb.lancedb     import LanceDb
@@ -28,17 +24,10 @@ from   agno.vectordb.search      import SearchType
 
 
 from   numel                     import (
-	DEFAULT_KNOWLEDGE_DB_TYPE,
-	DEFAULT_KNOWLEDGE_TYPE,
-	DEFAULT_MEMORY_DB_TYPE,
-	DEFAULT_MEMORY_TYPE,
-	DEFAULT_STORAGE_DB_TYPE,
-	DEFAULT_STORAGE_TYPE,
-	DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS,
+	DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS,
 	AppConfig,
 	AgentApp,
 	BackendConfig,
-	ModelConfig,
 	AgentOptionsConfig,
 	register_backend
 )
@@ -118,95 +107,165 @@ class _AgnoAgentApp(AgentApp):
 				search_type = self._get_search_type(item_config.search_type)
 				item = LanceDb(
 					uri         = item_config.url,
+					table_name  = item_config.table_name,
 					search_type = search_type,
-					# table_name  = item_config.table_name,
 				)
 				return item
 		raise ValueError(f"Unsupported Agno index db")
 
 
 	def _build_memory_manager(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
-		# class MemoryManagerConfig(ConfigModel):
-		# 	prompt : Optional[Union[PromptConfig, int]] = None  # prompt for memory processing
-		# 	store  : bool                               = False
-		# 	use    : bool                               = False
-		return None
+		item_config = config.memory_mgrs[index]
+		if item_config:
+			model          = None
+			system_message = None
+			if item_config.prompt is not None:
+				prompt         = impl.prompts [item_config.prompt]
+				model          = impl.models  [prompt.model      ]
+				system_message = prompt.override
+			item = MemoryManager(
+				model          = model,
+				system_message = system_message,
+			)
+			return item
+		raise ValueError(f"Unsupported Agno memory manager")
 
 
 	def _build_session_manager(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
-		# class SessionManagerConfig(ConfigModel):
-		# 	prompt       : Optional[Union[PromptConfig, int]] = None  # prompt for session processing
-		# 	store        : bool                               = False
-		# 	use          : bool                               = False
-		# 	history_size : int                                = 10
-		# 	# summary      : session_summary_manager,
-		# 	# read_chat_history=True
-		# 	# add_session_summary_to_context = True
-		# 	# enable_session_summaries=True
-		return None
-
-
-	def _build_knowledge_base(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
-		# class KnowledgeBaseConfig(ConfigModel):
-		# 	content_db : Optional [Union [ContentDBConfig, int]] = None  # where to store knowledge content
-		# 	index_db   : Union    [IndexDBConfig, int          ] = None  # where to store knowledge index
-		# 	urls       : Optional [List  [str                 ]] = None  # urls to fetch knowledge from
-		return None
+		item_config = config.prompts[index]
+		item        = copy.deepcopy(item_config)
+		return item
 
 
 	def _build_knowledge_manager(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
-		# class KnowledgeManagerConfig(ConfigModel):
-		# 	prompt : Optional [Union[PromptConfig, int]]              = None  # prompt for knowledge processing
-		# 	bases  : Optional [List[Union[KnowledgeBaseConfig, int]]] = None
-		# 	use    : bool                                             = False
-		return None
+		item_config = config.knowledge_mgrs[index]
+		if item_config:
+			description = item_config.description
+			content_db  = None
+			index_db    = None
+			if item_config.content_db is not None:
+				content_db = impl.content_dbs[item_config.content_db]
+			if item_config.index_db is not None:
+				index_db = impl.index_dbs[item_config.index_db]
+			item = Knowledge(
+				description = description,
+				contents_db = content_db,
+				vector_db   = index_db,
+				max_results = item_config.max_results,
+			)
+			return item
+		raise ValueError(f"Unsupported Agno memory manager")
 
 
 	def _build_tool(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
-		# class ToolConfig(ConfigModel):
-		# 	type : str
-		# 	args : Optional[Dict[str, Any]] = None
-		# 	ref  : Optional[str           ] = None
+		item_config = config.prompts[index]
+		if item_config:
+			args = item_config.args if item_config.args is not None else {}
+			item = None
+			if item_config.type == "reasoning":
+				item = ReasoningTools()
+			elif item_config.type == "web_search":
+				max_results = args.get("max_results", DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS)
+				item = DuckDuckGoTools(fixed_max_results=max_results)
+			return item
 		return None
 
 
 	def _build_agent_options(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
-		# class AgentOptionsConfig(ConfigModel):
-		# 	markdown                  : bool = DEFAULT_OPTIONS_MARKDOWN
-		# 	show_tool_calls           : bool = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
-		# 	tool_call_limit           : int  = DEFAULT_OPTIONS_TOOL_CALL_LIMIT
-		# 	reasoning                 : bool = DEFAULT_OPTIONS_REASONING
-		# 	stream_intermediate_steps : bool = DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS
+		item_config = config.agent_options[index]
+		item        = copy.deepcopy(item_config)
+		return item
 
-		# 	# search_knowledge                 : bool = DEFAULT_OPTIONS_SEARCH_KNOWLEDGE
-		# 	# enable_agentic_memory            : bool = DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY
-		# 	# add_history_to_messages          : bool = DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES
-		# 	# num_history_runs                 : int  = DEFAULT_OPTIONS_NUM_HISTORY_RUNS
-		# 	# enable_session_summaries         : bool = DEFAULT_OPTIONS_ENABLE_SESSION_SUMMARIES
-		# 	# search_previous_sessions_history : bool = DEFAULT_OPTIONS_SEARCH_PREVIOUS_SESSIONS_HISTORY
-		# 	# num_history_sessions             : int  = DEFAULT_OPTIONS_NUM_HISTORY_SESSIONS
-		# 	# show_tool_calls                  : bool = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
-		# 	# tool_call_limit                  : int  = DEFAULT_OPTIONS_TOOL_CALL_LIMIT
-		# 	# reasoning                        : bool = DEFAULT_OPTIONS_REASONING
-		# 	# stream_intermediate_steps        : bool = DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS
-		return None
 
 	def _build_agent(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
-		# class AgentConfig(ConfigModel):
-		# 	backend       : Optional [Union [BackendConfig         , int ]] = None
-		# 	name          : Optional [str                                 ] = None
-		# 	options       : Optional [Union [AgentOptionsConfig    , int ]] = None
-		# 	prompt        : Optional [Union [PromptConfig          , int ]] = None
-		# 	content_db    : Optional [Union [ContentDBConfig       , int ]] = None
-		# 	memory_mgr    : Optional [Union [MemoryManagerConfig   , int ]] = None
-		# 	session_mgr   : Optional [Union [SessionManagerConfig  , int ]] = None
-		# 	knowledge_mgr : Optional [Union [KnowledgeManagerConfig, int ]] = None
-		# 	tools         : Optional [List  [Union[ToolConfig      , int]]] = None
-		return None
+		item_config = config.agents[index]
+		if item_config:
+
+			if True:
+				name         = f"Numel Agno Agent {index}"
+				description  = None
+				instructions = None
+				if item_config.info:
+					if item_config.info.name:
+						name = item_config.info.name
+					description  = item_config.info.description
+					instructions = item_config.info.instructions
+
+			if True:
+				prompt = config.prompts[item_config.prompt]
+				model  = impl.models[prompt.model]
+
+			if True:
+				options  = impl.agent_options[item_config.options] if item_config.options is not None else AgentOptionsConfig()
+				markdown = options.markdown
+
+			if True:
+				content_db = None
+				if item_config.content_db is not None:
+					content_db = impl.content_dbs[item_config.content_db]
+
+			if True:
+				tools = [impl.tools[i] for i in item_config.tools if impl.tools[i] is not None]
+
+			if True:
+				enable_agentic_memory   = False
+				enable_user_memories    = False
+				add_memories_to_context = False
+				memory_mgr              = None
+				if item_config.memory_mgr is not None:
+					memory_mgr_config       = config.memory_mgrs[item_config.memory_mgr]
+					enable_agentic_memory   = memory_mgr_config.managed
+					add_memories_to_context = memory_mgr_config.query
+					enable_user_memories    = memory_mgr_config.update
+					memory_mgr              = impl.memory_mgrs[item_config.memory_mgr]
+
+			if True:
+				search_session_history  = False
+				num_history_sessions    = None
+				session_summary_manager = None
+				if item_config.session_mgr is not None:
+					session_mgr_config     = config.session_mgrs[item_config.session_mgr]
+					search_session_history = session_mgr_config.query
+					num_history_sessions   = session_mgr_config.history_size
+					if session_mgr_config.summarize:
+						model                  = None
+						session_summary_prompt = None
+						if item_config.session_mgr.prompt is not None:
+							prompt                 = config.prompts[item_config.session_mgr.prompt]
+							model                  = impl.models[prompt.model] if prompt.model is not None else None
+							session_summary_prompt = prompt.override
+						session_summary_manager = SessionSummaryManager(
+							model                  = model,
+							session_summary_prompt = session_summary_prompt,
+						)
+
+			if True:
+				item = Agent(
+					name                    = name,
+					model                   = model,
+					description             = description,
+					instructions            = instructions,
+
+					markdown                = markdown,
+					db                      = content_db,
+					tools                   = tools,
+
+					enable_agentic_memory   = enable_agentic_memory,
+					enable_user_memories    = enable_user_memories,
+					add_memories_to_context = add_memories_to_context,
+					memory_manager          = memory_mgr,
+
+					search_session_history  = search_session_history,
+					num_history_sessions    = num_history_sessions,
+					session_summary_manager = session_summary_manager,
+				)
+	
+			return item
+		raise ValueError(f"Unsupported Agno agent")
 
 
-	def __init__(self, config: AppConfig, agent_indices: List[int]):
-		super().__init__(config, agent_indices)
+	def __init__(self, config: AppConfig):
+		super().__init__(config)
 
 		if not _validate_config(self.config):
 			raise ValueError("Invalid Agno app configuration")
@@ -226,229 +285,6 @@ class _AgnoAgentApp(AgentApp):
 		config_impl.knowledge_mgrs  = [self._build_knowledge_manager (self.config, config_impl, i) for i in range(len(self.config.knowledge_mgrs ))]
 
 		config_impl.agents          = [self._build_agent             (self.config, config_impl, i) for i in range(len(self.config.agents         ))]
-
-		agent_config = self.config.agents[self.agent_index]
-		if not agent_config:
-			raise ValueError("Agno agent configuration not found")
-
-		def get_model(model_config: ModelConfig, do_raise: bool) -> Any:
-			if model_config:
-				if model_config.type == "openai":
-					return OpenAIChat(id=model_config.id)
-				if model_config.type == "ollama":
-					return Ollama(id=model_config.id)
-			if do_raise:
-				raise ValueError(f"Unsupported Agno model")
-			return None
-
-		def get_options(options_config: AgentOptionsConfig, do_raise: bool) -> Any:
-			if options_config:
-				options = dict(options_config)
-				del options["data"]
-				return options
-			if do_raise:
-				raise ValueError(f"Unsupported Agno agent options")
-			return None
-
-		def get_search_type(value: str, do_raise: bool) -> SearchType:
-			if value == "hybrid":
-				return SearchType.hybrid
-			if value == "keyword":
-				return SearchType.keyword
-			if value == "vector":
-				return SearchType.vector
-			if do_raise:
-				raise ValueError(f"Invalid Agno db search type: {value}")
-			return None
-
-		models        = [0] * len(self.config.models)
-		embeddings    = [0] * len(self.config.embeddings)
-		knowledge_dbs = [0] * len(self.config.knowledge_dbs)
-		knowledges    = [0] * len(self.config.knowledges)
-		memory_dbs    = [0] * len(self.config.memory_dbs)
-		memories      = [0] * len(self.config.memories)
-		storage_dbs   = [0] * len(self.config.storage_dbs)
-		storages      = [0] * len(self.config.storages)
-		agent_options = [0] * len(self.config.agent_options)
-		tools         = []
-
-		models        [agent_config.model    ] += 1
-		embeddings    [agent_config.embedding] += 1
-		agent_options [agent_config.options  ] += 1
-
-		if agent_config.knowledge is not None:
-			for index in agent_config.knowledge:
-				knowledges[index] += 1
-				knowledge_config = self.config.knowledges[index]
-				knowledge_dbs[knowledge_config.db] += 1
-				if knowledge_config.model is not None:
-					models[knowledge_config.model] += 1
-
-		if agent_config.memory is not None:
-			memories[agent_config.memory] += 1
-			memory_config = self.config.memories[agent_config.memory]
-			memory_dbs[memory_config.db] += 1
-			if memory_config.model is not None:
-				models[memory_config.model] += 1
-			if memory_config.summarizer is not None:
-				models[memory_config.summarizer] += 1
-
-		if agent_config.storage is not None:
-			storages[agent_config.storage] += 1
-			storage_config = self.config.storages[agent_config.storage]
-			storage_dbs[storage_config.db] += 1
-
-		for i, (enabled, item_config) in enumerate(zip(models, self.config.models)):
-			if not enabled:
-				continue
-			item = get_model(item_config, True)
-			models[i] = item
-
-		for i, (enabled, item_config) in enumerate(zip(embeddings, self.config.embeddings)):
-			if not enabled:
-				continue
-			item = get_model(item_config, True)
-			embeddings[i] = item
-
-		for i, (enabled, item_config) in enumerate(zip(agent_options, self.config.agent_options)):
-			if not enabled:
-				continue
-			item = get_options(item_config, True)
-			agent_options[i] = item
-
-		knowledge_base_path = config.options.knowledge_path or "."
-		for i, (enabled, item_config) in enumerate(zip(knowledge_dbs, self.config.knowledge_dbs)):
-			if not enabled:
-				continue
-			if item_config.type == DEFAULT_KNOWLEDGE_DB_TYPE:
-				db_url = os.path.join(knowledge_base_path, item_config.db_url) if not os.path.isabs(item_config.db_url) else item_config.db_url
-				item = LanceDb(
-					table_name  = item_config.table_name,
-					uri         = db_url,
-					search_type = get_search_type(item_config.search_type, True),
-				)
-			else:
-				raise ValueError("Invalid Agno knowledge db type")
-			knowledge_dbs[i] = item
-
-		for i, (enabled, item_config) in enumerate(zip(knowledges, self.config.knowledges)):
-			if not enabled:
-				continue
-			if item_config.type == DEFAULT_KNOWLEDGE_TYPE:
-				item = PDFUrlKnowledgeBase(
-					db   = knowledge_dbs[item_config.db],
-					urls = item_config.urls or [],
-				)
-			else:
-				raise ValueError("Invalid Agno knowledge type")
-			knowledges[i] = item
-
-		memory_base_path = config.options.memory_path or "."
-		for i, (enabled, item_config) in enumerate(zip(memory_dbs, self.config.memory_dbs)):
-			if not enabled:
-				continue
-			if item_config.type == DEFAULT_MEMORY_DB_TYPE:
-				db_url = os.path.join(memory_base_path, item_config.db_url) if not os.path.isabs(item_config.db_url) else item_config.db_url
-				item = SqliteMemoryDb(
-					table_name = item_config.table_name,
-					db_file    = db_url,
-				)
-			else:
-				raise ValueError("Invalid Agno memory db type")
-			memory_dbs[i] = item
-
-		for i, (enabled, item_config) in enumerate(zip(memories, self.config.memories)):
-			if not enabled:
-				continue
-			if item_config.type == DEFAULT_MEMORY_TYPE:
-				memory_model = models[item_config.model] if item_config.model is not None else None
-				summarizer   = SessionSummarizer(model=models[item_config.summarizer]) if item_config.summarizer is not None else None
-				item = Memory(
-					db         = memory_dbs[item_config.db],
-					model      = memory_model,
-					summarizer = summarizer,
-				)
-			else:
-				raise ValueError("Invalid Agno memory type")
-			memories[i] = item
-
-		session_base_path = config.options.session_path or "."
-		for i, (enabled, item_config) in enumerate(zip(storage_dbs, self.config.storage_dbs)):
-			if not enabled:
-				continue
-			if item_config.type == DEFAULT_STORAGE_DB_TYPE:
-				db_url = os.path.join(session_base_path, item_config.db_url) if not os.path.isabs(item_config.db_url) else item_config.db_url
-				item = SqliteStorage(
-					table_name = item_config.table_name,
-					db_file    = db_url,
-				)
-			else:
-				raise ValueError("Invalid Agno storage db type")
-			storage_dbs[i] = item
-
-		for i, (enabled, item_config) in enumerate(zip(storages, self.config.storages)):
-			if not enabled:
-				continue
-			if item_config.type == DEFAULT_STORAGE_TYPE:
-				item = storage_dbs[item_config.db]
-			else:
-				raise ValueError("Invalid Agno storage type")
-			storages[i] = item
-
-		tools = None
-		if agent_config.tools is not None:
-			tools = []
-			for tool_config in agent_config.tools:
-				tool = None
-				if tool_config.ref:
-					# TODO: Implement tool reference handling
-					# For now, we will just skip it
-					pass
-				else:
-					if tool_config.type == "reasoning":
-						tool = ReasoningTools()
-					elif tool_config.type == "web_search":
-						max_results = tool_config.args.get("max_results", DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS)
-						tool = DuckDuckGoTools(fixed_max_results=max_results)
-					# elif tool_config.type == "webcam":
-					# 	tool = start_webcam_stream
-					else:
-						pass
-				if tool is not None:
-					tools.append(tool)
-			if not tools:
-				tools = None
-
-		model = models        [agent_config.model  ]
-		opts  = agent_options [agent_config.options]
-
-		knowledge = None
-		if agent_config.knowledge is not None:
-			kgs = [knowledges[i] for i in agent_config.knowledge]
-			if len(kgs) == 1:
-				knowledge = kgs[0]
-			else:
-				# TODO
-				# knowledge = CombinedKnowledgeBase(...)
-				pass
-
-		memory = None
-		if agent_config.memory is not None:
-			memory = memories[agent_config.memory]
-
-		storage = None
-		if agent_config.storage is not None:
-			storage = storages[agent_config.storage]
-
-		agent = Agent(
-			model     = model,
-			knowledge = knowledge,
-			memory    = memory,
-			storage   = storage,
-			tools     = tools,
-			**opts,
-			stream=True,
-		)
 
 		self.config_impl = config_impl
 

@@ -21,19 +21,24 @@ DEFAULT_BACKEND_VERSION                           : str  = ""
 
 DEFAULT_MODEL_TYPE                                : str  = "ollama"
 DEFAULT_MODEL_ID                                  : str  = "mistral"
+DEFAULT_MODEL_FALLBACK                            : bool = False
 
 DEFAULT_EMBEDDING_TYPE                            : str  = "ollama"
 DEFAULT_EMBEDDING_ID                              : str  = "mistral"
+DEFAULT_EMBEDDING_FALLBACK                        : bool = False
+
+DEFAULT_CONTENT_DB_ENGINE                         : str  = "sqlite"
+DEFAULT_CONTENT_DB_URL                            : str  = "storage/content"
+DEFAULT_CONTENT_DB_FALLBACK                       : bool = False
 
 DEFAULT_INDEX_DB_ENGINE                           : str  = "lancedb"
 DEFAULT_INDEX_DB_URL                              : str  = "storage/index"
 DEFAULT_INDEX_DB_SEARCH_TYPE                      : str  = "hybrid"
-
-DEFAULT_CONTENT_DB_ENGINE                         : str  = "sqlite"
-DEFAULT_CONTENT_DB_URL                            : str  = "storage/content"
+DEFAULT_INDEX_DB_FALLBACK                         : bool = False
 
 DEFAULT_MEMORY_MANAGER_QUERY                      : bool = False
 DEFAULT_MEMORY_MANAGER_UPDATE                     : bool = False
+DEFAULT_MEMORY_MANAGER_MANAGED                    : bool = False
 DEFAULT_MEMORY_MANAGER_CONTENT_DB_TABLE_NAME      : str  = "memory_manager_content_db_table"
 
 DEFAULT_SESSION_MANAGER_QUERY                     : bool = False
@@ -42,18 +47,18 @@ DEFAULT_SESSION_MANAGER_HISTORY_SIZE              : int  = 10
 DEFAULT_SESSION_MANAGER_SUMMARIZE                 : bool = False
 DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME     : str  = "session_manager_content_db_table"
 
-DEFAULT_KNOWLEDGE_BASE_CONTENT_DB_TABLE_NAME      : str  = "knowledge_base_content_db_table"
-DEFAULT_KNOWLEDGE_BASE_INDEX_DB_TABLE_NAME        : str  = "knowledge_base_index_db_table"
-
+DEFAULT_KNOWLEDGE_MANAGER_CONTENT_DB_TABLE_NAME   : str  = "knowledge_base_content_db_table"
+DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME     : str  = "knowledge_base_index_db_table"
 DEFAULT_KNOWLEDGE_MANAGER_QUERY                   : bool = True
+DEFAULT_KNOWLEDGE_MANAGER_MAX_RESULTS             : int  = 10
+
+DEFAULT_TOOL_FALLBACK                             : bool = False
+DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS               : int  = 5
 
 DEFAULT_AGENT_OPTIONS_MARKDOWN                    : bool = True
-
-
 DEFAULT_AGENT_OPTIONS_USE_SESSION                 : bool = False
 DEFAULT_AGENT_OPTIONS_SESSION_HISTORY_SIZE        : int  = 10
 DEFAULT_AGENT_OPTIONS_SUMMARIZE_SESSIONS          : bool = False
-
 DEFAULT_AGENT_OPTIONS_USE_KNOWLEDGE               : bool = False
 
 # DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY             : bool = True
@@ -101,25 +106,29 @@ class ConfigModel(BaseModel):
 
 
 class InfoConfig(ConfigModel):
-	version     : Optional[str] = None
-	name        : Optional[str] = None
-	author      : Optional[str] = None
-	description : Optional[str] = None
+	version      : Optional[str      ] = None
+	name         : Optional[str      ] = None
+	author       : Optional[str      ] = None
+	description  : Optional[str      ] = None
+	instructions : Optional[List[str]] = None
 
 
 class BackendConfig(ConfigModel):
-	type    : str = DEFAULT_BACKEND_TYPE     # backend name
-	version : str = DEFAULT_BACKEND_VERSION  # backend version
+	type     : str  = DEFAULT_BACKEND_TYPE      # backend name
+	version  : str  = DEFAULT_BACKEND_VERSION   # backend version
+	fallback : bool = DEFAULT_BACKEND_FALLBACK  # backend fallback
 
 
 class ModelConfig(ConfigModel):
-	type : str = DEFAULT_MODEL_TYPE  # model provider name
-	id   : str = DEFAULT_MODEL_ID    # model name (relative to llm)
+	type     : str  = DEFAULT_MODEL_TYPE      # model provider name
+	id       : str  = DEFAULT_MODEL_ID        # model name (relative to llm)
+	fallback : bool = DEFAULT_MODEL_FALLBACK  # model fallback
 
 
 class EmbeddingConfig(ConfigModel):
-	type : str = DEFAULT_EMBEDDING_TYPE  # embedding provider name
-	id   : str = DEFAULT_EMBEDDING_TYPE  # embedding name (relative to embedder)
+	type     : str  = DEFAULT_EMBEDDING_TYPE      # embedding provider name
+	id       : str  = DEFAULT_EMBEDDING_TYPE      # embedding name (relative to embedder)
+	fallback : bool = DEFAULT_EMBEDDING_FALLBACK  # embedding fallback
 
 
 class PromptConfig(ConfigModel):
@@ -131,49 +140,50 @@ class PromptConfig(ConfigModel):
 
 
 class ContentDBConfig(ConfigModel):
-	engine               : str = DEFAULT_CONTENT_DB_ENGINE                      # db engine name (eg. sqlite)
-	url                  : str = DEFAULT_CONTENT_DB_URL                         # db url (eg. sqlite file path)
-	memory_table_name    : str = DEFAULT_MEMORY_MANAGER_CONTENT_DB_TABLE_NAME   # name of the table to store memory content
-	session_table_name   : str = DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME  # name of the table to store session content
-	knowledge_table_name : str = DEFAULT_KNOWLEDGE_BASE_CONTENT_DB_TABLE_NAME   # name of the table to store knowledge base content
+	engine               : str  = DEFAULT_CONTENT_DB_ENGINE                        # db engine name (eg. sqlite)
+	url                  : str  = DEFAULT_CONTENT_DB_URL                           # db url (eg. sqlite file path)
+	memory_table_name    : str  = DEFAULT_MEMORY_MANAGER_CONTENT_DB_TABLE_NAME     # name of the table to store memory content
+	session_table_name   : str  = DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME    # name of the table to store session content
+	knowledge_table_name : str  = DEFAULT_KNOWLEDGE_MANAGER_CONTENT_DB_TABLE_NAME  # name of the table to store knowledge content
+	fallback             : bool = DEFAULT_CONTENT_DB_FALLBACK                      # engine fallback
 
 
 class IndexDBConfig(ConfigModel):
-	engine      : str = DEFAULT_INDEX_DB_ENGINE       # db engine name (eg. sqlite)
-	url         : str = DEFAULT_INDEX_DB_URL          # db url (eg. sqlite file path)
-	search_type : str = DEFAULT_INDEX_DB_SEARCH_TYPE  # search type (eg. hybrid)
+	engine      : str  = DEFAULT_INDEX_DB_ENGINE       # db engine name (eg. sqlite)
+	url         : str  = DEFAULT_INDEX_DB_URL          # db url (eg. sqlite file path)
+	search_type : str  = DEFAULT_INDEX_DB_SEARCH_TYPE  # search type (eg. hybrid)
+	fallback    : bool = DEFAULT_INDEX_DB_FALLBACK     # engine fallback
 
 
 class MemoryManagerConfig(ConfigModel):
-	query  : bool                               = DEFAULT_MEMORY_MANAGER_QUERY
-	update : bool                               = DEFAULT_MEMORY_MANAGER_UPDATE
-	prompt : Optional[Union[PromptConfig, int]] = None  # prompt for memory processing
+	query   : bool                               = DEFAULT_MEMORY_MANAGER_QUERY
+	update  : bool                               = DEFAULT_MEMORY_MANAGER_UPDATE
+	managed : bool                               = DEFAULT_MEMORY_MANAGER_MANAGED
+	prompt  : Optional[Union[PromptConfig, int]] = None  # prompt for memory processing
 
 
 class SessionManagerConfig(ConfigModel):
 	query        : bool                               = DEFAULT_SESSION_MANAGER_QUERY
 	update       : bool                               = DEFAULT_SESSION_MANAGER_UPDATE
-	prompt       : Optional[Union[PromptConfig, int]] = None  # prompt for session processing
-	history_size : int                                = DEFAULT_SESSION_MANAGER_HISTORY_SIZE
 	summarize    : bool                               = DEFAULT_SESSION_MANAGER_SUMMARIZE
-
-
-class KnowledgeBaseConfig(ConfigModel):
-	content_db : Optional [Union [ContentDBConfig, int]] = None  # where to store knowledge content
-	index_db   : Union    [IndexDBConfig, int          ] = None  # where to store knowledge index
-	urls       : Optional [List  [str                 ]] = None  # urls to fetch knowledge from
+	history_size : int                                = DEFAULT_SESSION_MANAGER_HISTORY_SIZE
+	prompt       : Optional[Union[PromptConfig, int]] = None  # prompt for session summarization
 
 
 class KnowledgeManagerConfig(ConfigModel):
-	query  : bool                                            = DEFAULT_KNOWLEDGE_MANAGER_QUERY
-	prompt : Optional[Union[PromptConfig, int]]              = None  # prompt for knowledge processing
-	bases  : Optional[List[Union[KnowledgeBaseConfig, int]]] = None
+	query       : bool                                    = DEFAULT_KNOWLEDGE_MANAGER_QUERY
+	description : Optional [str                         ] = None
+	content_db  : Optional [Union [ContentDBConfig, int]] = None  # where to store knowledge content
+	index_db    : Union    [IndexDBConfig, int          ] = None  # where to store knowledge index
+	urls        : Optional [List  [str                 ]] = None  # urls to fetch knowledge from
+	max_results : int                                     = DEFAULT_KNOWLEDGE_MANAGER_MAX_RESULTS
 
 
 class ToolConfig(ConfigModel):
-	type : str
-	args : Optional[Dict[str, Any]] = None
-	ref  : Optional[str           ] = None
+	type     : str
+	args     : Optional[Dict[str, Any]] = None
+	ref      : Optional[str           ] = None
+	fallback : bool                     = DEFAULT_TOOL_FALLBACK
 
 
 class AgentOptionsConfig(ConfigModel):
@@ -246,7 +256,6 @@ class AppConfig(ConfigModel):
 	index_dbs        : Optional[List[IndexDBConfig         ]] = None
 	memory_mgrs      : Optional[List[MemoryManagerConfig   ]] = None
 	session_mgrs     : Optional[List[SessionManagerConfig  ]] = None
-	knowledge_bases  : Optional[List[KnowledgeBaseConfig   ]] = None
 	knowledge_mgrs   : Optional[List[KnowledgeManagerConfig]] = None
 	tools            : Optional[List[ToolConfig            ]] = None
 	agent_options    : Optional[List[AgentOptionsConfig    ]] = None
@@ -281,7 +290,6 @@ def unroll_config(config: AppConfig) -> AppConfig:
 		if not config_copy.index_dbs        : config_copy.index_dbs        = []
 		if not config_copy.memorie_mgrs     : config_copy.memorie_mgrs     = []
 		if not config_copy.session_mgrs     : config_copy.session_mgrs     = []
-		if not config_copy.knowledge_bases  : config_copy.knowledge_bases  = []
 		if not config_copy.knowledge_mgrs   : config_copy.knowledge_mgrs   = []
 		if not config_copy.tools            : config_copy.tools            = []
 		if not config_copy.agent_options    : config_copy.agent_options    = []
@@ -416,43 +424,20 @@ def unroll_config(config: AppConfig) -> AppConfig:
 	if True:
 		for knowledge_mgr in config_copy.knowledge_mgrs:
 			if True:
-				if knowledge_mgr.prompt is not None:
-					if isinstance(knowledge_mgr.prompt, PromptConfig):
-						config_copy.prompts.append(knowledge_mgr.prompt)
-						knowledge_mgr.prompt = len(config_copy.prompts) - 1
-					if not isinstance(knowledge_mgr.prompt, int) or knowledge_mgr.prompt < 0 or knowledge_mgr.prompt >= len(config_copy.prompts):
-						raise ValueError("Invalid knowledge prompt")
+				if knowledge_mgr.content_db is not None:
+					if isinstance(knowledge_mgr.content_db, ContentDBConfig):
+						config_copy.content_dbs.append(knowledge_mgr.content_db)
+						knowledge_mgr.content_db = len(knowledge_mgr.content_dbs) - 1
+					if not isinstance(knowledge_mgr.content_db, int) or knowledge_mgr.content_db < 0 or knowledge_mgr.content_db >= len(config_copy.content_dbs):
+						raise ValueError("Invalid knowledge manager content db")
 
 			if True:
-				if knowledge_mgr.bases is not None:
-					if not isinstance(knowledge_mgr.bases, list):
-						raise ValueError("Invalid knowledge bases")
-
-					for i, knowledge_base in enumerate(knowledge_mgr.bases):
-						if isinstance(knowledge_base, KnowledgeBaseConfig):
-							config_copy.knowledge_bases.append(knowledge_base)
-							knowledge_base = len(config_copy.knowledge_bases) - 1
-						if not isinstance(knowledge_base, int) or knowledge_base < 0 or knowledge_base >= len(config_copy.knowledge_bases):
-							raise ValueError("Invalid knowledge base")
-						knowledge_mgr.bases[i] = knowledge_base
-
-	if True:
-		for knowledge_base in config_copy.knowledge_bases:
-			if True:
-				if knowledge_base.content_db is not None:
-					if isinstance(knowledge_base.content_db, ContentDBConfig):
-						config_copy.content_dbs.append(knowledge_base.content_db)
-						knowledge_base.content_db = len(config_copy.content_dbs) - 1
-					if not isinstance(knowledge_base.content_db, int) or knowledge_base.content_db < 0 or knowledge_base.content_db >= len(config_copy.content_dbs):
-						raise ValueError("Invalid knowledge base content db")
-
-			if True:
-				if knowledge_base.index_db is not None:
-					if isinstance(knowledge_base.index_db, IndexDBConfig):
-						config_copy.index_dbs.append(knowledge_base.index_db)
-						knowledge_base.index_db = len(config_copy.index_dbs) - 1
-					if not isinstance(knowledge_base.index_db, int) or knowledge_base.index_db < 0 or knowledge_base.index_db >= len(config_copy.index_dbs):
-						raise ValueError("Invalid knowledge base index db")
+				if knowledge_mgr.index_db is not None:
+					if isinstance(knowledge_mgr.index_db, IndexDBConfig):
+						config_copy.index_dbs.append(knowledge_mgr.index_db)
+						knowledge_mgr.index_db = len(config_copy.index_dbs) - 1
+					if not isinstance(knowledge_mgr.index_db, int) or knowledge_mgr.index_db < 0 or knowledge_mgr.index_db >= len(config_copy.index_dbs):
+						raise ValueError("Invalid knowledge manager index db")
 
 	if True:
 		for prompt in config_copy.prompts:
@@ -526,11 +511,6 @@ def validate_config(config: AppConfig) -> bool:
 			pass
 
 	if True:
-		for knowledge_base in config.knowledge_bases:
-			# TODO: check knowledge_base
-			pass
-
-	if True:
 		for knowledge_mgr in config.knowledge_mgrs:
 			# TODO: check knowledge_mgr
 			pass
@@ -593,7 +573,6 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 	extracted.index_dbs        = []
 	extracted.memory_mgrs      = []
 	extracted.session_mgrs     = []
-	extracted.knowledge_bases  = []
 	extracted.knowledge_mgrs   = []
 	extracted.tools            = []
 	extracted.agent_options    = []
@@ -610,7 +589,6 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 	index_db_remap             = {None: None}
 	memory_mgr_remap           = {None: None}
 	session_mgr_remap          = {None: None}
-	knowledge_base_remap       = {None: None}
 	knowledge_mgr_remap        = {None: None}
 	tool_remap                 = {None: None}
 	agent_options_remap        = {None: None}
@@ -713,38 +691,15 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 					extracted.knowledge_mgrs.append(None)
 					knowledge_mgr = config.knowledge_mgrs[agent.knowledge_mgr]
 					if True:
-						if knowledge_mgr.prompt is not None:
-							if knowledge_mgr.prompt not in prompt_remap:
-								prompt_remap[knowledge_mgr.prompt] = len(extracted.prompts)
-								extracted.prompts.append(None)
-								prompt = config.prompts[knowledge_mgr.prompt]
-								if True:
-									if prompt.model is not None:
-										if prompt.model not in model_remap:
-											model_remap[prompt.model] = len(extracted.models)
-											extracted.models.append(None)
-								if True:
-									if prompt.embedding is not None:
-										if prompt.embedding not in embedding_remap:
-											embedding_remap[prompt.embedding] = len(extracted.embeddings)
-											extracted.embeddings.append(None)
+						if knowledge_mgr.content_db is not None:
+							if knowledge_mgr.content_db not in content_db_remap:
+								content_db_remap[knowledge_mgr.content_db] = len(extracted.content_dbs)
+								extracted.content_dbs.append(None)
 					if True:
-						if knowledge_mgr.bases is not None:
-							for knowledge_base in knowledge_mgr.bases:
-								if knowledge_base not in knowledge_base_remap:
-									knowledge_base_remap[knowledge_base] = len(extracted.knowledge_bases)
-									extracted.knowledge_bases.append(None)
-									knowledge_base = config.knowledge_bases[knowledge_base]
-									if True:
-										if knowledge_base.content_db is not None:
-											if knowledge_base.content_db not in content_db_remap:
-												content_db_remap[knowledge_base.content_db] = len(extracted.content_dbs)
-												extracted.content_dbs.append(None)
-									if True:
-										if knowledge_base.index_db is not None:
-											if knowledge_base.index_db not in index_db_remap:
-												index_db_remap[knowledge_base.index_db] = len(extracted.index_dbs)
-												extracted.index_dbs.append(None)
+						if knowledge_mgr.index_db is not None:
+							if knowledge_mgr.index_db not in index_db_remap:
+								index_db_remap[knowledge_mgr.index_db] = len(extracted.index_dbs)
+								extracted.index_dbs.append(None)
 
 		if True:
 			if agent.tools is not None:
@@ -807,22 +762,11 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 		dst_item.prompt = prompt_remap[src_item.prompt]
 		extracted.session_mgrs[dst] = dst_item
 
-	for src, dst in knowledge_base_remap:
-		src_item = config.knowledge_bases[src]
-		dst_item = copy.deepcopy(src_item)
-		dst_item.content_db = content_db_remap [src_item.content_db]
-		dst_item.index_db   = index_db_remap   [src_item.index_db  ]
-		extracted.knowledge_bases[dst] = dst_item
-
 	for src, dst in knowledge_mgr_remap:
 		src_item = config.knowledge_mgrs[src]
 		dst_item = copy.deepcopy(src_item)
-		dst_item.prompt = prompt_remap[src_item.prompt]
-		dst_item.bases  = []
-		if src_item.bases is not None:
-			for src_kb in src_item.bases:
-				dst_kb = knowledge_base_remap[src_kb]
-				dst_item.bases.append(dst_kb)
+		dst_item.content_db = content_db_remap [src_item.content_db]
+		dst_item.index_db   = index_db_remap   [src_item.index_db  ]
 		extracted.knowledge_mgrs[dst] = dst_item
 
 	for src, dst in tool_remap:
@@ -882,11 +826,8 @@ def get_backends() -> Dict[Tuple[str, str], Callable]:
 
 class AgentApp:
 
-	def __init__(self, config: AppConfig, agent_indices: List[int]):
-		if len(agent_indices) > len(config.agents):
-			raise ValueError("Invalid agent_indices length")
-		self.config        = copy.deepcopy(config)
-		self.agent_indices = copy.deepcopy(agent_indices)
+	def __init__(self, config: AppConfig):
+		self.config = copy.deepcopy(config)
 
 
 	def generate_app(self, agent_index: int) -> FastAPI:
