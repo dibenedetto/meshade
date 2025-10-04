@@ -46,7 +46,7 @@ if True:
 
 if True:
 	config = load_config(args.config_path) or AppConfig()
-	config.options.port = args.port
+	config.port = args.port
 	if config.options.seed is not None:
 		seed_everything(config.options.seed)
 
@@ -113,7 +113,7 @@ async def start_app():
 		return {"error": "App is already running"}
 	try:
 		host       = "0.0.0.0"
-		agent_port = config.options.port + 1
+		agent_port = config.port + 1
 
 		if config.options.seed is not None:
 			seed_everything(config.options.seed)
@@ -213,7 +213,7 @@ async def run_server():
 	global config, ctrl_app, ctrl_server
 
 	host        = "0.0.0.0"
-	ctrl_config = uvicorn.Config(ctrl_app, host=host, port=config.options.port)
+	ctrl_config = uvicorn.Config(ctrl_app, host=host, port=config.port)
 	ctrl_server = uvicorn.Server(ctrl_config)
 
 	await ctrl_server.serve()

@@ -12,9 +12,10 @@ from   typing          import Any, Dict, List, Optional, Tuple, Union
 
 DEFAULT_APP_MAX_AGENTS                            : int  = 100
 DEFAULT_APP_PORT                                  : int  = 8000
-DEFAULT_APP_RELOAD                                : bool = True
-DEFAULT_APP_SEED                                  : int  = 42
 DEFAULT_APP_API_KEY                               : str  = None
+
+DEFAULT_APP_OPTIONS_RELOAD                        : bool = True
+DEFAULT_APP_OPTIONS_SEED                          : int  = 42
 
 DEFAULT_BACKEND_TYPE                              : str  = "agno"
 DEFAULT_BACKEND_VERSION                           : str  = ""
@@ -25,7 +26,7 @@ DEFAULT_MODEL_ID                                  : str  = "mistral"
 DEFAULT_MODEL_FALLBACK                            : bool = False
 
 DEFAULT_EMBEDDING_TYPE                            : str  = "ollama"
-DEFAULT_EMBEDDING_ID                              : str  = "mistral"
+DEFAULT_EMBEDDING_ID                              : str  = ""
 DEFAULT_EMBEDDING_FALLBACK                        : bool = False
 
 DEFAULT_CONTENT_DB_ENGINE                         : str  = "sqlite"
@@ -50,8 +51,8 @@ DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME     : str  = "session_manager_cont
 
 DEFAULT_KNOWLEDGE_MANAGER_QUERY                   : bool = True
 DEFAULT_KNOWLEDGE_MANAGER_MAX_RESULTS             : int  = 10
-DEFAULT_KNOWLEDGE_MANAGER_CONTENT_DB_TABLE_NAME   : str  = "knowledge_base_content_db_table"
-DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME     : str  = "knowledge_base_index_db_table"
+DEFAULT_KNOWLEDGE_MANAGER_CONTENT_DB_TABLE_NAME   : str  = "knowledge_manager_content_db_table"
+DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME     : str  = "knowledge_manager_index_db_table"
 
 DEFAULT_TOOL_FALLBACK                             : bool = False
 DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS               : int  = 5
@@ -244,8 +245,7 @@ class WorkflowConfig(ConfigModel):
 
 class AppOptionsConfig(ConfigModel):
 	seed   : Optional[int] = None
-	port   : int           = DEFAULT_APP_PORT
-	reload : bool          = DEFAULT_APP_RELOAD
+	reload : bool          = DEFAULT_APP_OPTIONS_RELOAD
 
 
 class AppConfig(ConfigModel):
@@ -267,6 +267,7 @@ class AppConfig(ConfigModel):
 	teams            : Optional[List[TeamConfig            ]] = []
 	workflow_options : Optional[List[WorkflowOptionsConfig ]] = []
 	workflows        : Optional[List[WorkflowConfig        ]] = []
+	port             : int                                    = DEFAULT_APP_PORT
 
 
 def compatible_backends(a: BackendConfig, b: BackendConfig) -> bool:
