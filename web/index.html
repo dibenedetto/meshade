@@ -275,15 +275,17 @@
 
 		<script>
 			const baseConfig = {
-				"version"     : "1.0.0",
-				"name"        : "Numel Playground",
-				"description" : "Numel AI Playground",
-				"author"      : "marco@numel.app",
-				"data"        : null,
+				"info" : {
+					"version"      : "1.0.0",
+					"name"         : "Numel Playground",
+					"author"       : "marco@numel.app",
+					"description"  : "Numel AI Playground"
+				},
 
 				"options" : {
-					"seed" : 7,
-					"port" : 8000
+					"seed"   : 7,
+					"port"   : 8000,
+					"reload" : true
 				},
 
 				"backends" : [
@@ -295,137 +297,114 @@
 
 				"models" : [
 					{
-						"type" : "ollama",
-						"id"   : "mistral"
+						"type" : "openai",
+						"id"   : "gpt-4"
 					}
 				],
 
 				"embeddings" : [
 					{
-						"type" : "ollama",
-						"id"   : "mistral"
+						"type" : "openai",
+						"id"   : ""
 					}
 				],
 
-				"knowledge_dbs" : [
+				"prompts" : [
 					{
-						"type"        : "lancedb",
-						"table_name"  : "knowledge",
-						"db_url"      : "storage/knowledge/knowledge_lancedb_1",
-						"search_type" : "hybrid"
-					}
-				],
-
-				"knowledges" : [
-					{
-						"type" : "knowledge",
-						"db"   : 0,
-						"urls" : []
-					}
-				],
-
-				"memory_dbs" : [
-					{
-						"type"       : "sqlite",
-						"table_name" : "memory",
-						"db_url"     : "storage/memory/memory_sqlite_1.db"
-					}
-				],
-
-				"memories" : [
-					{
-						"type"       : "memory",
-						"db"         : 0,
-						"model"      : 0,
-						"summarizer" : 0
-					}
-				],
-
-				"storage_dbs" : [
-					{
-						"type"       : "sqlite",
-						"table_name" : "session",
-						"db_url"     : "storage/session/storage_sqlite_1.db"
-					}
-				],
-
-				"storages" : [
-					{
-						"type"       : "storage",
-						"db"         : 0,
-						"model"      : 0,
-						"summarizer" : 0
-					}
-				],
-
-				"agent_options" : [
-					{
-						"markdown"                         : true,
-						"search_knowledge"                 : true,
-						"enable_agentic_memory"            : true,
-						"add_history_to_messages"          : true,
-						"num_history_runs"                 : 3,
-						"enable_session_summaries"         : true,
-						"search_previous_sessions_history" : true,
-						"num_history_sessions"             : 2,
-						"show_tool_calls"                  : true,
-						"tool_call_limit"                  : 5,
-						"reasoning"                        : false
-					}
-				],
-
-				"agents" : [
-					{
-						"version" : "1.0.0",
-						"name"    : "Numel Assistant",
-						"author"  : "user@numel.app",
-						"data"    : null,
-
+						"model"        : 0,
+						"embedding"    : 0,
 						"description"  : "Numel AI Assistant",
 						"instructions" : [
 							"Be helpful and informative",
 							"Provide accurate and relevant information",
 							"Use markdown formatting when appropriate"
-						],
-
-						"backend"   : 0,
-						"model"     : 0,
-						"knowledge" : [ 0 ],
-						"memory"    : 0,
-						"storage"   : 0,
-						"options"   : 0,
-
-						"tools" : [
-							{
-								"type" : "reasoning",
-								"args" : null,
-								"ref"  : null
-							},
-							{
-								"type" : "web_search",
-								"args" : {
-									"max_results" : 5
-								},
-								"ref"  : null
-							}
 						]
+					}
+				],
+
+				"content_dbs" : [
+					{
+						"engine" : "sqlite",
+						"url"    : "storage/content_db_sqlite_1.db"
+					}
+				],
+
+				"index_dbs" : [
+					{
+						"engine"      : "lancedb",
+						"embedding"   : 0,
+						"url"         : "storage/knowledge/index_db_lancedb_1",
+						"search_type" : "hybrid"
+					}
+				],
+
+				"memory_mgrs" : [
+					{
+						"query"   : false,
+						"update"  : false,
+						"managed" : false,
+						"prompt"  : null
+					}
+				],
+
+				"session_mgrs" : [
+					{
+						"query"        : false,
+						"update"       : false,
+						"summarize"    : false,
+						"history_size" : 10,
+						"prompt"       : null
+					}
+				],
+
+				"knowledge_mgrs" : [
+					{
+						"query"        : false,
+						"description"  : null,
+						"content_db"   : 0,
+						"index_db"     : 0,
+						"max_results"  : 10,
+						"urls"         : []
+					}
+				],
+
+				"tools" : [
+					{
+						"type" : "reasoning",
+						"args" : null,
+						"ref"  : null
 					},
 					{
-						"version" : "1.0.0",
-						"name"    : "Italian Assistant",
-						"author"  : "italian@numel.app",
-						"data"    : null,
+						"type" : "web_search",
+						"args" : {
+							"max_results" : 5
+						},
+						"ref"  : null
+					}
+				],
 
-						"description"  : "Italian AI Assistant",
-						"instructions" : [
-							"Always answer in Italian"
-						],
+				"agent_options" : [
+					{
+						"markdown" : true
+					}
+				],
 
-						"backend" : 0,
-						"model"   : {
-							"type" : "openai",
-							"id"   : "gpt-4o"
-						}
+				"agents" : [
+					{
+						"info" : {
+							"version" : "1.0.0",
+							"name"    : "Numel Agent",
+							"author"  : "marco@numel.app"
+						},
+
+						"options"       : 0,
+						"backend"       : 0,
+						"prompt"        : 0,
+						"content_db"    : 0,
+						"memory_mgr"    : 0,
+						"session_mgr"   : 0,
+						"knowledge_mgr" : 0,
+						"tools"         : [0, 1]
 					}
 				]
 			};
@@ -610,7 +589,7 @@
 
 				if (agentPrevIndex != agentCurrIndex) {
 					agentPrevIndex = agentCurrIndex;
-					agentName      = aguiApp.status["config"]["agents"][agentPrevIndex]["name"];
+					agentName      = aguiApp.status["config"]["agents"][agentPrevIndex]["info"]["name"];
 					addMessage("ui", `🤖 Talking to Agent "${agentName}"`);
 				}
 
@@ -682,7 +661,7 @@
 					agentCurrIndex = 0;
 					for (let i=0; i<agents.length; ++i) {
 						const selected = (i == agentCurrIndex) ? " selected" : "";
-						content += `<option value="${i}"${selected}>${agents[i]["name"]}</option>`;
+						content += `<option value="${i}"${selected}>${agents[i]["info"]["name"]}</option>`;
 					}
 				}
 				appAgentSelect.innerHTML = content;

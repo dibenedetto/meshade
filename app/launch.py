@@ -15,7 +15,6 @@ from   utils                   import get_time_str, log_print, seed_everything
 from   numel                   import (
 	DEFAULT_APP_PORT,
 	AppConfig,
-	BackendConfig,
 	compact_config,
 	extract_config,
 	get_backends,
@@ -28,10 +27,20 @@ from   numel                   import (
 load_dotenv()
 
 
+def add_middleware(app: FastAPI) -> None:
+	app.add_middleware(
+		CORSMiddleware,
+		allow_credentials = False,
+		allow_headers     = ["*"],
+		allow_methods     = ["*"],
+		allow_origins     = ["*"],
+	)
+
+
 if True:
 	parser = argparse.ArgumentParser(description="App configuration")
 	parser .add_argument("--port", type=int, default=DEFAULT_APP_PORT, help="Listening port for control server")
-	parser .add_argument("--config_path", type=str, default="app/config.json", help="Path to configuration file")
+	parser .add_argument("--config_path", type=str, default="config.json", help="Path to configuration file")
 	args   = parser.parse_args()
 
 
@@ -64,14 +73,7 @@ if True:
 	running_servers = []
 
 	ctrl_app = FastAPI(title="Status")
-
-	ctrl_app.add_middleware(
-		CORSMiddleware,
-		allow_credentials = False,
-		allow_headers     = ["*"],
-		allow_methods     = ["*"],
-		allow_origins     = ["*"],
-	)
+	add_middleware(ctrl_app)
 
 
 @ctrl_app.post("/ping")
@@ -110,8 +112,8 @@ async def start_app():
 	if apps is not None:
 		return {"error": "App is already running"}
 	try:
-		host = "0.0.0.0"
-		port = config.options.port + 1
+		host       = "0.0.0.0"
+		agent_port = config.options.port + 1
 
 		if config.options.seed is not None:
 			seed_everything(config.options.seed)
@@ -120,18 +122,19 @@ async def start_app():
 		backends      = get_backends()
 		apps          = []
 
-		for bkd, cll in backends:
-			backend = BackendConfig(**bkd)
+		agent_index = 0
+		for backend, ctor in backends.values():
 			bkd_cfg = extract_config(config, backend, active_agents)
 			if not bkd_cfg.agents:
 				continue
 
-			app = cll(bkd_cfg)
+			app = ctor(bkd_cfg)
 			apps.append(app)
 
-			for i in range(app.config.agents):
-				agent_app    = app.generate_app(i)
-				agent_port   = port + i
+			for i in range(len(app.config.agents)):
+				agent_app = app.generate_app(i)
+				add_middleware(agent_app)
+
 				agent_config = uvicorn.Config(agent_app, host=host, port=agent_port)
 				agent_server = uvicorn.Server(agent_config)
 				agent_task   = asyncio.create_task(agent_server.serve())
@@ -140,6 +143,10 @@ async def start_app():
 					"task"   : agent_task,
 				}
 				running_servers.append(item)
+
+				config.agents[agent_index].port = agent_port
+				agent_index += 1
+				agent_port  += 1
 
 		ctrl_status["config"] = config
 		ctrl_status["status"] = "running"
@@ -161,10 +168,10 @@ async def stop_app():
 				server.should_exit = True
 			if task:
 				await task
-		for info in apps.values():
-			backend = info["backend"]
-			if backend is not None:
-				backend.close()
+		for app in apps:
+			app.close()
+		for agent in config.agents:
+			agent.port = 0
 		apps                  = None
 		running_servers       = []
 		ctrl_status["config"] = None

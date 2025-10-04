@@ -171,7 +171,7 @@ class NumelApp {
 		const url     = `${baseUrl}:${port}/agui`;
 
 		agent = new AGUI.HttpAgent({
-			name : config["name"],
+			name : config["info"]["name"],
 			url  : url,
 		});
 

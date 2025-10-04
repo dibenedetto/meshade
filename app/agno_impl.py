@@ -4,26 +4,29 @@ import copy
 import os
 
 
-from   fastapi                   import FastAPI
-from   typing                    import Any
+from   fastapi                         import FastAPI
+from   typing                          import Any
 
 
-from   agno.agent                import Agent
-from   agno.db.sqlite            import SqliteDb
-from   agno.knowledge.knowledge  import Knowledge
-from   agno.memory.manager       import MemoryManager
-from   agno.models.ollama        import Ollama
-from   agno.models.openai        import OpenAIChat
-from   agno.os                   import AgentOS
-from   agno.os.interfaces.agui   import AGUI
-from   agno.session.summary      import SessionSummaryManager
-from   agno.tools.duckduckgo     import DuckDuckGoTools
-from   agno.tools.reasoning      import ReasoningTools
-from   agno.vectordb.lancedb     import LanceDb
-from   agno.vectordb.search      import SearchType
+from   agno.agent                      import Agent
+from   agno.db.sqlite                  import SqliteDb
+from   agno.knowledge.embedder.openai  import OpenAIEmbedder
+from   agno.knowledge.embedder.ollama  import OllamaEmbedder
+from   agno.knowledge.knowledge        import Knowledge
+from   agno.memory.manager             import MemoryManager
+from   agno.models.ollama              import Ollama
+from   agno.models.openai              import OpenAIChat
+from   agno.os                         import AgentOS
+from   agno.os.interfaces.agui         import AGUI
+from   agno.session.summary            import SessionSummaryManager
+from   agno.tools.duckduckgo           import DuckDuckGoTools
+from   agno.tools.reasoning            import ReasoningTools
+from   agno.vectordb.lancedb           import LanceDb
+from   agno.vectordb.search            import SearchType
 
 
 from   numel                     import (
+	DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME,
 	DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS,
 	AppConfig,
 	AgentApp,
@@ -66,10 +69,10 @@ class _AgnoAgentApp(AgentApp):
 		item_config = config.embeddings[index]
 		if item_config:
 			if item_config.type == "openai":
-				item = OpenAIChat(id=item_config.id)
+				item = OpenAIEmbedder()
 				return item
 			if item_config.type == "ollama":
-				item = Ollama(id=item_config.id)
+				item = OllamaEmbedder()
 				return item
 		raise ValueError(f"Unsupported Agno embdding")
 
@@ -106,8 +109,9 @@ class _AgnoAgentApp(AgentApp):
 			if item_config.engine == "lancedb":
 				search_type = self._get_search_type(item_config.search_type)
 				item = LanceDb(
+					embedder    = impl.embeddings[item_config.embedding],
 					uri         = item_config.url,
-					table_name  = item_config.table_name,
+					table_name  = DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME,
 					search_type = search_type,
 				)
 				return item
@@ -158,17 +162,16 @@ class _AgnoAgentApp(AgentApp):
 
 
 	def _build_tool(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
-		item_config = config.prompts[index]
+		item_config = config.tools[index]
+		item        = None
 		if item_config:
-			args = item_config.args if item_config.args is not None else {}
-			item = None
+			args = item_config.args if item_config.args is not None else dict()
 			if item_config.type == "reasoning":
 				item = ReasoningTools()
 			elif item_config.type == "web_search":
 				max_results = args.get("max_results", DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS)
 				item = DuckDuckGoTools(fixed_max_results=max_results)
-			return item
-		return None
+		return item
 
 
 	def _build_agent_options(self, config: AppConfig, impl: AppConfig, index: int) -> Any:
@@ -277,6 +280,7 @@ class _AgnoAgentApp(AgentApp):
 		config_impl.content_dbs    = [self._build_content_db        (self.config, config_impl, i) for i in range(len(self.config.content_dbs   ))]
 		config_impl.index_dbs      = [self._build_index_db          (self.config, config_impl, i) for i in range(len(self.config.index_dbs     ))]
 		config_impl.tools          = [self._build_tool              (self.config, config_impl, i) for i in range(len(self.config.tools         ))]
+		config_impl.agent_options  = [self._build_agent_options     (self.config, config_impl, i) for i in range(len(self.config.agent_options ))]
 
 		config_impl.prompts        = [self._build_prompt            (self.config, config_impl, i) for i in range(len(self.config.prompts       ))]
 		config_impl.memory_mgrs    = [self._build_memory_manager    (self.config, config_impl, i) for i in range(len(self.config.memory_mgrs   ))]

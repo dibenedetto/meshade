@@ -2,205 +2,211 @@ class NumelGraph {
 
 	static schema = `
 from   pydantic        import BaseModel
-from   typing          import Any, Dict, List, Optional, Required, Tuple, Union
+from   typing          import Any, Dict, List, Optional, Union
 
 
-DEFAULT_SEED                                      : int  = 42
-
-DEFAULT_API_KEY                                   : str  = None
+DEFAULT_APP_MAX_AGENTS                            : int  = 100
+DEFAULT_APP_PORT                                  : int  = 8000
+DEFAULT_APP_RELOAD                                : bool = True
+DEFAULT_APP_SEED                                  : int  = 42
+DEFAULT_APP_API_KEY                               : str  = None
 
 DEFAULT_BACKEND_TYPE                              : str  = "agno"
 DEFAULT_BACKEND_VERSION                           : str  = ""
+DEFAULT_BACKEND_FALLBACK                          : bool = False
 
 DEFAULT_MODEL_TYPE                                : str  = "ollama"
 DEFAULT_MODEL_ID                                  : str  = "mistral"
+DEFAULT_MODEL_FALLBACK                            : bool = False
 
 DEFAULT_EMBEDDING_TYPE                            : str  = "ollama"
 DEFAULT_EMBEDDING_ID                              : str  = "mistral"
+DEFAULT_EMBEDDING_FALLBACK                        : bool = False
 
-DEFAULT_KNOWLEDGE_DB_TYPE                         : str  = "lancedb"
-DEFAULT_KNOWLEDGE_DB_TABLE_NAME                   : str  = "knowledge"
-DEFAULT_KNOWLEDGE_DB_URL                          : str  = "storage/knowledge"
-DEFAULT_KNOWLEDGE_DB_SEARCH_TYPE                  : str  = "hybrid"
+DEFAULT_CONTENT_DB_ENGINE                         : str  = "sqlite"
+DEFAULT_CONTENT_DB_URL                            : str  = "storage/content"
+DEFAULT_CONTENT_DB_FALLBACK                       : bool = False
 
-DEFAULT_KNOWLEDGE_TYPE                            : str  = "knowledge"
+DEFAULT_INDEX_DB_ENGINE                           : str  = "lancedb"
+DEFAULT_INDEX_DB_URL                              : str  = "storage/index"
+DEFAULT_INDEX_DB_SEARCH_TYPE                      : str  = "hybrid"
+DEFAULT_INDEX_DB_FALLBACK                         : bool = False
 
-DEFAULT_MEMORY_DB_TYPE                            : str  = "sqlite"
-DEFAULT_MEMORY_DB_TABLE_NAME                      : str  = "memory"
-DEFAULT_MEMORY_DB_URL                             : str  = "storage/memory"
+DEFAULT_MEMORY_MANAGER_QUERY                      : bool = False
+DEFAULT_MEMORY_MANAGER_UPDATE                     : bool = False
+DEFAULT_MEMORY_MANAGER_MANAGED                    : bool = False
+DEFAULT_MEMORY_MANAGER_CONTENT_DB_TABLE_NAME      : str  = "memory_manager_content_db_table"
 
-DEFAULT_MEMORY_TYPE                               : str  = "memory"
+DEFAULT_SESSION_MANAGER_QUERY                     : bool = False
+DEFAULT_SESSION_MANAGER_UPDATE                    : bool = False
+DEFAULT_SESSION_MANAGER_HISTORY_SIZE              : int  = 10
+DEFAULT_SESSION_MANAGER_SUMMARIZE                 : bool = False
+DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME     : str  = "session_manager_content_db_table"
 
-DEFAULT_STORAGE_DB_TYPE                           : str  = "sqlite"
-DEFAULT_STORAGE_DB_TABLE_NAME                     : str  = "session"
-DEFAULT_STORAGE_DB_URL                            : str  = "storage/session"
+DEFAULT_KNOWLEDGE_MANAGER_QUERY                   : bool = True
+DEFAULT_KNOWLEDGE_MANAGER_MAX_RESULTS             : int  = 10
+DEFAULT_KNOWLEDGE_MANAGER_CONTENT_DB_TABLE_NAME   : str  = "knowledge_base_content_db_table"
+DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME     : str  = "knowledge_base_index_db_table"
 
-DEFAULT_STORAGE_TYPE                              : str  = "storage"
+DEFAULT_TOOL_FALLBACK                             : bool = False
+DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS               : int  = 5
 
-DEFAULT_OPTIONS_MARKDOWN                          : bool = True
-DEFAULT_OPTIONS_SEARCH_KNOWLEDGE                  : bool = True
-DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY             : bool = True
-DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES           : bool = True
-DEFAULT_OPTIONS_NUM_HISTORY_RUNS                  : int  = 3
-DEFAULT_OPTIONS_ENABLE_SESSION_SUMMARIES          : bool = True
-DEFAULT_OPTIONS_SEARCH_PREVIOUS_SESSIONS_HISTORY  : bool = True
-DEFAULT_OPTIONS_NUM_HISTORY_SESSIONS              : int  = 2
-DEFAULT_OPTIONS_SHOW_TOOL_CALLS                   : bool = True
-DEFAULT_OPTIONS_TOOL_CALL_LIMIT                   : int  = 5
-DEFAULT_OPTIONS_REASONING                         : bool = True
-DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS         : bool = True
-DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS            : int  = 5
-
-
-DEFAULT_APP_KNOWLEDGE_PATH                        : str  = "../storage/knowledge"
-DEFAULT_APP_MEMORY_PATH                           : str  = "../storage/memory"
-DEFAULT_APP_SESSION_PATH                          : str  = "../storage/session"
-DEFAULT_APP_PORT                                  : int  = 8000
-DEFAULT_APP_RELOAD                                : bool = True
+DEFAULT_AGENT_OPTIONS_MARKDOWN                    : bool = True
+DEFAULT_AGENT_OPTIONS_USE_SESSION                 : bool = False
+DEFAULT_AGENT_OPTIONS_SESSION_HISTORY_SIZE        : int  = 10
+DEFAULT_AGENT_OPTIONS_SUMMARIZE_SESSIONS          : bool = False
+DEFAULT_AGENT_OPTIONS_USE_KNOWLEDGE               : bool = False
 
 
-class BackendConfig(BaseModel):
-	type    : str = DEFAULT_BACKEND_TYPE
-	version : str = DEFAULT_BACKEND_VERSION
+class ConfigModel(BaseModel):
+	data : Optional[Any] = None  # custom data
 
 
-class ModelConfig(BaseModel):
-	type    : str           = DEFAULT_MODEL_TYPE
-	id      : str           = DEFAULT_MODEL_ID
-	path    : Optional[str] = None
-	wrapper : Optional[str] = None
-	version : Optional[str] = None
-	name    : Optional[str] = None
-	author  : Optional[str] = None
-	source  : Optional[str] = None
-	data    : Optional[Any] = None
+class InfoConfig(ConfigModel):
+	version      : Optional[str      ] = None
+	name         : Optional[str      ] = None
+	author       : Optional[str      ] = None
+	description  : Optional[str      ] = None
+	instructions : Optional[List[str]] = None
 
 
-class EmbeddingConfig(BaseModel):
-	type    : str           = DEFAULT_EMBEDDING_TYPE
-	id      : str           = DEFAULT_EMBEDDING_ID
-	path    : Optional[str] = None
-	wrapper : Optional[str] = None
-	version : Optional[str] = None
-	name    : Optional[str] = None
-	author  : Optional[str] = None
-	source  : Optional[str] = None
-	data    : Optional[Any] = None
+class BackendConfig(ConfigModel):
+	type     : str  = DEFAULT_BACKEND_TYPE      # backend name
+	version  : str  = DEFAULT_BACKEND_VERSION   # backend version
+	fallback : bool = DEFAULT_BACKEND_FALLBACK  # backend fallback
 
 
-class KnowledgeDBConfig(BaseModel):
-	type        : str           = DEFAULT_KNOWLEDGE_DB_TYPE
-	table_name  : str           = DEFAULT_KNOWLEDGE_DB_TABLE_NAME
-	db_url      : str           = DEFAULT_KNOWLEDGE_DB_URL
-	search_type : str           = DEFAULT_KNOWLEDGE_DB_SEARCH_TYPE
-	data        : Optional[Any] = None
+class ModelConfig(ConfigModel):
+	type     : str  = DEFAULT_MODEL_TYPE      # model provider name
+	id       : str  = DEFAULT_MODEL_ID        # model name (relative to llm)
+	fallback : bool = DEFAULT_MODEL_FALLBACK  # model fallback
 
 
-class KnowledgeConfig(BaseModel):
-	type  : str                                     = DEFAULT_KNOWLEDGE_TYPE
-	db    : Optional[Union[KnowledgeDBConfig, int]] = None
-	model : Optional[Union[ModelConfig, int]]       = None
-	urls  : Optional[List[str]]                     = None
-	data  : Optional[Any]                           = None
+class EmbeddingConfig(ConfigModel):
+	type     : str  = DEFAULT_EMBEDDING_TYPE      # embedding provider name
+	id       : str  = DEFAULT_EMBEDDING_TYPE      # embedding name (relative to embedder)
+	fallback : bool = DEFAULT_EMBEDDING_FALLBACK  # embedding fallback
 
 
-class MemoryDBConfig(BaseModel):
-	type       : str           = DEFAULT_MEMORY_DB_TYPE
-	table_name : str           = DEFAULT_MEMORY_DB_TABLE_NAME
-	db_url     : str           = DEFAULT_MEMORY_DB_URL
-	data       : Optional[Any] = None
+class PromptConfig(ConfigModel):
+	model        : Optional[Union[ModelConfig    , int]] = None  # model to use for agentic knowledge processing
+	embedding    : Optional[Union[EmbeddingConfig, int]] = None  # embedding to use for agentic knowledge processing
+	description  : Optional[str]                         = None
+	instructions : Optional[List[str]]                   = None
+	override     : Optional[str]                         = None  # override prompt template
 
 
-class MemoryConfig(BaseModel):
-	type       : str                                  = DEFAULT_MEMORY_TYPE
-	db         : Optional[Union[MemoryDBConfig, int]] = None
-	model      : Optional[Union[ModelConfig, int]]    = None
-	summarizer : Optional[Union[ModelConfig, int]]    = None
-	data       : Optional[Any]                        = None
+class ContentDBConfig(ConfigModel):
+	engine               : str  = DEFAULT_CONTENT_DB_ENGINE                        # db engine name (eg. sqlite)
+	url                  : str  = DEFAULT_CONTENT_DB_URL                           # db url (eg. sqlite file path)
+	memory_table_name    : str  = DEFAULT_MEMORY_MANAGER_CONTENT_DB_TABLE_NAME     # name of the table to store memory content
+	session_table_name   : str  = DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME    # name of the table to store session content
+	knowledge_table_name : str  = DEFAULT_KNOWLEDGE_MANAGER_CONTENT_DB_TABLE_NAME  # name of the table to store knowledge content
+	fallback             : bool = DEFAULT_CONTENT_DB_FALLBACK                      # engine fallback
 
 
-class StorageDBConfig(BaseModel):
-	type       : str           = DEFAULT_STORAGE_DB_TYPE
-	table_name : str           = DEFAULT_STORAGE_DB_TABLE_NAME
-	db_url     : str           = DEFAULT_STORAGE_DB_URL
-	data       : Optional[Any] = None
+class IndexDBConfig(ConfigModel):
+	engine      : str  = DEFAULT_INDEX_DB_ENGINE       # db engine name (eg. sqlite)
+	embedding   : Union[EmbeddingConfig, int]
+	url         : str  = DEFAULT_INDEX_DB_URL          # db url (eg. sqlite file path)
+	search_type : str  = DEFAULT_INDEX_DB_SEARCH_TYPE  # search type (eg. hybrid)
+	fallback    : bool = DEFAULT_INDEX_DB_FALLBACK     # engine fallback
 
 
-class StorageConfig(BaseModel):
-	type : str                                   = DEFAULT_STORAGE_TYPE
-	db   : Optional[Union[StorageDBConfig, int]] = None
-	data : Optional[Any]                         = None
+class MemoryManagerConfig(ConfigModel):
+	query   : bool                               = DEFAULT_MEMORY_MANAGER_QUERY
+	update  : bool                               = DEFAULT_MEMORY_MANAGER_UPDATE
+	managed : bool                               = DEFAULT_MEMORY_MANAGER_MANAGED
+	prompt  : Optional[Union[PromptConfig, int]] = None  # prompt for memory processing
 
 
-class ToolConfig(BaseModel):
-	type : str
-	args : Optional[Dict[str, Any]] = None
-	ref  : Optional[str]            = None
-	data : Optional[Any]            = None
+class SessionManagerConfig(ConfigModel):
+	query        : bool                               = DEFAULT_SESSION_MANAGER_QUERY
+	update       : bool                               = DEFAULT_SESSION_MANAGER_UPDATE
+	summarize    : bool                               = DEFAULT_SESSION_MANAGER_SUMMARIZE
+	history_size : int                                = DEFAULT_SESSION_MANAGER_HISTORY_SIZE
+	prompt       : Optional[Union[PromptConfig, int]] = None  # prompt for session summarization
 
 
-class AgentOptionsConfig(BaseModel):
-	markdown                         : bool          = DEFAULT_OPTIONS_MARKDOWN
-	search_knowledge                 : bool          = DEFAULT_OPTIONS_SEARCH_KNOWLEDGE
-	enable_agentic_memory            : bool          = DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY
-	add_history_to_messages          : bool          = DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES
-	num_history_runs                 : int           = DEFAULT_OPTIONS_NUM_HISTORY_RUNS
-	enable_session_summaries         : bool          = DEFAULT_OPTIONS_ENABLE_SESSION_SUMMARIES
-	search_previous_sessions_history : bool          = DEFAULT_OPTIONS_SEARCH_PREVIOUS_SESSIONS_HISTORY
-	num_history_sessions             : int           = DEFAULT_OPTIONS_NUM_HISTORY_SESSIONS
-	show_tool_calls                  : bool          = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
-	tool_call_limit                  : int           = DEFAULT_OPTIONS_TOOL_CALL_LIMIT
-	reasoning                        : bool          = DEFAULT_OPTIONS_REASONING
-	stream_intermediate_steps        : bool          = DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS
-	data                             : Optional[Any] = None
+class KnowledgeManagerConfig(ConfigModel):
+	query       : bool                                    = DEFAULT_KNOWLEDGE_MANAGER_QUERY
+	description : Optional [str                         ] = None
+	content_db  : Optional [Union [ContentDBConfig, int]] = None  # where to store knowledge content
+	index_db    : Union    [IndexDBConfig, int          ] = None  # where to store knowledge index
+	max_results : int                                     = DEFAULT_KNOWLEDGE_MANAGER_MAX_RESULTS
+	urls        : Optional [List  [str                 ]] = None  # urls to fetch knowledge from
 
 
-class AgentConfig(BaseModel):
-	backend      : Optional[Union[BackendConfig, int]]         = None
-	model        : Optional[Union[ModelConfig, int]]           = None
-	embedding    : Optional[Union[EmbeddingConfig, int]]       = None
-	options      : Optional[Union[AgentOptionsConfig, int]]    = None
-	version      : Optional[str]                               = None
-	name         : Optional[str]                               = None
-	author       : Optional[str]                               = None
-	port         : Optional[int]                               = None
-	description  : Optional[str]                               = None
-	instructions : Optional[List[str]]                         = None
-	knowledge    : Optional[List[Union[KnowledgeConfig, int]]] = None
-	memory       : Optional[Union[MemoryConfig, int]]          = None
-	storage      : Optional[Union[StorageConfig, int]]         = None
-	tools        : Optional[List[ToolConfig]]                  = None
-	data         : Optional[Any]                               = None
+class ToolConfig(ConfigModel):
+	type     : str
+	args     : Optional[Dict[str, Any]] = None
+	ref      : Optional[str           ] = None
+	fallback : bool                     = DEFAULT_TOOL_FALLBACK
 
 
-class AppOptionsConfig(BaseModel):
-	knowledge_path : str           = DEFAULT_APP_KNOWLEDGE_PATH
-	memory_path    : str           = DEFAULT_APP_MEMORY_PATH
-	session_path   : str           = DEFAULT_APP_SESSION_PATH
-	port           : int           = DEFAULT_APP_PORT
-	reload         : bool          = DEFAULT_APP_RELOAD
-	seed           : Optional[int] = None
+class AgentOptionsConfig(ConfigModel):
+	markdown : bool = DEFAULT_AGENT_OPTIONS_MARKDOWN
+	port     : int  = 0
 
 
-class AppConfig(BaseModel):
-	options       : AppOptionsConfig                    = AppOptionsConfig()
-	backend       : Optional[Union[BackendConfig, int]] = None
-	version       : Optional[str]                       = None
-	name          : Optional[str]                       = None
-	author        : Optional[str]                       = None
-	description   : Optional[str]                       = None
-	backends      : Optional[List[BackendConfig]]       = None
-	models        : Optional[List[ModelConfig]]         = None
-	embeddings    : Optional[List[EmbeddingConfig]]     = None
-	knowledge_dbs : Optional[List[KnowledgeDBConfig]]   = None
-	knowledges    : Optional[List[KnowledgeConfig]]     = None
-	memory_dbs    : Optional[List[MemoryDBConfig]]      = None
-	memories      : Optional[List[MemoryConfig]]        = None
-	storage_dbs   : Optional[List[StorageDBConfig]]     = None
-	storages      : Optional[List[StorageConfig]]       = None
-	agent_options : Optional[List[AgentOptionsConfig]]  = None
-	agents        : Optional[List[AgentConfig]]         = None
-	data          : Optional[Any]                       = None
+class AgentConfig(ConfigModel):
+	info          : Optional [InfoConfig                          ] = InfoConfig()
+	options       : Optional [Union [AgentOptionsConfig    , int ]] = AgentOptionsConfig()
+	backend       : Union    [BackendConfig, int                  ]
+	prompt        : Union    [PromptConfig , int                  ]
+	content_db    : Optional [Union [ContentDBConfig       , int ]] = None
+	memory_mgr    : Optional [Union [MemoryManagerConfig   , int ]] = None
+	session_mgr   : Optional [Union [SessionManagerConfig  , int ]] = None
+	knowledge_mgr : Optional [Union [KnowledgeManagerConfig, int ]] = None
+	tools         : Optional [List  [Union[ToolConfig      , int]]] = []
+
+
+class TeamOptionsConfig(ConfigModel):
+	tag : int = 0
+
+
+class TeamConfig(ConfigModel):
+	info    : Optional[InfoConfig]                    = InfoConfig()
+	options : Optional[Union[TeamOptionsConfig, int]] = TeamOptionsConfig()
+	agents  : List[Union[AgentConfig, int]]           = []
+
+
+class WorkflowOptionsConfig(ConfigModel):
+	tag : int = 0
+
+
+class WorkflowConfig(ConfigModel):
+	info    : Optional[InfoConfig]                        = InfoConfig()
+	options : Optional[Union[WorkflowOptionsConfig, int]] = WorkflowOptionsConfig()
+	agents  : List[Union[AgentConfig, int]]               = []
+	teams   : List[Union[TeamConfig, int]]                = []
+
+
+class AppOptionsConfig(ConfigModel):
+	seed   : Optional[int] = None
+	port   : int           = DEFAULT_APP_PORT
+	reload : bool          = DEFAULT_APP_RELOAD
+
+
+class AppConfig(ConfigModel):
+	info             : Optional[InfoConfig                  ] = InfoConfig()
+	options          : Optional[AppOptionsConfig            ] = AppOptionsConfig()
+	backends         : Optional[List[BackendConfig         ]] = []
+	models           : Optional[List[ModelConfig           ]] = []
+	embeddings       : Optional[List[EmbeddingConfig       ]] = []
+	prompts          : Optional[List[PromptConfig          ]] = []
+	content_dbs      : Optional[List[ContentDBConfig       ]] = []
+	index_dbs        : Optional[List[IndexDBConfig         ]] = []
+	memory_mgrs      : Optional[List[MemoryManagerConfig   ]] = []
+	session_mgrs     : Optional[List[SessionManagerConfig  ]] = []
+	knowledge_mgrs   : Optional[List[KnowledgeManagerConfig]] = []
+	tools            : Optional[List[ToolConfig            ]] = []
+	agent_options    : Optional[List[AgentOptionsConfig    ]] = []
+	agents           : Optional[List[AgentConfig           ]] = []
+	team_options     : Optional[List[TeamOptionsConfig     ]] = []
+	teams            : Optional[List[TeamConfig            ]] = []
+	workflow_options : Optional[List[WorkflowOptionsConfig ]] = []
+	workflows        : Optional[List[WorkflowConfig        ]] = []
 	`;
 
 	constructor(canvasId) {
@@ -268,7 +274,7 @@ class AppConfig(BaseModel):
 			}
 
 			// Collect model names
-			const classMatch = line.match(/^class\s+(\w+)\s*\([^)]*BaseModel[^)]*\):/);
+			const classMatch = line.match(/^class\s+(\w+)\s*\([^)]*((BaseModel)|(ConfigModel))[^)]*\):/);
 			if (classMatch) {
 				models[classMatch[1]] = { fields: {}, relationships: [], constants: constants };
 			}
@@ -283,7 +289,7 @@ class AppConfig(BaseModel):
 			if (line.startsWith('#') || line.startsWith('from ') || line.startsWith('import ')) continue;
 
 			// Class definition
-			const classMatch = line.match(/^class\s+(\w+)\s*\([^)]*BaseModel[^)]*\):/);
+			const classMatch = line.match(/^class\s+(\w+)\s*\([^)]*((BaseModel)|(ConfigModel))[^)]*\):/);
 			if (classMatch) {
 				currentModel = classMatch[1];
 				inClass = true;
@@ -311,7 +317,7 @@ class AppConfig(BaseModel):
 			// End of class
 			if (inClass && (line === '' || line.startsWith('class '))) {
 				if (line.startsWith('class ')) {
-					const classMatch = line.match(/^class\s+(\w+)\s*\([^)]*BaseModel[^)]*\):/);
+					const classMatch = line.match(/^class\s+(\w+)\s*\([^)]*((BaseModel)|(ConfigModel))[^)]*\):/);
 					if (classMatch) {
 						currentModel = classMatch[1];
 					}

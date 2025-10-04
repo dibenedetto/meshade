@@ -18,6 +18,7 @@ DEFAULT_APP_API_KEY                               : str  = None
 
 DEFAULT_BACKEND_TYPE                              : str  = "agno"
 DEFAULT_BACKEND_VERSION                           : str  = ""
+DEFAULT_BACKEND_FALLBACK                          : bool = False
 
 DEFAULT_MODEL_TYPE                                : str  = "ollama"
 DEFAULT_MODEL_ID                                  : str  = "mistral"
@@ -47,10 +48,10 @@ DEFAULT_SESSION_MANAGER_HISTORY_SIZE              : int  = 10
 DEFAULT_SESSION_MANAGER_SUMMARIZE                 : bool = False
 DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME     : str  = "session_manager_content_db_table"
 
-DEFAULT_KNOWLEDGE_MANAGER_CONTENT_DB_TABLE_NAME   : str  = "knowledge_base_content_db_table"
-DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME     : str  = "knowledge_base_index_db_table"
 DEFAULT_KNOWLEDGE_MANAGER_QUERY                   : bool = True
 DEFAULT_KNOWLEDGE_MANAGER_MAX_RESULTS             : int  = 10
+DEFAULT_KNOWLEDGE_MANAGER_CONTENT_DB_TABLE_NAME   : str  = "knowledge_base_content_db_table"
+DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME     : str  = "knowledge_base_index_db_table"
 
 DEFAULT_TOOL_FALLBACK                             : bool = False
 DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS               : int  = 5
@@ -150,6 +151,7 @@ class ContentDBConfig(ConfigModel):
 
 class IndexDBConfig(ConfigModel):
 	engine      : str  = DEFAULT_INDEX_DB_ENGINE       # db engine name (eg. sqlite)
+	embedding   : Union[EmbeddingConfig, int]
 	url         : str  = DEFAULT_INDEX_DB_URL          # db url (eg. sqlite file path)
 	search_type : str  = DEFAULT_INDEX_DB_SEARCH_TYPE  # search type (eg. hybrid)
 	fallback    : bool = DEFAULT_INDEX_DB_FALLBACK     # engine fallback
@@ -175,8 +177,8 @@ class KnowledgeManagerConfig(ConfigModel):
 	description : Optional [str                         ] = None
 	content_db  : Optional [Union [ContentDBConfig, int]] = None  # where to store knowledge content
 	index_db    : Union    [IndexDBConfig, int          ] = None  # where to store knowledge index
-	urls        : Optional [List  [str                 ]] = None  # urls to fetch knowledge from
 	max_results : int                                     = DEFAULT_KNOWLEDGE_MANAGER_MAX_RESULTS
+	urls        : Optional [List  [str                 ]] = None  # urls to fetch knowledge from
 
 
 class ToolConfig(ConfigModel):
@@ -207,15 +209,16 @@ class AgentOptionsConfig(ConfigModel):
 
 
 class AgentConfig(ConfigModel):
-	info          : Optional [InfoConfig                          ] = None
-	options       : Optional [Union [AgentOptionsConfig    , int ]] = None
+	info          : Optional [InfoConfig                          ] = InfoConfig()
+	options       : Optional [Union [AgentOptionsConfig    , int ]] = AgentOptionsConfig()
 	backend       : Union    [BackendConfig, int                  ]
 	prompt        : Union    [PromptConfig , int                  ]
 	content_db    : Optional [Union [ContentDBConfig       , int ]] = None
 	memory_mgr    : Optional [Union [MemoryManagerConfig   , int ]] = None
 	session_mgr   : Optional [Union [SessionManagerConfig  , int ]] = None
 	knowledge_mgr : Optional [Union [KnowledgeManagerConfig, int ]] = None
-	tools         : Optional [List  [Union[ToolConfig      , int]]] = None
+	tools         : Optional [List  [Union[ToolConfig      , int]]] = []
+	port          : int                                             = 0
 
 
 class TeamOptionsConfig(ConfigModel):
@@ -223,9 +226,9 @@ class TeamOptionsConfig(ConfigModel):
 
 
 class TeamConfig(ConfigModel):
-	info    : Optional[InfoConfig] = None
-	options : Optional[Union[TeamOptionsConfig, int]] = None
-	agents  : List[AgentConfig, int]
+	info    : Optional[InfoConfig]                    = InfoConfig()
+	options : Optional[Union[TeamOptionsConfig, int]] = TeamOptionsConfig()
+	agents  : List[Union[AgentConfig, int]]           = []
 
 
 class WorkflowOptionsConfig(ConfigModel):
@@ -233,37 +236,37 @@ class WorkflowOptionsConfig(ConfigModel):
 
 
 class WorkflowConfig(ConfigModel):
-	info    : Optional[InfoConfig] = None
-	options : Optional[Union[TeamOptionsConfig, int]] = None
-	agents  : List[AgentConfig, int]
-	teams   : List[TeamConfig, int]
+	info    : Optional[InfoConfig]                        = InfoConfig()
+	options : Optional[Union[WorkflowOptionsConfig, int]] = WorkflowOptionsConfig()
+	agents  : List[Union[AgentConfig, int]]               = []
+	teams   : List[Union[TeamConfig, int]]                = []
 
 
 class AppOptionsConfig(ConfigModel):
-	seed        : Optional[int] = None
-	port        : int           = DEFAULT_APP_PORT
-	reload      : bool          = DEFAULT_APP_RELOAD
+	seed   : Optional[int] = None
+	port   : int           = DEFAULT_APP_PORT
+	reload : bool          = DEFAULT_APP_RELOAD
 
 
 class AppConfig(ConfigModel):
-	info             : Optional[InfoConfig                  ] = None
-	options          : Optional[AppOptionsConfig            ] = None
-	backends         : Optional[List[BackendConfig         ]] = None
-	models           : Optional[List[ModelConfig           ]] = None
-	embeddings       : Optional[List[EmbeddingConfig       ]] = None
-	prompts          : Optional[List[PromptConfig          ]] = None
-	content_dbs      : Optional[List[ContentDBConfig       ]] = None
-	index_dbs        : Optional[List[IndexDBConfig         ]] = None
-	memory_mgrs      : Optional[List[MemoryManagerConfig   ]] = None
-	session_mgrs     : Optional[List[SessionManagerConfig  ]] = None
-	knowledge_mgrs   : Optional[List[KnowledgeManagerConfig]] = None
-	tools            : Optional[List[ToolConfig            ]] = None
-	agent_options    : Optional[List[AgentOptionsConfig    ]] = None
-	agents           : Optional[List[AgentConfig           ]] = None
-	team_options     : Optional[List[TeamOptionsConfig     ]] = None
-	teams            : Optional[List[TeamConfig            ]] = None
-	workflow_options : Optional[List[WorkflowOptionsConfig ]] = None
-	workflows        : Optional[List[WorkflowConfig        ]] = None
+	info             : Optional[InfoConfig                  ] = InfoConfig()
+	options          : Optional[AppOptionsConfig            ] = AppOptionsConfig()
+	backends         : Optional[List[BackendConfig         ]] = []
+	models           : Optional[List[ModelConfig           ]] = []
+	embeddings       : Optional[List[EmbeddingConfig       ]] = []
+	prompts          : Optional[List[PromptConfig          ]] = []
+	content_dbs      : Optional[List[ContentDBConfig       ]] = []
+	index_dbs        : Optional[List[IndexDBConfig         ]] = []
+	memory_mgrs      : Optional[List[MemoryManagerConfig   ]] = []
+	session_mgrs     : Optional[List[SessionManagerConfig  ]] = []
+	knowledge_mgrs   : Optional[List[KnowledgeManagerConfig]] = []
+	tools            : Optional[List[ToolConfig            ]] = []
+	agent_options    : Optional[List[AgentOptionsConfig    ]] = []
+	agents           : Optional[List[AgentConfig           ]] = []
+	team_options     : Optional[List[TeamOptionsConfig     ]] = []
+	teams            : Optional[List[TeamConfig            ]] = []
+	workflow_options : Optional[List[WorkflowOptionsConfig ]] = []
+	workflows        : Optional[List[WorkflowConfig        ]] = []
 
 
 def compatible_backends(a: BackendConfig, b: BackendConfig) -> bool:
@@ -288,7 +291,7 @@ def unroll_config(config: AppConfig) -> AppConfig:
 		if not config_copy.prompts          : config_copy.prompts          = []
 		if not config_copy.content_dbs      : config_copy.content_dbs      = []
 		if not config_copy.index_dbs        : config_copy.index_dbs        = []
-		if not config_copy.memorie_mgrs     : config_copy.memorie_mgrs     = []
+		if not config_copy.memory_mgrs      : config_copy.memory_mgrs      = []
 		if not config_copy.session_mgrs     : config_copy.session_mgrs     = []
 		if not config_copy.knowledge_mgrs   : config_copy.knowledge_mgrs   = []
 		if not config_copy.tools            : config_copy.tools            = []
@@ -434,6 +437,11 @@ def unroll_config(config: AppConfig) -> AppConfig:
 			if True:
 				if knowledge_mgr.index_db is not None:
 					if isinstance(knowledge_mgr.index_db, IndexDBConfig):
+						if isinstance(knowledge_mgr.index_db.embedding, EmbeddingConfig):
+							config_copy.embeddings.append(knowledge_mgr.index_db.embedding)
+							knowledge_mgr.index_db.embedding = len(config_copy.embeddings) - 1
+						if not isinstance(knowledge_mgr.index_db.embedding, int) or knowledge_mgr.index_db.embedding < 0 or knowledge_mgr.index_db.embedding >= len(config_copy.index_dbs):
+							raise ValueError("Invalid knowledge manager index db embedding")
 						config_copy.index_dbs.append(knowledge_mgr.index_db)
 						knowledge_mgr.index_db = len(config_copy.index_dbs) - 1
 					if not isinstance(knowledge_mgr.index_db, int) or knowledge_mgr.index_db < 0 or knowledge_mgr.index_db >= len(config_copy.index_dbs):
@@ -582,17 +590,17 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 	extracted.workflow_options = []
 	extracted.workflows        = []
 
-	model_remap                = {None: None}
-	embedding_remap            = {None: None}
-	prompt_remap               = {None: None}
-	content_db_remap           = {None: None}
-	index_db_remap             = {None: None}
-	memory_mgr_remap           = {None: None}
-	session_mgr_remap          = {None: None}
-	knowledge_mgr_remap        = {None: None}
-	tool_remap                 = {None: None}
-	agent_options_remap        = {None: None}
-	agent_remap                = {None: None}
+	model_remap                = dict()
+	embedding_remap            = dict()
+	prompt_remap               = dict()
+	content_db_remap           = dict()
+	index_db_remap             = dict()
+	memory_mgr_remap           = dict()
+	session_mgr_remap          = dict()
+	knowledge_mgr_remap        = dict()
+	tool_remap                 = dict()
+	agent_options_remap        = dict()
+	agent_remap                = dict()
 
 	for i, agent in enumerate(config.agents):
 		if not active_agents[i] or not compatible_backends(config.backends[agent.backend], backend):
@@ -631,12 +639,6 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 				if agent.content_db not in content_db_remap:
 					content_db_remap[agent.content_db] = len(extracted.content_dbs)
 					extracted.content_dbs.append(None)
-
-		if True:
-			if agent.index_db is not None:
-				if agent.index_db not in index_db_remap:
-					index_db_remap[agent.index_db] = len(extracted.index_dbs)
-					extracted.index_dbs.append(None)
 
 		if True:
 			if agent.memory_mgr is not None:
@@ -698,6 +700,11 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 					if True:
 						if knowledge_mgr.index_db is not None:
 							if knowledge_mgr.index_db not in index_db_remap:
+								index_db = config.index_dbs[knowledge_mgr.index_db]
+								if True:
+									if index_db.embedding not in embedding_remap:
+										embedding_remap[index_db.embedding] = len(extracted.embeddings)
+										extracted.embeddings.append(None)
 								index_db_remap[knowledge_mgr.index_db] = len(extracted.index_dbs)
 								extracted.index_dbs.append(None)
 
@@ -723,76 +730,93 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 		dst_item = copy.deepcopy(src_item)
 		extracted.backends = [dst_item]
 
-	for src, dst in model_remap:
+	for src, dst in model_remap.items():
 		src_item = config.models[src]
 		dst_item = copy.deepcopy(src_item)
 		extracted.models[dst] = dst_item
 
-	for src, dst in embedding_remap:
+	for src, dst in embedding_remap.items():
 		src_item = config.embeddings[src]
 		dst_item = copy.deepcopy(src_item)
 		extracted.embeddings[dst] = dst_item
 
-	for src, dst in prompt_remap:
+	for src, dst in prompt_remap.items():
 		src_item = config.prompts[src]
 		dst_item = copy.deepcopy(src_item)
 		dst_item.model     = model_remap     [src_item.model    ]
 		dst_item.embedding = embedding_remap [src_item.embedding]
 		extracted.prompts[dst] = dst_item
 
-	for src, dst in content_db_remap:
+	for src, dst in content_db_remap.items():
 		src_item = config.content_dbs[src]
 		dst_item = copy.deepcopy(src_item)
 		extracted.content_dbs[dst] = dst_item
 
-	for src, dst in index_db_remap:
+	for src, dst in index_db_remap.items():
 		src_item = config.index_dbs[src]
 		dst_item = copy.deepcopy(src_item)
 		extracted.index_dbs[dst] = dst_item
 
-	for src, dst in memory_mgr_remap:
+	for src, dst in memory_mgr_remap.items():
 		src_item = config.memory_mgrs[src]
 		dst_item = copy.deepcopy(src_item)
-		dst_item.prompt = prompt_remap[src_item.prompt]
+		if src_item.prompt is not None:
+			dst_item.prompt = prompt_remap[src_item.prompt]
 		extracted.memory_mgrs[dst] = dst_item
 
-	for src, dst in session_mgr_remap:
+	for src, dst in session_mgr_remap.items():
 		src_item = config.session_mgrs[src]
 		dst_item = copy.deepcopy(src_item)
-		dst_item.prompt = prompt_remap[src_item.prompt]
+		if src_item.prompt is not None:
+			dst_item.prompt = prompt_remap[src_item.prompt]
 		extracted.session_mgrs[dst] = dst_item
 
-	for src, dst in knowledge_mgr_remap:
+	for src, dst in knowledge_mgr_remap.items():
 		src_item = config.knowledge_mgrs[src]
 		dst_item = copy.deepcopy(src_item)
-		dst_item.content_db = content_db_remap [src_item.content_db]
-		dst_item.index_db   = index_db_remap   [src_item.index_db  ]
+		if src_item.content_db is not None:
+			dst_item.content_db = content_db_remap[src_item.content_db]
+		if src_item.index_db is not None:
+			dst_item.index_db = index_db_remap[src_item.index_db]
 		extracted.knowledge_mgrs[dst] = dst_item
 
-	for src, dst in tool_remap:
+	for src, dst in tool_remap.items():
 		src_item = config.tools[src]
 		dst_item = copy.deepcopy(src_item)
 		extracted.tools[dst] = dst_item
 
-	for src, dst in agent_options_remap:
+	for src, dst in agent_options_remap.items():
 		src_item = config.agent_options[src]
 		dst_item = copy.deepcopy(src_item)
 		extracted.agent_options[dst] = dst_item
 
-	for src, dst in agent_remap:
+	model_remap         [None] = None
+	embedding_remap     [None] = None
+	prompt_remap        [None] = None
+	content_db_remap    [None] = None
+	index_db_remap      [None] = None
+	memory_mgr_remap    [None] = None
+	session_mgr_remap   [None] = None
+	knowledge_mgr_remap [None] = None
+	tool_remap          [None] = None
+	agent_options_remap [None] = None
+
+	for src, dst in agent_remap.items():
 		src_item = config.agents[src]
 		dst_item = copy.deepcopy(src_item)
 		dst_item.backend       = 0
-		dst_item.prompt        = prompt_remap[src_item.prompt]
-		dst_item.options       = agent_options_remap[src_item.options]
-		dst_item.content_db    = content_db_remap[src_item.content_db]
-		dst_item.memory_mgr    = memory_mgr_remap[src_item.memory_mgr]
-		dst_item.session_mgr   = session_mgr_remap[src_item.session_mgr]
-		dst_item.knowledge_mgr = knowledge_mgr_remap[src_item.knowledge_mgr]
+		dst_item.prompt        = prompt_remap        [src_item.prompt       ]
+		dst_item.options       = agent_options_remap [src_item.options      ]
+		dst_item.content_db    = content_db_remap    [src_item.content_db   ]
+		dst_item.memory_mgr    = memory_mgr_remap    [src_item.memory_mgr   ]
+		dst_item.session_mgr   = session_mgr_remap   [src_item.session_mgr  ]
+		dst_item.knowledge_mgr = knowledge_mgr_remap [src_item.knowledge_mgr]
 		dst_item.tools         = []
-		for src_tool in src_item.tools:
-			dst_tool = tool_remap[src_tool]
-			dst_item.tools.append(dst_tool)
+		if src_item.tools is not None:
+			for src_tool in src_item.tools:
+				dst_tool = tool_remap[src_tool]
+				dst_item.tools.append(dst_tool)
+		extracted.agents[dst] = dst_item
 
 	return extracted
 
@@ -814,7 +838,7 @@ _backends: Dict[Tuple[str, str], Callable] = dict()
 def register_backend(backend: BackendConfig, ctor: Callable) -> bool:
 	global _backends
 	key = (backend.type, backend.version)
-	_backends[key] = ctor
+	_backends[key] = (copy.deepcopy(backend), ctor)
 	return True
 
 
