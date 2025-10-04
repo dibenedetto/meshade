@@ -272,19 +272,18 @@ class _AgnoAgentApp(AgentApp):
 
 		config_impl = copy.deepcopy(self.config)
 
-		config_impl.models          = [self._build_model             (self.config, config_impl, i) for i in range(len(self.config.models         ))]
-		config_impl.embeddings      = [self._build_embedding         (self.config, config_impl, i) for i in range(len(self.config.embeddings     ))]
-		config_impl.content_dbs     = [self._build_content_db        (self.config, config_impl, i) for i in range(len(self.config.content_dbs    ))]
-		config_impl.index_dbs       = [self._build_index_db          (self.config, config_impl, i) for i in range(len(self.config.index_dbs      ))]
-		config_impl.tools           = [self._build_tool              (self.config, config_impl, i) for i in range(len(self.config.tools          ))]
+		config_impl.models         = [self._build_model             (self.config, config_impl, i) for i in range(len(self.config.models        ))]
+		config_impl.embeddings     = [self._build_embedding         (self.config, config_impl, i) for i in range(len(self.config.embeddings    ))]
+		config_impl.content_dbs    = [self._build_content_db        (self.config, config_impl, i) for i in range(len(self.config.content_dbs   ))]
+		config_impl.index_dbs      = [self._build_index_db          (self.config, config_impl, i) for i in range(len(self.config.index_dbs     ))]
+		config_impl.tools          = [self._build_tool              (self.config, config_impl, i) for i in range(len(self.config.tools         ))]
 
-		config_impl.prompts         = [self._build_prompt            (self.config, config_impl, i) for i in range(len(self.config.prompts        ))]
-		config_impl.memory_mgrs     = [self._build_memory_manager    (self.config, config_impl, i) for i in range(len(self.config.memory_mgrs    ))]
-		config_impl.session_mgrs    = [self._build_session_manager   (self.config, config_impl, i) for i in range(len(self.config.session_mgrs   ))]
-		config_impl.knowledge_bases = [self._build_knowledge_base    (self.config, config_impl, i) for i in range(len(self.config.knowledge_bases))]
-		config_impl.knowledge_mgrs  = [self._build_knowledge_manager (self.config, config_impl, i) for i in range(len(self.config.knowledge_mgrs ))]
+		config_impl.prompts        = [self._build_prompt            (self.config, config_impl, i) for i in range(len(self.config.prompts       ))]
+		config_impl.memory_mgrs    = [self._build_memory_manager    (self.config, config_impl, i) for i in range(len(self.config.memory_mgrs   ))]
+		config_impl.session_mgrs   = [self._build_session_manager   (self.config, config_impl, i) for i in range(len(self.config.session_mgrs  ))]
+		config_impl.knowledge_mgrs = [self._build_knowledge_manager (self.config, config_impl, i) for i in range(len(self.config.knowledge_mgrs))]
 
-		config_impl.agents          = [self._build_agent             (self.config, config_impl, i) for i in range(len(self.config.agents         ))]
+		config_impl.agents         = [self._build_agent             (self.config, config_impl, i) for i in range(len(self.config.agents        ))]
 
 		self.config_impl = config_impl
 
