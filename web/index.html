@@ -271,7 +271,7 @@
 
 		<script type="text/javascript" src="dist/agui-client.bundle.js"></script>
 		<script type="text/javascript" src="numel.js"></script>
-		<script type="text/javascript" src="graph.js"></script>
+		<script type="text/javascript" src="updated_graph_js.js"></script>
 
 		<script>
 			const baseConfig = {
@@ -669,6 +669,19 @@
 				return status;
 			}
 
+			function multiplyMatrix4x4(a, b) {
+				// a and b are 4x4 matrices represented as arrays of length 16 (row-major)
+				const result = new Array(16).fill(0);
+				for (let row = 0; row < 4; ++row) {
+					for (let col = 0; col < 4; ++col) {
+						for (let k = 0; k < 4; ++k) {
+							result[row * 4 + col] += a[row * 4 + k] * b[k * 4 + col];
+						}
+					}
+				}
+				return result;
+			}
+
 			function resizeCanvas() {
 				const canvasEl = document.getElementById('numelCanvas');
 				const wrapper = canvasEl.parentElement;
@@ -797,21 +810,16 @@
 				checkAGUILoaded();
 			});
 
+			let currentLayout = 0;
+
 			// Add keyboard shortcuts for layout
 			document.addEventListener("keydown", (e) => {
 				if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
+					const layouts = ['hierarchical', 'force', 'circular', 'grid'];
 					switch(e.key) {
-						case "h":  // Hierarchical
-							graph.layoutGraph("hierarchical");
-							break;
-						case "f":  // Force-directed
-							graph.layoutGraph("force");
-							break;
-						case "c":  // Circular
-							graph.layoutGraph("circular");
-							break;
-						case "g":  // Grid
-							graph.layoutGraph("grid");
+						case "z":
+							currentLayout = (currentLayout + 1) % layouts.length;
+							graph.layoutGraph(layouts[currentLayout]);
 							break;
 						case "a":  // Spacebar - center view
 							e.preventDefault();

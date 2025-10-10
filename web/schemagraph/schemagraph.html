@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SchemaGraph - Complete</title>
+  <link rel="stylesheet" href="schemagraph.css">
+</head>
+<body>
+  <div class="header">
+    <div class="header-top">
+      <h1>SchemaGraph - LiteGraph Clone with Pydantic Support</h1>
+      <div class="header-actions">
+        <button id="uploadSchemaBtn" class="action-btn action-btn-primary" title="Upload Pydantic schema">📤 Upload Schema</button>
+        <button id="exportBtn" class="action-btn" title="Export graph">Export Graph</button>
+        <button id="importBtn" class="action-btn" title="Import graph">Import Graph</button>
+        <button id="exportConfigBtn" class="action-btn" title="Export as config JSON">Export Config</button>
+        <button id="importConfigBtn" class="action-btn" title="Import config JSON">Import Config</button>
+        <input type="file" id="uploadSchemaFile" accept=".py" style="display: none;" />
+        <input type="file" id="importFile" accept=".json" style="display: none;" />
+        <input type="file" id="importConfigFile" accept=".json" style="display: none;" />
+        <button id="centerViewBtn" class="action-btn" title="Center view on graph">🎯 Center</button>
+        <select id="layoutSelect" class="layout-select" title="Apply layout algorithm">
+          <option value="">🔧 Layout...</option>
+          <option value="hierarchical-vertical">Hierarchical (Vertical)</option>
+          <option value="hierarchical-horizontal">Hierarchical (Horizontal)</option>
+          <option value="force-directed">Force-Directed</option>
+          <option value="grid">Grid</option>
+          <option value="circular">Circular</option>
+        </select>
+        <button id="themeBtn" class="theme-btn" title="Switch theme">🎨</button>
+      </div>
+    </div>
+    <div class="status">Status: <span class="status-value" id="status">Loading...</span></div>
+    <div class="error-banner" id="errorBanner"></div>
+    <div class="node-types" id="nodeTypes"><strong>Registered Node Types:</strong> <span id="nodeTypesList">None</span></div>
+    <div class="schema-manager">
+      <div class="schema-manager-title">📋 Registered Schemas:</div>
+      <div id="schemaList"></div>
+    </div>
+  </div>
+  
+  <!-- Schema Registration Dialog -->
+  <div id="schemaDialog" class="dialog-overlay">
+    <div class="dialog">
+      <div class="dialog-header">Register Pydantic Schema</div>
+      <div class="dialog-body">
+        <div class="dialog-field">
+          <label for="schemaNameInput">Schema Name:</label>
+          <input type="text" id="schemaNameInput" placeholder="e.g., MySchema" />
+        </div>
+        <div class="dialog-field">
+          <label for="schemaIndexTypeInput">Index Type:</label>
+          <input type="text" id="schemaIndexTypeInput" placeholder="e.g., Index, int" />
+          <small>The type used for index references (default: int)</small>
+        </div>
+        <div class="dialog-field">
+          <label for="schemaRootTypeInput">Root Type:</label>
+          <input type="text" id="schemaRootTypeInput" placeholder="e.g., AppConfig" />
+          <small>The main config class that contains lists of other models</small>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="schemaDialogCancel" class="dialog-btn dialog-btn-cancel">Cancel</button>
+        <button id="schemaDialogConfirm" class="dialog-btn dialog-btn-confirm">Register</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Schema Removal Dialog -->
+  <div id="schemaRemovalDialog" class="dialog-overlay">
+    <div class="dialog">
+      <div class="dialog-header">⚠️ Remove Schema</div>
+      <div class="dialog-body">
+        <div class="dialog-field">
+          <label for="schemaRemovalNameInput">Schema to Remove:</label>
+          <select id="schemaRemovalNameInput" class="dialog-select"></select>
+          <small style="color: var(--accent-red); margin-top: 8px;">Warning: This will permanently delete all nodes of this schema type from the graph!</small>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="schemaRemovalCancel" class="dialog-btn dialog-btn-cancel">Cancel</button>
+        <button id="schemaRemovalConfirm" class="dialog-btn dialog-btn-confirm" style="background: var(--accent-red);">Remove Schema</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-container">
+    <canvas id="canvas"></canvas>
+    <div id="contextMenu" class="context-menu"></div>
+    <input type="text" id="nodeInput" class="node-input-overlay" />
+    <div class="zoom-indicator">
+      Zoom: <span class="zoom-value" id="zoomLevel">100%</span>
+      <button id="resetZoomBtn" class="zoom-reset-btn" title="Reset zoom to 100%">⟲</button>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>How to Use:</strong>
+    <ul>
+      <li><strong>Upload schema:</strong> Click "Upload Schema" button to upload a Pydantic .py file</li>
+      <li><strong>Create nodes:</strong> Right-click on canvas (all registered schemas appear in menu)</li>
+      <li><strong>Delete node:</strong> Select a node and press Delete/Backspace, or right-click on node and choose "Delete Node"</li>
+      <li><strong>Remove schema:</strong> Click "Remove" button in schema manager (removes all nodes of that schema)</li>
+      <li><strong>Edit values:</strong> Double-click value boxes on schema nodes or native node value boxes</li>
+      <li><strong>Pan:</strong> Middle-click and drag, or Space+drag</li>
+      <li><strong>Zoom:</strong> Mouse wheel</li>
+      <li><strong>Connect:</strong> Drag from output (purple) to input (blue)</li>
+      <li><strong>Remove link:</strong> Click connected input slot</li>
+      <li><strong>Center View:</strong> Click "🎯 Center" button to center and fit all nodes in view</li>
+      <li><strong>Reset Zoom:</strong> Click "⟲" button next to zoom indicator to reset to 100%</li>
+      <li><strong>Apply Layout:</strong> Select a layout algorithm from the dropdown to organize nodes (Hierarchical, Force-Directed, Grid, or Circular)</li>
+      <li><strong>Export Graph:</strong> Click "Export Graph" button or press Ctrl/Cmd+S (saves node positions and connections)</li>
+      <li><strong>Import Graph:</strong> Click "Import Graph" button or press Ctrl/Cmd+O (restores saved graph)</li>
+      <li><strong>Export Config:</strong> Click "Export Config" button to convert graph to JSON configuration</li>
+      <li><strong>Import Config:</strong> Click "Import Config" button to load JSON configuration as graph</li>
+    </ul>
+    <strong>Schema Registration:</strong>
+    <p style="margin: 10px 0; color: var(--text-secondary); font-size: 12px;">
+      Upload a Pydantic schema file (.py) and specify the schema name, index type (e.g., 'Index' or 'int'), and root type (the main config class like 'AppConfig' that contains lists of other models). The system will parse the schema and generate node types automatically.
+    </p>
+  </div>
+
+  <script src="schemagraph.js"></script>
+</body>
+</html>

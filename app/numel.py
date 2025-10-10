@@ -15,7 +15,7 @@ DEFAULT_APP_PORT                                  : int  = 8000
 DEFAULT_APP_API_KEY                               : str  = None
 
 DEFAULT_APP_OPTIONS_RELOAD                        : bool = True
-DEFAULT_APP_OPTIONS_SEED                          : int  = 42
+DEFAULT_APP_OPTIONS_SEED                          : int  = None
 
 DEFAULT_BACKEND_TYPE                              : str  = "agno"
 DEFAULT_BACKEND_VERSION                           : str  = ""
@@ -63,44 +63,8 @@ DEFAULT_AGENT_OPTIONS_SESSION_HISTORY_SIZE        : int  = 10
 DEFAULT_AGENT_OPTIONS_SUMMARIZE_SESSIONS          : bool = False
 DEFAULT_AGENT_OPTIONS_USE_KNOWLEDGE               : bool = False
 
-# DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY             : bool = True
-# DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES           : bool = True
-# DEFAULT_OPTIONS_NUM_HISTORY_RUNS                  : int  = 3
-# DEFAULT_OPTIONS_ENABLE_SESSION_SUMMARIES          : bool = True
-# DEFAULT_OPTIONS_SEARCH_PREVIOUS_SESSIONS_HISTORY  : bool = True
-# DEFAULT_OPTIONS_NUM_HISTORY_SESSIONS              : int  = 2
-# DEFAULT_OPTIONS_SHOW_TOOL_CALLS                   : bool = True
-# DEFAULT_OPTIONS_TOOL_CALL_LIMIT                   : int  = 5
-# DEFAULT_OPTIONS_REASONING                         : bool = True
-# DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS         : bool = True
-# DEFAULT_OPTIONS_MAX_WEB_SEARCH_RESULTS            : int  = 5
 
-# BACKEND_TYPES             = ["agno"]
-# MODEL_TYPES               = ["ollama", "openai"]
-# EMBEDDING_TYPES           = ["ollama", "openai"]
-# CONTENT_DB_ENGINES        = ["sqlite"]
-# KNOWLEDGE_DB_ENGINES      = ["lancedb"]
-# KNOWLEDGE_DB_SEARCH_TYPES = ["hybrid"]
-
-
-# class Capabilities(BaseModel):
-# 	name          : Optional[str]                       = None
-# 	description   : Optional[str]                       = None
-# 	reference     : Optional[str]                       = None
-
-# 	type          : str
-# 	version       : str
-
-# 	models        : Optional[List[ModelConfig]]         = None
-# 	embeddings    : Optional[List[EmbeddingConfig]]     = None
-# 	knowledge_dbs : Optional[List[KnowledgeDBConfig]]   = None
-# 	knowledges    : Optional[List[KnowledgeConfig]]     = None
-# 	memory_dbs    : Optional[List[MemoryDBConfig]]      = None
-# 	memories      : Optional[List[MemoryConfig]]        = None
-# 	storage_dbs   : Optional[List[StorageDBConfig]]     = None
-# 	storages      : Optional[List[StorageConfig]]       = None
-# 	options       : Optional[List[OptionsConfig]]       = None
-# 	data          : Optional[Any]                       = None
+Index = int
 
 
 class ConfigModel(BaseModel):
@@ -134,11 +98,11 @@ class EmbeddingConfig(ConfigModel):
 
 
 class PromptConfig(ConfigModel):
-	model        : Optional[Union[ModelConfig    , int]] = None  # model to use for agentic knowledge processing
-	embedding    : Optional[Union[EmbeddingConfig, int]] = None  # embedding to use for agentic knowledge processing
-	description  : Optional[str]                         = None
-	instructions : Optional[List[str]]                   = None
-	override     : Optional[str]                         = None  # override prompt template
+	model        : Optional[Union[ModelConfig    , Index]] = None  # model to use for agentic knowledge processing
+	embedding    : Optional[Union[EmbeddingConfig, Index]] = None  # embedding to use for agentic knowledge processing
+	description  : Optional[str]                           = None
+	instructions : Optional[List[str]]                     = None
+	override     : Optional[str]                           = None  # override prompt template
 
 
 class ContentDBConfig(ConfigModel):
@@ -152,34 +116,34 @@ class ContentDBConfig(ConfigModel):
 
 class IndexDBConfig(ConfigModel):
 	engine      : str  = DEFAULT_INDEX_DB_ENGINE       # db engine name (eg. sqlite)
-	embedding   : Union[EmbeddingConfig, int]
+	embedding   : Union[EmbeddingConfig, Index]
 	url         : str  = DEFAULT_INDEX_DB_URL          # db url (eg. sqlite file path)
 	search_type : str  = DEFAULT_INDEX_DB_SEARCH_TYPE  # search type (eg. hybrid)
 	fallback    : bool = DEFAULT_INDEX_DB_FALLBACK     # engine fallback
 
 
 class MemoryManagerConfig(ConfigModel):
-	query   : bool                               = DEFAULT_MEMORY_MANAGER_QUERY
-	update  : bool                               = DEFAULT_MEMORY_MANAGER_UPDATE
-	managed : bool                               = DEFAULT_MEMORY_MANAGER_MANAGED
-	prompt  : Optional[Union[PromptConfig, int]] = None  # prompt for memory processing
+	query   : bool                                 = DEFAULT_MEMORY_MANAGER_QUERY
+	update  : bool                                 = DEFAULT_MEMORY_MANAGER_UPDATE
+	managed : bool                                 = DEFAULT_MEMORY_MANAGER_MANAGED
+	prompt  : Optional[Union[PromptConfig, Index]] = None  # prompt for memory processing
 
 
 class SessionManagerConfig(ConfigModel):
-	query        : bool                               = DEFAULT_SESSION_MANAGER_QUERY
-	update       : bool                               = DEFAULT_SESSION_MANAGER_UPDATE
-	summarize    : bool                               = DEFAULT_SESSION_MANAGER_SUMMARIZE
-	history_size : int                                = DEFAULT_SESSION_MANAGER_HISTORY_SIZE
-	prompt       : Optional[Union[PromptConfig, int]] = None  # prompt for session summarization
+	query        : bool                                 = DEFAULT_SESSION_MANAGER_QUERY
+	update       : bool                                 = DEFAULT_SESSION_MANAGER_UPDATE
+	summarize    : bool                                 = DEFAULT_SESSION_MANAGER_SUMMARIZE
+	history_size : int                                  = DEFAULT_SESSION_MANAGER_HISTORY_SIZE
+	prompt       : Optional[Union[PromptConfig, Index]] = None  # prompt for session summarization
 
 
 class KnowledgeManagerConfig(ConfigModel):
-	query       : bool                                    = DEFAULT_KNOWLEDGE_MANAGER_QUERY
-	description : Optional [str                         ] = None
-	content_db  : Optional [Union [ContentDBConfig, int]] = None  # where to store knowledge content
-	index_db    : Union    [IndexDBConfig, int          ] = None  # where to store knowledge index
-	max_results : int                                     = DEFAULT_KNOWLEDGE_MANAGER_MAX_RESULTS
-	urls        : Optional [List  [str                 ]] = None  # urls to fetch knowledge from
+	query       : bool                                      = DEFAULT_KNOWLEDGE_MANAGER_QUERY
+	description : Optional [str                           ] = None
+	content_db  : Optional [Union [ContentDBConfig, Index]] = None  # where to store knowledge content
+	index_db    : Union    [IndexDBConfig, Index          ] = None  # where to store knowledge index
+	max_results : int                                       = DEFAULT_KNOWLEDGE_MANAGER_MAX_RESULTS
+	urls        : Optional [List  [str                   ]] = None  # urls to fetch knowledge from
 
 
 class ToolConfig(ConfigModel):
@@ -190,36 +154,20 @@ class ToolConfig(ConfigModel):
 
 
 class AgentOptionsConfig(ConfigModel):
-	markdown                  : bool = DEFAULT_AGENT_OPTIONS_MARKDOWN
-
-	# show_tool_calls           : bool = DEFAULT_AGENT_OPTIONS_SHOW_TOOL_CALLS
-	# tool_call_limit           : int  = DEFAULT_AGENT_OPTIONS_TOOL_CALL_LIMIT
-	# reasoning                 : bool = DEFAULT_AGENT_OPTIONS_REASONING
-	# stream_intermediate_steps : bool = DEFAULT_AGENT_OPTIONS_STREAM_INTERMEDIATE_STEPS
-	# search_knowledge                 : bool = DEFAULT_OPTIONS_SEARCH_KNOWLEDGE
-	# enable_agentic_memory            : bool = DEFAULT_OPTIONS_ENABLE_AGENTIC_MEMORY
-	# add_history_to_messages          : bool = DEFAULT_OPTIONS_ADD_HISTORY_TO_MESSAGES
-	# num_history_runs                 : int  = DEFAULT_OPTIONS_NUM_HISTORY_RUNS
-	# enable_session_summaries         : bool = DEFAULT_OPTIONS_ENABLE_SESSION_SUMMARIES
-	# search_previous_sessions_history : bool = DEFAULT_OPTIONS_SEARCH_PREVIOUS_SESSIONS_HISTORY
-	# num_history_sessions             : int  = DEFAULT_OPTIONS_NUM_HISTORY_SESSIONS
-	# show_tool_calls                  : bool = DEFAULT_OPTIONS_SHOW_TOOL_CALLS
-	# tool_call_limit                  : int  = DEFAULT_OPTIONS_TOOL_CALL_LIMIT
-	# reasoning                        : bool = DEFAULT_OPTIONS_REASONING
-	# stream_intermediate_steps        : bool = DEFAULT_OPTIONS_STREAM_INTERMEDIATE_STEPS
+	markdown : bool = DEFAULT_AGENT_OPTIONS_MARKDOWN
 
 
 class AgentConfig(ConfigModel):
-	info          : Optional [InfoConfig                          ] = InfoConfig()
-	options       : Optional [Union [AgentOptionsConfig    , int ]] = AgentOptionsConfig()
-	backend       : Union    [BackendConfig, int                  ]
-	prompt        : Union    [PromptConfig , int                  ]
-	content_db    : Optional [Union [ContentDBConfig       , int ]] = None
-	memory_mgr    : Optional [Union [MemoryManagerConfig   , int ]] = None
-	session_mgr   : Optional [Union [SessionManagerConfig  , int ]] = None
-	knowledge_mgr : Optional [Union [KnowledgeManagerConfig, int ]] = None
-	tools         : Optional [List  [Union[ToolConfig      , int]]] = []
-	port          : int                                             = 0
+	info          : Optional [InfoConfig                            ] = InfoConfig()
+	options       : Optional [Union [AgentOptionsConfig    , Index ]] = AgentOptionsConfig()
+	backend       : Union    [BackendConfig, Index                  ]
+	prompt        : Union    [PromptConfig , Index                  ]
+	content_db    : Optional [Union [ContentDBConfig       , Index ]] = None
+	memory_mgr    : Optional [Union [MemoryManagerConfig   , Index ]] = None
+	session_mgr   : Optional [Union [SessionManagerConfig  , Index ]] = None
+	knowledge_mgr : Optional [Union [KnowledgeManagerConfig, Index ]] = None
+	tools         : Optional [List  [Union[ToolConfig      , Index]]] = []
+	port          : int                                               = 0
 
 
 class TeamOptionsConfig(ConfigModel):
@@ -227,9 +175,9 @@ class TeamOptionsConfig(ConfigModel):
 
 
 class TeamConfig(ConfigModel):
-	info    : Optional[InfoConfig]                    = InfoConfig()
-	options : Optional[Union[TeamOptionsConfig, int]] = TeamOptionsConfig()
-	agents  : List[Union[AgentConfig, int]]           = []
+	info    : Optional[InfoConfig]                      = InfoConfig()
+	options : Optional[Union[TeamOptionsConfig, Index]] = TeamOptionsConfig()
+	agents  : List[Union[AgentConfig, Index]]           = []
 
 
 class WorkflowOptionsConfig(ConfigModel):
@@ -237,37 +185,39 @@ class WorkflowOptionsConfig(ConfigModel):
 
 
 class WorkflowConfig(ConfigModel):
-	info    : Optional[InfoConfig]                        = InfoConfig()
-	options : Optional[Union[WorkflowOptionsConfig, int]] = WorkflowOptionsConfig()
-	agents  : List[Union[AgentConfig, int]]               = []
-	teams   : List[Union[TeamConfig, int]]                = []
+	info    : Optional[InfoConfig]                          = InfoConfig()
+	options : Optional[Union[WorkflowOptionsConfig, Index]] = WorkflowOptionsConfig()
+	agents  : List[Union[AgentConfig, Index]]               = []
+	teams   : List[Union[TeamConfig, Index]]                = []
 
 
 class AppOptionsConfig(ConfigModel):
-	seed   : Optional[int] = None
+	seed   : Optional[int] = DEFAULT_APP_OPTIONS_SEED
 	reload : bool          = DEFAULT_APP_OPTIONS_RELOAD
 
 
 class AppConfig(ConfigModel):
-	info             : Optional[InfoConfig                  ] = InfoConfig()
-	options          : Optional[AppOptionsConfig            ] = AppOptionsConfig()
-	backends         : Optional[List[BackendConfig         ]] = []
-	models           : Optional[List[ModelConfig           ]] = []
-	embeddings       : Optional[List[EmbeddingConfig       ]] = []
-	prompts          : Optional[List[PromptConfig          ]] = []
-	content_dbs      : Optional[List[ContentDBConfig       ]] = []
-	index_dbs        : Optional[List[IndexDBConfig         ]] = []
-	memory_mgrs      : Optional[List[MemoryManagerConfig   ]] = []
-	session_mgrs     : Optional[List[SessionManagerConfig  ]] = []
-	knowledge_mgrs   : Optional[List[KnowledgeManagerConfig]] = []
-	tools            : Optional[List[ToolConfig            ]] = []
-	agent_options    : Optional[List[AgentOptionsConfig    ]] = []
-	agents           : Optional[List[AgentConfig           ]] = []
-	team_options     : Optional[List[TeamOptionsConfig     ]] = []
-	teams            : Optional[List[TeamConfig            ]] = []
-	workflow_options : Optional[List[WorkflowOptionsConfig ]] = []
-	workflows        : Optional[List[WorkflowConfig        ]] = []
-	port             : int                                    = DEFAULT_APP_PORT
+	info             : Optional[Union[InfoConfig      , Index]] = InfoConfig()
+	options          : Optional[Union[AppOptionsConfig, Index]] = AppOptionsConfig()
+	infos            : Optional[List[InfoConfig              ]] = []
+	app_options      : Optional[List[AppOptionsConfig        ]] = []
+	backends         : Optional[List[BackendConfig           ]] = []
+	models           : Optional[List[ModelConfig             ]] = []
+	embeddings       : Optional[List[EmbeddingConfig         ]] = []
+	prompts          : Optional[List[PromptConfig            ]] = []
+	content_dbs      : Optional[List[ContentDBConfig         ]] = []
+	index_dbs        : Optional[List[IndexDBConfig           ]] = []
+	memory_mgrs      : Optional[List[MemoryManagerConfig     ]] = []
+	session_mgrs     : Optional[List[SessionManagerConfig    ]] = []
+	knowledge_mgrs   : Optional[List[KnowledgeManagerConfig  ]] = []
+	tools            : Optional[List[ToolConfig              ]] = []
+	agent_options    : Optional[List[AgentOptionsConfig      ]] = []
+	agents           : Optional[List[AgentConfig             ]] = []
+	team_options     : Optional[List[TeamOptionsConfig       ]] = []
+	teams            : Optional[List[TeamConfig              ]] = []
+	workflow_options : Optional[List[WorkflowOptionsConfig   ]] = []
+	workflows        : Optional[List[WorkflowConfig          ]] = []
+	port             : int                                      = DEFAULT_APP_PORT
 
 
 def compatible_backends(a: BackendConfig, b: BackendConfig) -> bool:
@@ -286,6 +236,8 @@ def unroll_config(config: AppConfig) -> AppConfig:
 	if True:
 		if not config_copy.info             : config_copy.info             = InfoConfig()
 		if not config_copy.options          : config_copy.options          = AppOptionsConfig()
+		if not config_copy.infos            : config_copy.infos            = []
+		if not config_copy.app_options      : config_copy.app_options      = []
 		if not config_copy.backends         : config_copy.backends         = []
 		if not config_copy.models           : config_copy.models           = []
 		if not config_copy.embeddings       : config_copy.embeddings       = []
@@ -304,7 +256,28 @@ def unroll_config(config: AppConfig) -> AppConfig:
 		if not config_copy.workflows        : config_copy.workflows        = []
 
 	if True:
+		if isinstance(config_copy.info, InfoConfig):
+			config_copy.infos.append(config_copy.info)
+			config_copy.info = len(config_copy.infos) - 1
+		if not isinstance(config_copy.info, int) or config_copy.info < 0 or config_copy.info >= len(config_copy.infos):
+			raise ValueError("Invalid config info")
+
+	if True:
+		if isinstance(config_copy.options, AppOptionsConfig):
+			config_copy.app_options.append(config_copy.options)
+			config_copy.options = len(config_copy.app_options) - 1
+		if not isinstance(config_copy.options, int) or config_copy.options < 0 or config_copy.options >= len(config_copy.app_options):
+			raise ValueError("Invalid config options")
+
+	if True:
 		for agent in config_copy.agents:
+			if True:
+				if isinstance(agent.info, InfoConfig):
+					config_copy.infos.append(agent.info)
+					agent.info = len(config_copy.infos) - 1
+				if not isinstance(agent.info, int) or agent.info < 0 or agent.info >= len(config_copy.infos):
+					raise ValueError("Invalid agent info")
+
 			if True:
 				if isinstance(agent.options, AgentOptionsConfig):
 					config_copy.agent_options.append(agent.options)
@@ -480,6 +453,24 @@ def validate_config(config: AppConfig) -> bool:
 		pass
 
 	if True:
+		# TODO: check options
+		pass
+
+	if True:
+		# TODO: check port
+		pass
+
+	if True:
+		for info in config.infos:
+			# TODO: check info
+			pass
+
+	if True:
+		for app_options in config.app_options:
+			# TODO: check app_options
+			pass
+
+	if True:
 		for backend in config.backends:
 			# TODO: check backend
 			pass
@@ -574,6 +565,8 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 
 	extracted = AppConfig()
 
+	extracted.infos            = []
+	extracted.app_options      = []
 	extracted.backends         = []
 	extracted.models           = []
 	extracted.embeddings       = []
@@ -591,6 +584,8 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 	extracted.workflow_options = []
 	extracted.workflows        = []
 
+	info_remap                 = dict()
+	app_options_remap          = dict()
 	model_remap                = dict()
 	embedding_remap            = dict()
 	prompt_remap               = dict()
@@ -603,6 +598,18 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 	agent_options_remap        = dict()
 	agent_remap                = dict()
 
+	if True:
+		if config.info is not None:
+			if config.info not in info_remap:
+				info_remap[config.info] = len(extracted.infos)
+				extracted.infos.append(None)
+
+	if True:
+		if config.options is not None:
+			if config.options not in app_options_remap:
+				app_options_remap[config.options] = len(extracted.app_options)
+				extracted.app_options.append(None)
+
 	for i, agent in enumerate(config.agents):
 		if not active_agents[i] or not compatible_backends(config.backends[agent.backend], backend):
 			continue
@@ -611,6 +618,12 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 
 		agent_remap[i] = len(extracted.agents)
 		extracted.agents.append(None)
+
+		if True:
+			if agent.info is not None:
+				if agent.info not in info_remap:
+					info_remap[agent.info] = len(extracted.infos)
+					extracted.infos.append(None)
 
 		if True:
 			if agent.prompt is not None:
@@ -717,19 +730,19 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 						extracted.tools.append(None)
 
 	if True:
-		src_item = config.info
-		dst_item = copy.deepcopy(src_item)
-		extracted.info = dst_item
-
-	if True:
-		src_item = config.options
-		dst_item = copy.deepcopy(src_item)
-		extracted.options = dst_item
-
-	if True:
 		src_item = backend
 		dst_item = copy.deepcopy(src_item)
 		extracted.backends = [dst_item]
+
+	for src, dst in info_remap.items():
+		src_item = config.infos[src]
+		dst_item = copy.deepcopy(src_item)
+		extracted.infos[dst] = dst_item
+
+	for src, dst in app_options_remap.items():
+		src_item = config.app_options[src]
+		dst_item = copy.deepcopy(src_item)
+		extracted.app_options[dst] = dst_item
 
 	for src, dst in model_remap.items():
 		src_item = config.models[src]
@@ -791,6 +804,8 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 		dst_item = copy.deepcopy(src_item)
 		extracted.agent_options[dst] = dst_item
 
+	info_remap          [None] = None
+	app_options_remap   [None] = None
 	model_remap         [None] = None
 	embedding_remap     [None] = None
 	prompt_remap        [None] = None
@@ -802,10 +817,20 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 	tool_remap          [None] = None
 	agent_options_remap [None] = None
 
+	if True:
+		extracted.info = info_remap[config.info]
+
+	if True:
+		extracted.options = app_options_remap[config.options]
+
+	if True:
+		extracted.port = config.port
+
 	for src, dst in agent_remap.items():
 		src_item = config.agents[src]
 		dst_item = copy.deepcopy(src_item)
 		dst_item.backend       = 0
+		dst_item.info          = info_remap          [src_item.info         ]
 		dst_item.prompt        = prompt_remap        [src_item.prompt       ]
 		dst_item.options       = agent_options_remap [src_item.options      ]
 		dst_item.content_db    = content_db_remap    [src_item.content_db   ]
