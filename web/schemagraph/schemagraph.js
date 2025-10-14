@@ -164,7 +164,7 @@ class LGraph {
 class SchemaGraph extends LGraph {
   constructor() {
     super();
-    this.schemas = {};
+    this.schemas   = {};
     this.nodeTypes = {};
   }
 
@@ -957,7 +957,8 @@ class SchemaGraphApp {
     this.setupEventListeners();
     this.resizeCanvas();
     this.updateSchemaList();
-    this.loadExampleSchema();
+    // this.loadExampleSchema();
+    this.setReady();
     this.draw();
     
     console.log('=== SCHEMAGRAPH READY ===');
@@ -1871,13 +1872,13 @@ class SchemaGraphApp {
     this.ctx.shadowOffsetY = 0;
     this.ctx.stroke();
     
-    if (node.isRootType) {
-      this.ctx.strokeStyle = colors.accentYellow || '#ffd700';
-      this.ctx.lineWidth = 3 / this.camera.scale;
-      this.ctx.setLineDash([10 / this.camera.scale, 5 / this.camera.scale]);
-      this.ctx.stroke();
-      this.ctx.setLineDash([]);
-    }
+    // if (node.isRootType) {
+    //   this.ctx.strokeStyle = colors.accentYellow || '#ffd700';
+    //   this.ctx.lineWidth = 3 / this.camera.scale;
+    //   this.ctx.setLineDash([10 / this.camera.scale, 5 / this.camera.scale]);
+    //   this.ctx.stroke();
+    //   this.ctx.setLineDash([]);
+    // }
     
     const headerColor = node.isNative ? colors.accentPurple : (node.isRootType ? colors.accentOrange : colors.nodeHeader);
     this.ctx.fillStyle = headerColor;
@@ -3652,6 +3653,65 @@ class SchemaGraphApp {
     }, 2000);
   }
 
+  setReady() {
+    this.statusEl.textContent = 'Ready. Upload a schema to begin.';
+  }
+
+//   findRootNodeFromSchemaName(schemaName) {
+//     if (!schemaName) {
+//       const keys = Object.keys(this.graph.schemas);
+//       if (keys && keys.length > 0) {
+//         schemaName = keys[0];
+//       }
+//     }
+
+//     if (!schemaName || !(schemaName in this.graph.schemas)) {
+//       return null;
+//     }
+
+//     const schemaInfo   = this.graph.schemas[schemaName];
+//     let   rootTypeNode = null;
+//     if (schemaInfo.rootType) {
+//       for (const node of this.graph.nodes) {
+//         if (node.schemaName === schemaName && node.modelName === schemaInfo.rootType) {
+//           rootTypeNode = node;
+//           break;
+//         }
+//       }
+//       return rootTypeNode;
+//     }
+
+//     return null;
+//   }
+
+//   unlinkReferenceListsFromRoot(schemaName) {
+//     const rootNode = this.findRootNodeFromSchemaName(schemaName);
+//     if (!rootNode || !rootNode.multiInputs) {
+//       return;
+//     }
+
+// 	const links = [];
+// 	for (let multiInput of rootNode.multiInputs) {
+// 		links.push(...multiInput.links);
+// 	}
+
+// 	for (let link of links) {
+//   removeLink(linkId, targetNode, targetSlot) {
+//     const link = this.graph.links[linkId];
+//     if (link) {
+//       const originNode = this.graph.getNodeById(link.origin_id);
+//       if (originNode) {
+//         const idx = originNode.outputs[link.origin_slot].links.indexOf(linkId);
+//         if (idx > -1) originNode.outputs[link.origin_slot].links.splice(idx, 1);
+//       }
+//       delete this.graph.links[linkId];
+//       targetNode.inputs[targetSlot].link = null;
+//       this.draw();
+//     }
+//   }
+// 	}
+//   }
+
   loadExampleSchema() {
     const exampleSchema = `from pydantic import BaseModel
 from typing import Any, Dict, List, Optional, Union
@@ -3675,19 +3735,20 @@ class AppConfig(BaseModel):
       this.updateSchemaList();
       this.draw();
     } else {
-      this.statusEl.textContent = 'Ready. Upload a schema to begin.';
+      this.setReady();
     }
   }
 }
 
+let gApp = null;
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    const app = new SchemaGraphApp();
-    window.graph = app.graph;
-    window.app = app;
+    gApp = new SchemaGraphApp();
+    window.graph = gApp.graph;
+    window.app = gApp;
   });
 } else {
-  const app = new SchemaGraphApp();
-  window.graph = app.graph;
-  window.app = app;
+  gApp = new SchemaGraphApp();
+  window.graph = gApp.graph;
+  window.app = gApp;
 }
