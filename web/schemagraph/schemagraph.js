@@ -223,7 +223,9 @@ class SchemaGraph extends LGraph {
       const fieldName = field.name;
       const fieldType = field.type;
       
-      console.log('  Field:', fieldName, '| Raw type:', field.rawType);
+      console.log('  Analyzing field:', fieldName);
+      console.log('    Raw type:', field.rawType);
+      console.log('    Parsed type kind:', fieldType.kind);
       
       const modelType = this._extractModelTypeFromField(fieldType);
       
@@ -233,8 +235,9 @@ class SchemaGraph extends LGraph {
         console.log('    ✅ MAPPED:', modelType, '↔', fieldName);
       } else if (modelType) {
         console.log('    ⚠️ Model type', modelType, 'not in parsed models');
+        console.log('    Available models:', Object.keys(parsedModels).join(', '));
       } else {
-        console.log('    ℹ️ Not a model reference (probably primitive type)');
+        console.log('    ℹ️ Not a model reference (primitive or complex type)');
       }
     }
     
@@ -254,8 +257,24 @@ class SchemaGraph extends LGraph {
       current = current.inner;
     }
     
-    if (current.kind === 'list') {
+    if (current.kind === 'list' || current.kind === 'set' || current.kind === 'tuple') {
       current = current.inner;
+    }
+    
+    if (current.kind === 'dict') {
+      const innerStr = current.inner;
+      if (innerStr && innerStr.indexOf('Union[') !== -1) {
+        const unionMatch = innerStr.match(/Union\[([^\]]+)\]/);
+        if (unionMatch) {
+          const types = unionMatch[1].split(',').map(t => t.trim());
+          for (const type of types) {
+            if (type.endsWith('Config')) {
+              return type;
+            }
+          }
+        }
+      }
+      return null;
     }
     
     if (current.kind === 'union') {
@@ -377,6 +396,19 @@ class SchemaGraph extends LGraph {
       const inner = this._extractBracket(str, 5);
       return { kind: 'list', inner: this._parseType(inner) };
     }
+    if (str.indexOf('Set[') === 0) {
+      const inner = this._extractBracket(str, 4);
+      return { kind: 'set', inner: this._parseType(inner) };
+    }
+    if (str.indexOf('Tuple[') === 0) {
+      const inner = this._extractBracket(str, 6);
+      return { kind: 'tuple', inner: this._parseType(inner) };
+    }
+    if (str.indexOf('Dict[') === 0 || str.indexOf('dict[') === 0) {
+      const startIdx = str.indexOf('[') + 1;
+      const inner = this._extractBracket(str, startIdx);
+      return { kind: 'dict', inner: inner };
+    }
     return { kind: 'basic', name: str };
   }
 
@@ -417,12 +449,24 @@ class SchemaGraph extends LGraph {
       const fields = models[modelName];
       
       const self = this;
+      const schemaInfo = this.schemas[schemaName];
+      const isRootType = schemaInfo && schemaInfo.rootType === modelName;
+      
+      if (isRootType) {
+        console.log('🌟 Generating ROOT TYPE node:', schemaName + '.' + modelName);
+      }
+      
       class GeneratedNode extends LNode {
         constructor() {
           super(schemaName + '.' + modelName);
           this.schemaName = schemaName;
           this.modelName = modelName;
+          this.isRootType = isRootType;
           this.addOutput('self', modelName);
+          
+          if (this.isRootType) {
+            console.log('✨ Created ROOT TYPE node instance:', this.title);
+          }
           
           this.nativeInputs = {};
           this.multiInputs = {};
@@ -438,11 +482,10 @@ class SchemaGraph extends LGraph {
               this.optionalFields[i] = true;
             }
             
-            const isListOfUnions = (f.type.kind === 'list' && f.type.inner.kind === 'union') ||
-                                   (f.type.kind === 'optional' && f.type.inner.kind === 'list' && 
-                                    f.type.inner.inner.kind === 'union');
+            const isCollectionOfUnions = self._isCollectionOfUnions(f.type);
+            const isListField = isRootType && self._isListFieldType(f.type);
             
-            if (isListOfUnions) {
+            if (isCollectionOfUnions || isListField) {
               this.addInput(f.name, compactType);
               this.multiInputs[i] = {
                 type: compactType,
@@ -491,11 +534,14 @@ class SchemaGraph extends LGraph {
                 const val = this.nativeInputs[i].value;
                 const isOptional = this.nativeInputs[i].optional;
                 
-                if (isOptional && (val === null || val === undefined || val === '')) {
+                // Check if value is truly empty (not false, not 0)
+                const isEmpty = val === null || val === undefined || val === '';
+                
+                if (isOptional && isEmpty) {
                   continue;
                 }
                 
-                if (val !== null && val !== undefined && val !== '') {
+                if (!isEmpty || typeof val === 'boolean' || typeof val === 'number') {
                   if (this.nativeInputs[i].type === 'dict') {
                     try {
                       data[this.inputs[i].name] = JSON.parse(val);
@@ -575,6 +621,44 @@ class SchemaGraph extends LGraph {
     return false;
   }
 
+  _isCollectionOfUnions(fieldType) {
+    let current = fieldType;
+    
+    if (current.kind === 'optional') {
+      current = current.inner;
+    }
+    
+    if (current.kind === 'list' || current.kind === 'set' || current.kind === 'tuple') {
+      return current.inner && current.inner.kind === 'union';
+    }
+    
+    if (current.kind === 'dict') {
+      const innerStr = current.inner;
+      if (innerStr && (innerStr.indexOf('Union[') !== -1 || innerStr.indexOf('union[') !== -1)) {
+        return true;
+      }
+    }
+    
+    if (current.kind === 'basic' && current.name) {
+      const name = current.name;
+      if (name.indexOf('Dict[') === 0 || name.indexOf('dict[') === 0) {
+        return name.indexOf('Union[') !== -1 || name.indexOf('union[') !== -1;
+      }
+    }
+    
+    return false;
+  }
+
+  _isListFieldType(fieldType) {
+    let current = fieldType;
+    
+    if (current.kind === 'optional') {
+      current = current.inner;
+    }
+    
+    return current.kind === 'list';
+  }
+
   _getNativeBaseType(typeStr) {
     if (!typeStr) return 'str';
     const base = typeStr.replace(/^Optional\[|\]$/g, '').split('|')[0].trim();
@@ -628,6 +712,17 @@ class SchemaGraph extends LGraph {
     if (t.kind === 'list') {
       const innerType = this._getInputType({ type: t.inner }, indexType);
       return 'List[' + innerType + ']';
+    }
+    if (t.kind === 'set') {
+      const innerType = this._getInputType({ type: t.inner }, indexType);
+      return 'Set[' + innerType + ']';
+    }
+    if (t.kind === 'tuple') {
+      const innerType = this._getInputType({ type: t.inner }, indexType);
+      return 'Tuple[' + innerType + ',...]';
+    }
+    if (t.kind === 'dict') {
+      return 'Dict[' + t.inner + ']';
     }
     if (t.kind === 'basic') return t.name;
     return 'Any';
@@ -733,7 +828,8 @@ class SchemaGraph extends LGraph {
         properties: JSON.parse(JSON.stringify(node.properties)),
         schemaName: node.schemaName,
         modelName: node.modelName,
-        isNative: node.isNative || false
+        isNative: node.isNative || false,
+        isRootType: node.isRootType || false
       };
       
       if (node.nativeInputs) {
@@ -798,6 +894,10 @@ class SchemaGraph extends LGraph {
       node.pos = nodeData.pos.slice();
       node.size = nodeData.size.slice();
       node.properties = JSON.parse(JSON.stringify(nodeData.properties));
+      
+      if (nodeData.isRootType !== undefined) {
+        node.isRootType = nodeData.isRootType;
+      }
       
       if (nodeData.nativeInputs) {
         node.nativeInputs = JSON.parse(JSON.stringify(nodeData.nativeInputs));
@@ -1376,18 +1476,33 @@ class SchemaGraphApp {
       const registeredSchemas = this.graph.getRegisteredSchemas();
       for (const schemaName of registeredSchemas) {
         const schemaTypes = [];
+        const schemaInfo = this.graph.getSchemaInfo(schemaName);
+        let rootNodeType = null;
         
         for (const type in this.graph.nodeTypes) {
           if (this.graph.nodeTypes.hasOwnProperty(type) && type.indexOf(schemaName + '.') === 0) {
             schemaTypes.push(type);
+            if (schemaInfo && schemaInfo.rootType && type === schemaName + '.' + schemaInfo.rootType) {
+              rootNodeType = type;
+            }
           }
         }
         
         if (schemaTypes.length > 0) {
           html += '<div class="context-menu-category">' + schemaName + ' Schema</div>';
+          
+          // Show root node first with special marker
+          if (rootNodeType) {
+            const name = rootNodeType.split('.')[1];
+            html += '<div class="context-menu-item" data-type="' + rootNodeType + '" style="font-weight: bold; color: var(--accent-orange);">★ ' + name + ' (Root)</div>';
+          }
+          
+          // Show other nodes
           for (const schemaType of schemaTypes) {
-            const name = schemaType.split('.')[1];
-            html += '<div class="context-menu-item" data-type="' + schemaType + '">' + name + '</div>';
+            if (schemaType !== rootNodeType) {
+              const name = schemaType.split('.')[1];
+              html += '<div class="context-menu-item" data-type="' + schemaType + '">' + name + '</div>';
+            }
           }
         }
       }
@@ -1583,6 +1698,8 @@ class SchemaGraphApp {
       accentPurpleLight: style.getPropertyValue('--accent-purple-light').trim(),
       accentGreen: style.getPropertyValue('--accent-green').trim(),
       accentRed: style.getPropertyValue('--accent-red').trim(),
+      accentOrange: style.getPropertyValue('--accent-orange').trim(),
+      accentYellow: style.getPropertyValue('--accent-yellow').trim(),
       slotInput: style.getPropertyValue('--slot-input').trim(),
       slotOutput: style.getPropertyValue('--slot-output').trim(),
       slotDefault: style.getPropertyValue('--slot-default').trim(),
@@ -1754,7 +1871,15 @@ class SchemaGraphApp {
     this.ctx.shadowOffsetY = 0;
     this.ctx.stroke();
     
-    const headerColor = node.isNative ? colors.accentPurple : colors.nodeHeader;
+    if (node.isRootType) {
+      this.ctx.strokeStyle = colors.accentYellow || '#ffd700';
+      this.ctx.lineWidth = 3 / this.camera.scale;
+      this.ctx.setLineDash([10 / this.camera.scale, 5 / this.camera.scale]);
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
+    }
+    
+    const headerColor = node.isNative ? colors.accentPurple : (node.isRootType ? colors.accentOrange : colors.nodeHeader);
     this.ctx.fillStyle = headerColor;
     this.ctx.beginPath();
     this.ctx.moveTo(x + radius, y);
@@ -1770,7 +1895,10 @@ class SchemaGraphApp {
     this.ctx.fillStyle = colors.textPrimary;
     this.ctx.font = (11 / this.camera.scale) + 'px Arial, sans-serif';
     this.ctx.textBaseline = 'middle';
-    const titleText = node.title.length > 20 ? node.title.substring(0, 20) + '...' : node.title;
+    let titleText = node.title.length > 20 ? node.title.substring(0, 20) + '...' : node.title;
+    if (node.isRootType) {
+      titleText = '★ ' + titleText;
+    }
     this.ctx.fillText(titleText, x + 8, y + 13);
     
     const worldMouse = this.screenToWorld(this.mousePos[0], this.mousePos[1]);
@@ -1883,7 +2011,9 @@ class SchemaGraphApp {
       this.ctx.strokeRect(boxX, boxY, boxW, boxH);
       
       const displayVal = node.nativeInputs[j].value;
-      if (displayVal === '' || displayVal === null || displayVal === undefined) {
+      const isEmpty = displayVal === '' || displayVal === null || displayVal === undefined;
+      
+      if (isEmpty) {
         if (isOptional) {
           this.ctx.fillStyle = colors.textTertiary || '#707070';
           this.ctx.font = 'italic ' + (8 / this.camera.scale) + 'px Arial, sans-serif';
@@ -2169,10 +2299,29 @@ class SchemaGraphApp {
       this.updateSchemaList();
       this.updateNodeTypesList();
       this.draw();
-      this.statusEl.textContent = `Schema "${schemaName}" registered successfully!`;
+      
+      if (rootType) {
+        const rootNodeType = schemaName + '.' + rootType;
+        if (this.graph.nodeTypes[rootNodeType]) {
+          const createRootNode = confirm(`Schema registered! Would you like to create the root node (${rootType}) now?`);
+          if (createRootNode) {
+            const node = this.graph.createNode(rootNodeType);
+            node.pos = [100, 100];
+            this.draw();
+            this.statusEl.textContent = `Schema "${schemaName}" registered and root node created!`;
+          } else {
+            this.statusEl.textContent = `Schema "${schemaName}" registered! Right-click to create the ★ ${rootType} root node.`;
+          }
+        } else {
+          this.statusEl.textContent = `Schema "${schemaName}" registered successfully!`;
+        }
+      } else {
+        this.statusEl.textContent = `Schema "${schemaName}" registered successfully!`;
+      }
+      
       setTimeout(() => {
         this.statusEl.textContent = 'Right-click to add nodes.';
-      }, 2000);
+      }, 3000);
     } else {
       this.showError('Failed to register schema. Check console for details.');
     }
@@ -2228,10 +2377,25 @@ class SchemaGraphApp {
   }
 
   buildConfig(schemaName) {
+    const schemaInfo = this.graph.schemas[schemaName];
+    
+    let rootTypeNode = null;
+    if (schemaInfo && schemaInfo.rootType) {
+      for (const node of this.graph.nodes) {
+        if (node.schemaName === schemaName && node.modelName === schemaInfo.rootType) {
+          rootTypeNode = node;
+          break;
+        }
+      }
+    }
+    
+    if (rootTypeNode) {
+      return this.buildConfigFromRootNode(rootTypeNode, schemaName);
+    }
+    
     const config = {};
     const nodesByType = {};
     const nodeToIndex = new Map();
-    const schemaInfo = this.graph.schemas[schemaName];
     
     let fieldMapping = schemaInfo.fieldMapping;
     if (!fieldMapping) {
@@ -2274,6 +2438,111 @@ class SchemaGraphApp {
       }
     }
   
+    return config;
+  }
+
+  buildConfigFromRootNode(rootNode, schemaName) {
+    console.log('=== BUILDING CONFIG FROM ROOT NODE ===');
+    const schemaInfo = this.graph.schemas[schemaName];
+    const config = {};
+    
+    const nodesByType = {};
+    const nodeToIndex = new Map();
+    
+    for (const node of this.graph.nodes) {
+      if (node.schemaName !== schemaName) continue;
+      if (node === rootNode) continue;
+      
+      if (!nodesByType[node.modelName]) {
+        nodesByType[node.modelName] = [];
+      }
+      const index = nodesByType[node.modelName].length;
+      nodesByType[node.modelName].push(node);
+      nodeToIndex.set(node, { modelName: node.modelName, index });
+    }
+    
+    let fieldMapping = schemaInfo.fieldMapping;
+    if (!fieldMapping) {
+      fieldMapping = this.graph._createFieldMappingFromSchema(schemaInfo.code, schemaInfo.parsed, schemaInfo.rootType);
+      schemaInfo.fieldMapping = fieldMapping;
+    }
+    
+    for (const node of this.graph.nodes) {
+      if (node.schemaName === schemaName) {
+        node.onExecute();
+      }
+    }
+    
+    for (let i = 0; i < rootNode.inputs.length; i++) {
+      const input = rootNode.inputs[i];
+      const fieldName = input.name;
+      
+      if (rootNode.multiInputs && rootNode.multiInputs[i]) {
+        const connectedNodes = [];
+        for (const linkId of rootNode.multiInputs[i].links) {
+          const link = this.graph.links[linkId];
+          if (link) {
+            const sourceNode = this.graph.getNodeById(link.origin_id);
+            if (sourceNode && nodeToIndex.has(sourceNode)) {
+              connectedNodes.push(sourceNode);
+            }
+          }
+        }
+        
+        if (connectedNodes.length > 0) {
+          config[fieldName] = [];
+          for (const node of connectedNodes) {
+            const nodeData = node.outputs[0].value || {};
+            const processedData = this.processNodeDataWithIndices(nodeData, nodeToIndex, fieldMapping);
+            config[fieldName].push(processedData);
+          }
+        }
+      } else {
+        const connectedValue = rootNode.getInputData(i);
+        if (connectedValue !== null && connectedValue !== undefined) {
+          let isNodeReference = false;
+          for (const [node, info] of nodeToIndex.entries()) {
+            if (node.outputs && node.outputs[0] && node.outputs[0].value === connectedValue) {
+              config[fieldName] = info.index;
+              isNodeReference = true;
+              break;
+            }
+          }
+          
+          if (!isNodeReference) {
+            const processedData = this.processNodeDataWithIndices(connectedValue, nodeToIndex, fieldMapping);
+            config[fieldName] = processedData;
+          }
+        } else if (rootNode.nativeInputs && rootNode.nativeInputs[i] !== undefined) {
+          const val = rootNode.nativeInputs[i].value;
+          const isOptional = rootNode.nativeInputs[i].optional;
+          
+          if (isOptional && (val === null || val === undefined || val === '')) {
+            continue;
+          }
+          
+          if (val !== null && val !== undefined && val !== '') {
+            if (rootNode.nativeInputs[i].type === 'dict' || rootNode.nativeInputs[i].type === 'list') {
+              try {
+                config[fieldName] = JSON.parse(val);
+              } catch (e) {
+                config[fieldName] = val;
+              }
+            } else if (rootNode.nativeInputs[i].type === 'int') {
+              config[fieldName] = parseInt(val) || 0;
+            } else if (rootNode.nativeInputs[i].type === 'float') {
+              config[fieldName] = parseFloat(val) || 0.0;
+            } else if (rootNode.nativeInputs[i].type === 'bool') {
+              config[fieldName] = val === true || val === 'true';
+            } else {
+              config[fieldName] = val;
+            }
+          }
+        }
+      }
+    }
+    
+    console.log('=== CONFIG BUILT FROM ROOT NODE ===');
     return config;
   }
 
@@ -2414,53 +2683,75 @@ class SchemaGraphApp {
     this.graph.last_link_id = 0;
 
     const createdNodes = {};
+    const allNodesForField = {}; // Track ALL nodes for each field, including embedded
     let xOffset = 50;
     const yOffset = 100;
     const xSpacing = 250;
 
+    // First pass: create top-level nodes
     for (const fieldName in configData) {
       if (!configData.hasOwnProperty(fieldName)) continue;
       const items = configData[fieldName];
       
       const modelName = fieldMapping.fieldToModel[fieldName];
-      console.log('Field:', fieldName, '→ Model:', modelName);
+      console.log('📦 Field:', fieldName, '→ Model:', modelName);
       
       if (!modelName) {
-        console.warn('Unknown field name:', fieldName, '- cannot map to model type');
+        console.warn('⚠️ Unknown field name:', fieldName, '- cannot map to model type');
         continue;
       }
       
       const nodeType = targetSchema + '.' + modelName;
-      console.log('Node type:', nodeType);
+      console.log('   Node type:', nodeType);
 
       if (!this.graph.nodeTypes[nodeType]) {
-        console.warn('Node type not found:', nodeType);
+        console.warn('⚠️ Node type not found:', nodeType);
         continue;
       }
 
       if (!createdNodes[fieldName]) {
         createdNodes[fieldName] = [];
       }
+      
+      if (!allNodesForField[fieldName]) {
+        allNodesForField[fieldName] = [];
+      }
 
       const isListField = Array.isArray(items);
       
       if (isListField) {
+        console.log('   Creating', items.length, 'nodes for list field');
         for (let i = 0; i < items.length; i++) {
           const node = this.graph.createNode(nodeType);
           node.pos = [xOffset, yOffset + i * 150];
           createdNodes[fieldName].push(node);
-          console.log('Created node:', nodeType, 'at', node.pos);
+          allNodesForField[fieldName].push(node);
+          console.log('   ✓ Created', nodeType, 'at index', i, '- node ID:', node.id);
         }
       } else {
+        console.log('   Creating 1 node for single field');
         const node = this.graph.createNode(nodeType);
         node.pos = [xOffset, yOffset];
         createdNodes[fieldName].push(node);
-        console.log('Created single node:', nodeType, 'at', node.pos);
+        allNodesForField[fieldName].push(node);
+        console.log('   ✓ Created', nodeType, '- node ID:', node.id);
       }
 
       xOffset += xSpacing;
     }
+    
+    console.log('📦 Top-level node creation complete');
+    console.log('   Created nodes for fields:', Object.keys(createdNodes).join(', '));
+    for (const fieldName in allNodesForField) {
+      if (allNodesForField.hasOwnProperty(fieldName)) {
+        const nodeIds = allNodesForField[fieldName].map(n => n.id).join(', ');
+        console.log('   ', fieldName + ':', allNodesForField[fieldName].length, 'nodes - IDs:', nodeIds);
+      }
+    }
 
+    // Second pass: populate nodes with data (this may create embedded nodes)
+    const nodesBefore = this.graph.nodes.length;
+    
     for (const fieldName in configData) {
       if (!configData.hasOwnProperty(fieldName)) continue;
       const items = configData[fieldName];
@@ -2483,7 +2774,169 @@ class SchemaGraphApp {
         }
       }
     }
+    
+    const nodesAfter = this.graph.nodes.length;
+    console.log('Nodes created during population:', nodesAfter - nodesBefore, '(embedded nodes)');
 
+    // Third pass: create root type node if applicable
+    if (schemaInfo && schemaInfo.rootType) {
+      const rootNodeType = targetSchema + '.' + schemaInfo.rootType;
+      if (this.graph.nodeTypes[rootNodeType]) {
+        const rootNode = this.graph.createNode(rootNodeType);
+        rootNode.pos = [-300, yOffset];
+        console.log('Created root node:', rootNodeType, 'at', rootNode.pos);
+        
+        // Connect root node to all field nodes
+        console.log('🔗 Connecting root node to field nodes...');
+        console.log('   Root node has', rootNode.inputs.length, 'inputs');
+        console.log('   Config has', Object.keys(configData).length, 'fields');
+        
+        for (const fieldName in configData) {
+          if (!configData.hasOwnProperty(fieldName)) continue;
+          
+          console.log('');
+          console.log('🔌 Processing field:', fieldName);
+          
+          // Find the input slot for this field
+          const inputIdx = rootNode.inputs.findIndex(inp => inp.name === fieldName);
+          if (inputIdx === -1) {
+            console.warn('⚠️ No input slot found on root node for field:', fieldName);
+            console.warn('   Available inputs:', rootNode.inputs.map(inp => inp.name).join(', '));
+            continue;
+          }
+          
+          console.log('   ✓ Found input slot:', inputIdx, '(type:', rootNode.inputs[inputIdx].type + ')');
+          
+          const items = configData[fieldName];
+          const isListField = Array.isArray(items);
+          
+          console.log('   Value is', isListField ? 'array with ' + items.length + ' items' : typeof items);
+          
+          // Get all nodes for this field (only the top-level ones we created)
+          const fieldNodes = allNodesForField[fieldName] || [];
+          
+          console.log('   Looking for nodes in allNodesForField["' + fieldName + '"]');
+          console.log('   Found:', fieldNodes.length, 'nodes');
+          
+          if (fieldNodes.length === 0) {
+            console.warn('⚠️ No nodes in allNodesForField for:', fieldName);
+            console.warn('   Available field keys:', Object.keys(allNodesForField).join(', '));
+            // Check if this field even needs nodes (might be a primitive value)
+            if (rootNode.nativeInputs && rootNode.nativeInputs[inputIdx] !== undefined) {
+              console.log('   → Field is a native input, setting value directly');
+              if (typeof items === 'object') {
+                rootNode.nativeInputs[inputIdx].value = JSON.stringify(items);
+              } else {
+                rootNode.nativeInputs[inputIdx].value = items;
+              }
+              console.log('   ✅ Set native value:', items);
+            }
+            continue;
+          }
+          
+          const nodeInfo = fieldNodes.map(n => n.id + ':' + n.title).join(', ');
+          console.log('   Node details:', nodeInfo);
+          
+          if (isListField) {
+            // Connect all nodes to multi-input
+            if (rootNode.multiInputs && rootNode.multiInputs[inputIdx]) {
+              console.log('   ✓ Field is multi-input (list field)');
+              for (const node of fieldNodes) {
+                const linkId = ++this.graph.last_link_id;
+                const link = new LLink(
+                  linkId,
+                  node.id,
+                  0,
+                  rootNode.id,
+                  inputIdx,
+                  node.outputs[0].type
+                );
+                this.graph.links[linkId] = link;
+                node.outputs[0].links.push(linkId);
+                rootNode.multiInputs[inputIdx].links.push(linkId);
+                console.log('   ✅ Connected', node.title, 'to root at slot', inputIdx);
+              }
+            } else {
+              console.warn('   ⚠️ Expected multi-input but not found for field:', fieldName);
+              console.warn('   Input type:', rootNode.inputs[inputIdx].type);
+              console.warn('   Has multiInputs?', !!rootNode.multiInputs);
+              if (rootNode.multiInputs) {
+                console.warn('   multiInputs[' + inputIdx + ']?', !!rootNode.multiInputs[inputIdx]);
+              }
+            }
+          } else {
+            // Connect single node or set native value
+            console.log('   ✓ Field is single-input');
+            if (typeof items === 'number') {
+              // This is an index reference to another node
+              console.log('   → Value is an index reference:', items);
+              const modelName = fieldMapping.fieldToModel[fieldName];
+              const refNode = this.findNodeByTypeAndIndex(modelName, items, createdNodes, fieldMapping);
+              if (refNode) {
+                this.graph.connect(refNode, 0, rootNode, inputIdx);
+                console.log('   ✅ Connected indexed node', refNode.title, 'to root');
+              } else {
+                console.warn('   ⚠️ Could not find referenced node at index', items);
+              }
+            } else if (fieldNodes[0]) {
+              this.graph.connect(fieldNodes[0], 0, rootNode, inputIdx);
+              console.log('   ✅ Connected', fieldNodes[0].title, 'to root at slot', inputIdx);
+            } else if (rootNode.nativeInputs && rootNode.nativeInputs[inputIdx] !== undefined) {
+              // Set native value
+              console.log('   → Setting native value');
+              if (typeof items === 'object') {
+                rootNode.nativeInputs[inputIdx].value = JSON.stringify(items);
+              } else {
+                rootNode.nativeInputs[inputIdx].value = items;
+              }
+              console.log('   ✅ Set native value');
+            }
+          }
+        }
+        
+        console.log('🎯 Root node connection summary:');
+        console.log('   Total inputs:', rootNode.inputs.length);
+        console.log('   Config fields:', Object.keys(configData).join(', '));
+        console.log('   Root node input names:', rootNode.inputs.map(inp => inp.name).join(', '));
+        
+        let connectedCount = 0;
+        for (let i = 0; i < rootNode.inputs.length; i++) {
+          const input = rootNode.inputs[i];
+          const fieldName = input.name;
+          const isInConfig = configData.hasOwnProperty(fieldName);
+          
+          if (rootNode.multiInputs && rootNode.multiInputs[i]) {
+            const links = rootNode.multiInputs[i].links.length;
+            if (links > 0) {
+              console.log('   ✓', fieldName, '(multi):', links, 'connections', isInConfig ? '' : '⚠️ NOT IN CONFIG');
+              connectedCount++;
+            } else {
+              console.log('   ✗', fieldName, '(multi): no connections', isInConfig ? '❌ WAS IN CONFIG!' : '(not in config)');
+            }
+          } else if (input.link) {
+            console.log('   ✓', fieldName, ': connected', isInConfig ? '' : '⚠️ NOT IN CONFIG');
+            connectedCount++;
+          } else if (rootNode.nativeInputs && rootNode.nativeInputs[i]) {
+            const val = rootNode.nativeInputs[i].value;
+            // Check if value is truly empty (not false, not 0)
+            const isEmpty = val === null || val === undefined || val === '';
+            const hasValue = !isEmpty || typeof val === 'boolean' || typeof val === 'number';
+            
+            if (hasValue) {
+              console.log('   ✓', fieldName, '(native):', JSON.stringify(val), '(type: ' + typeof val + ')', isInConfig ? '' : '⚠️ NOT IN CONFIG');
+              connectedCount++;
+            } else {
+              console.log('   ○', fieldName, '(native): empty', rootNode.nativeInputs[i].optional ? '(optional)' : '❌ REQUIRED!', isInConfig ? '❌ WAS IN CONFIG!' : '');
+            }
+          } else {
+            console.log('   ✗', fieldName, ': not connected', isInConfig ? '❌ WAS IN CONFIG!' : '(not in config)');
+          }
+        }
+        console.log('   Connected:', connectedCount, '/', rootNode.inputs.length);
+      }
+    }
+
+    // Execute all nodes
     for (const node of this.graph.nodes) {
       node.onExecute();
     }
@@ -2579,6 +3032,9 @@ class SchemaGraphApp {
         if (node.nativeInputs && node.nativeInputs[i] !== undefined) {
           if (typeof value === 'object') {
             node.nativeInputs[i].value = JSON.stringify(value);
+          } else if (typeof value === 'boolean') {
+            // Handle boolean explicitly - false is a valid value!
+            node.nativeInputs[i].value = value;
           } else {
             node.nativeInputs[i].value = value;
           }
@@ -2642,51 +3098,169 @@ class SchemaGraphApp {
     return null;
   }
 
-  createEmbeddedNode(configItem, schemaName, createdNodes, fieldMapping, expectedType) {
-    let targetModelType = null;
+  isNativeCollectionType(typeString) {
+    if (!typeString) return false;
     
-    if (expectedType) {
-      const unionMatch = expectedType.match(/Union\[([^\]]+)\]/);
-      if (unionMatch) {
-        const types = unionMatch[1].split(',').map(t => t.trim());
-        for (const t of types) {
-          if (t.endsWith('Config')) {
-            targetModelType = t;
-            break;
-          }
-        }
-      } else if (expectedType.endsWith('Config')) {
-        targetModelType = expectedType;
+    // Check for Dict[str, Any], List[str], Set[int], Tuple[str, ...], etc.
+    const collectionMatch = typeString.match(/^(Optional\[)?(List|Set|Tuple|Dict|dict)\[(.+)\]$/);
+    if (!collectionMatch) return false;
+    
+    const innerType = collectionMatch[3];
+    
+    // For Dict, check if it's Dict[primitive, primitive] or Dict[str, Any]
+    if (collectionMatch[2] === 'Dict' || collectionMatch[2] === 'dict') {
+      // If it contains 'Union[' with a model type, it's not a native collection
+      if (innerType.indexOf('Union[') !== -1 && innerType.match(/[A-Z][a-zA-Z]*Config/)) {
+        return false;
       }
-      
-      const listMatch = expectedType.match(/List\[([^\]]+)\]/);
-      if (listMatch && !targetModelType) {
-        const inner = listMatch[1];
-        const innerUnionMatch = inner.match(/Union\[([^\]]+)\]/);
-        if (innerUnionMatch) {
-          const types = innerUnionMatch[1].split(',').map(t => t.trim());
-          for (const t of types) {
-            if (t.endsWith('Config')) {
-              targetModelType = t;
-              break;
-            }
-          }
-        } else if (inner.endsWith('Config')) {
-          targetModelType = inner;
-        }
+      // Dict[str, Any], Dict[str, int], etc. are native
+      return true;
+    }
+    
+    // For List/Set/Tuple, check if the inner type is primitive
+    const primitives = ['str', 'int', 'bool', 'float', 'Any', 'string', 'integer'];
+    
+    // Strip Optional if present
+    let checkType = innerType;
+    const optMatch = checkType.match(/^Optional\[(.+)\]$/);
+    if (optMatch) checkType = optMatch[1];
+    
+    // Check if it's a primitive
+    if (primitives.indexOf(checkType) !== -1) {
+      return true;
+    }
+    
+    // Check if it's a Union that doesn't contain model types
+    const unionMatch = checkType.match(/^Union\[(.+)\]$/);
+    if (unionMatch) {
+      // If it contains a Config type, it's not a native collection
+      if (unionMatch[1].match(/[A-Z][a-zA-Z]*Config/)) {
+        return false;
+      }
+      return true;
+    }
+    
+    return false;
+  }
+
+  extractModelTypeFromUnionOrOptional(typeString) {
+    if (!typeString) return null;
+    
+    let workingType = typeString.trim();
+    console.log('          Extracting model type from:', workingType);
+    
+    // Strip Optional wrapper
+    const optionalMatch = workingType.match(/^Optional\[(.+)\]$/);
+    if (optionalMatch) {
+      workingType = optionalMatch[1].trim();
+      console.log('          After stripping Optional:', workingType);
+    }
+    
+    // Strip List/Set/Dict/Tuple wrapper to get the inner type
+    const listMatch = workingType.match(/^(List|Set|Tuple)\[(.+)\]$/);
+    if (listMatch) {
+      workingType = listMatch[2].trim();
+      console.log('          After stripping ' + listMatch[1] + ':', workingType);
+    }
+    
+    const dictMatch = workingType.match(/^(Dict|dict)\[(.+)\]$/);
+    if (dictMatch) {
+      // For Dict, extract the value type (second parameter)
+      const dictContent = dictMatch[2];
+      const parts = this.splitTypeParameters(dictContent);
+      if (parts.length >= 2) {
+        workingType = parts[1].trim();
+        console.log('          After stripping Dict, got value type:', workingType);
       }
     }
+    
+    // Now extract from Union if present
+    const unionMatch = workingType.match(/^Union\[(.+)\]$/);
+    if (unionMatch) {
+      const unionContent = unionMatch[1];
+      const types = this.splitTypeParameters(unionContent);
+      console.log('          Union contains types:', types);
+      
+      // Find the non-Index type (the actual model type)
+      for (const t of types) {
+        const trimmed = t.trim();
+        if (trimmed !== 'Index' && trimmed !== 'int' && !trimmed.startsWith('int ')) {
+          console.log('          ✅ Selected model type from union:', trimmed);
+          return trimmed;
+        }
+      }
+      console.warn('          ⚠️ No model type found in union, only Index/int');
+      return null;
+    }
+    
+    // If no Union, return the working type if it's not a primitive
+    const primitives = ['str', 'int', 'bool', 'float', 'Any', 'Index', 'string', 'integer'];
+    if (primitives.indexOf(workingType) === -1) {
+      console.log('          ✅ Direct model type:', workingType);
+      return workingType;
+    }
+    
+    console.log('          → Type is primitive:', workingType);
+    return null;
+  }
+
+  splitTypeParameters(str) {
+    // Split by comma, but respect nested brackets
+    const result = [];
+    let current = '';
+    let depth = 0;
+    
+    for (let i = 0; i < str.length; i++) {
+      const char = str[i];
+      if (char === '[') depth++;
+      if (char === ']') depth--;
+      
+      if (char === ',' && depth === 0) {
+        if (current.trim()) result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    
+    if (current.trim()) result.push(current.trim());
+    return result;
+  }
+
+  createEmbeddedNode(configItem, schemaName, createdNodes, fieldMapping, expectedType) {
+    console.log('      🔨 Creating embedded node');
+    console.log('         Expected type from schema:', expectedType);
+    console.log('         Config item keys:', Object.keys(configItem).join(', '));
+    
+    // CHECK: If this is a native collection type, don't create a node
+    if (this.isNativeCollectionType(expectedType)) {
+      console.log('         ℹ️ Skipping node creation - native collection type:', expectedType);
+      return null;
+    }
+    
+    // Use the proper type extraction method
+    const targetModelType = this.extractModelTypeFromUnionOrOptional(expectedType);
     
     if (targetModelType) {
       const nodeType = schemaName + '.' + targetModelType;
+      console.log('         Attempting to create:', nodeType);
+      
       if (this.graph.nodeTypes[nodeType]) {
         const node = this.graph.createNode(nodeType);
         node.pos = [Math.random() * 400 + 100, Math.random() * 400 + 100];
+        console.log('         ✅ Created:', nodeType);
         this.populateNodeFromConfig(node, configItem, createdNodes, fieldMapping);
         return node;
+      } else {
+        console.error('         ❌ Node type does not exist:', nodeType);
+        console.error('         Available types:', Object.keys(this.graph.nodeTypes).filter(t => t.indexOf(schemaName) === 0).join(', '));
       }
+    } else {
+      console.warn('         ⚠️ Could not extract model type from:', expectedType);
     }
     
+    // Fallback: try to match by fields (but warn it's ambiguous)
+    console.log('         ⚠️ FALLBACK: Trying field matching (ambiguous!)');
     let bestMatch = null;
     let bestMatchScore = 0;
     const itemKeys = Object.keys(configItem);
@@ -2712,25 +3286,14 @@ class SchemaGraphApp {
     }
     
     if (bestMatch) {
+      console.log('         ⚠️ Using best field match:', bestMatch, '(score:', bestMatchScore + ')');
       const node = this.graph.createNode(bestMatch);
       node.pos = [Math.random() * 400 + 100, Math.random() * 400 + 100];
       this.populateNodeFromConfig(node, configItem, createdNodes, fieldMapping);
       return node;
     }
-    
-    for (const key in configItem) {
-      if (!configItem.hasOwnProperty(key)) continue;
-      const modelName = this.fieldNameToModelName(key);
-      const nodeType = schemaName + '.' + modelName;
 
-      if (this.graph.nodeTypes[nodeType]) {
-        const node = this.graph.createNode(nodeType);
-        node.pos = [Math.random() * 400 + 100, Math.random() * 400 + 100];
-        this.populateNodeFromConfig(node, configItem[key], createdNodes, fieldMapping);
-        return node;
-      }
-    }
-
+    console.error('         ❌ Complete failure - could not create node!');
     return null;
   }
 
@@ -3103,9 +3666,14 @@ class AppConfig(BaseModel):
     tools: Optional[List[Union[ToolConfig, Index]]] = []`;
     
     if (this.graph.registerSchema('ExampleSchema', exampleSchema, 'Index', 'AppConfig')) {
-      this.statusEl.textContent = 'Example schema loaded. Right-click to add nodes.';
+      // Create the root node automatically
+      const rootNode = this.graph.createNode('ExampleSchema.AppConfig');
+      rootNode.pos = [100, 100];
+      
+      this.statusEl.textContent = 'Example schema loaded with root node (★ AppConfig). Right-click to add more nodes.';
       this.updateNodeTypesList();
       this.updateSchemaList();
+      this.draw();
     } else {
       this.statusEl.textContent = 'Ready. Upload a schema to begin.';
     }
