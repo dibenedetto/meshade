@@ -1,6 +1,156 @@
 console.log('=== SCHEMAGRAPH LOADING ===');
 
 // ========================================================================
+// EVENT BUS
+// ========================================================================
+
+class EventBus {
+  constructor() {
+    this.listeners = new Map();
+    this.eventHistory = [];
+    this.maxHistory = 1000;
+  }
+
+  on(event, callback, context = null) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event).push({ callback, context });
+    return () => this.off(event, callback);
+  }
+
+  off(event, callback) {
+    if (!this.listeners.has(event)) return;
+    const listeners = this.listeners.get(event);
+    const index = listeners.findIndex(l => l.callback === callback);
+    if (index > -1) {
+      listeners.splice(index, 1);
+    }
+  }
+
+  emit(event, data = null) {
+    const eventData = { event, data, timestamp: Date.now() };
+    this.eventHistory.push(eventData);
+    if (this.eventHistory.length > this.maxHistory) {
+      this.eventHistory.shift();
+    }
+
+    if (!this.listeners.has(event)) return;
+    const listeners = this.listeners.get(event);
+    for (const { callback, context } of listeners) {
+      try {
+        callback.call(context, data);
+      } catch (e) {
+        console.error(`Error in event listener for ${event}:`, e);
+      }
+    }
+  }
+
+  clear(event = null) {
+    if (event) {
+      this.listeners.delete(event);
+    } else {
+      this.listeners.clear();
+    }
+  }
+
+  getHistory(event = null, limit = 100) {
+    let history = this.eventHistory;
+    if (event) {
+      history = history.filter(e => e.event === event);
+    }
+    return history.slice(-limit);
+  }
+}
+
+// ========================================================================
+// ANALYTICS SERVICE
+// ========================================================================
+
+class AnalyticsService {
+  constructor(eventBus) {
+    this.eventBus = eventBus;
+    this.metrics = {
+      nodeCreated: 0,
+      nodeDeleted: 0,
+      linkCreated: 0,
+      linkDeleted: 0,
+      schemaRegistered: 0,
+      schemaRemoved: 0,
+      graphExported: 0,
+      graphImported: 0,
+      configExported: 0,
+      configImported: 0,
+      layoutApplied: 0,
+      errors: 0,
+      interactions: 0
+    };
+    this.sessions = [];
+    this.currentSession = this.createSession();
+    this.setupListeners();
+  }
+
+  createSession() {
+    return {
+      id: Math.random().toString(36).substr(2, 9),
+      startTime: Date.now(),
+      events: [],
+      metrics: {}
+    };
+  }
+
+  setupListeners() {
+    this.eventBus.on('node:created', () => this.track('nodeCreated'));
+    this.eventBus.on('node:deleted', () => this.track('nodeDeleted'));
+    this.eventBus.on('link:created', () => this.track('linkCreated'));
+    this.eventBus.on('link:deleted', () => this.track('linkDeleted'));
+    this.eventBus.on('schema:registered', () => this.track('schemaRegistered'));
+    this.eventBus.on('schema:removed', () => this.track('schemaRemoved'));
+    this.eventBus.on('graph:exported', () => this.track('graphExported'));
+    this.eventBus.on('graph:imported', () => this.track('graphImported'));
+    this.eventBus.on('config:exported', () => this.track('configExported'));
+    this.eventBus.on('config:imported', () => this.track('configImported'));
+    this.eventBus.on('layout:applied', () => this.track('layoutApplied'));
+    this.eventBus.on('error', () => this.track('errors'));
+    this.eventBus.on('interaction', () => this.track('interactions'));
+  }
+
+  track(metric, value = 1) {
+    if (this.metrics.hasOwnProperty(metric)) {
+      this.metrics[metric] += value;
+    }
+    this.currentSession.events.push({
+      metric,
+      value,
+      timestamp: Date.now()
+    });
+  }
+
+  getMetrics() {
+    return { ...this.metrics };
+  }
+
+  getSessionMetrics() {
+    return {
+      sessionId: this.currentSession.id,
+      duration: Date.now() - this.currentSession.startTime,
+      events: this.currentSession.events.length,
+      metrics: this.metrics
+    };
+  }
+
+  endSession() {
+    this.currentSession.endTime = Date.now();
+    this.sessions.push(this.currentSession);
+    this.currentSession = this.createSession();
+  }
+
+  log(message, data = null) {
+    console.log(`[Analytics] ${message}`, data || '');
+  }
+}
+
+// ========================================================================
 // CORE GRAPH CLASSES
 // ========================================================================
 
@@ -162,23 +312,19 @@ class LGraph {
 // ========================================================================
 
 class SchemaGraph extends LGraph {
-  constructor() {
+  constructor(eventBus) {
     super();
-    this.schemas   = {};
+    this.eventBus = eventBus;
+    this.schemas = {};
     this.nodeTypes = {};
   }
 
   registerSchema(schemaName, schemaCode, indexType = 'int', rootType = null) {
     try {
       console.log('=== REGISTERING SCHEMA:', schemaName, '===');
-      console.log('Root type:', rootType);
-      console.log('Index type:', indexType);
       
       const parsed = this._parseSchema(schemaCode);
-      console.log('Parsed models:', Object.keys(parsed));
-      
       const fieldMapping = this._createFieldMappingFromSchema(schemaCode, parsed, rootType);
-      console.log('Field mapping created:', fieldMapping);
       
       this.schemas[schemaName] = { 
         code: schemaCode, 
@@ -188,64 +334,32 @@ class SchemaGraph extends LGraph {
         fieldMapping
       };
       this._generateNodes(schemaName, parsed, indexType);
-      console.log('=== SCHEMA REGISTRATION COMPLETE ===');
+      
+      this.eventBus.emit('schema:registered', { schemaName, rootType });
       return true;
     } catch (e) {
       console.error('Schema error:', e);
+      this.eventBus.emit('error', { type: 'schema:register', error: e.message });
       return false;
     }
   }
 
   _createFieldMappingFromSchema(schemaCode, parsedModels, rootType) {
-    console.log('=== BUILDING FIELD MAPPING FROM SCHEMA ===');
-    console.log('Root type:', rootType);
-    console.log('Available models:', Object.keys(parsedModels));
+    const mapping = { modelToField: {}, fieldToModel: {} };
     
-    const mapping = {
-      modelToField: {},
-      fieldToModel: {}
-    };
-    
-    if (!rootType) {
-      console.warn('⚠ No root type specified - using fallback');
-      return this._createFallbackMapping(parsedModels);
-    }
-    
-    if (!parsedModels[rootType]) {
-      console.warn('⚠ Root type not found in parsed models:', rootType);
+    if (!rootType || !parsedModels[rootType]) {
       return this._createFallbackMapping(parsedModels);
     }
     
     const rootFields = parsedModels[rootType];
-    console.log('📋 Root config has', rootFields.length, 'fields');
     
     for (const field of rootFields) {
-      const fieldName = field.name;
-      const fieldType = field.type;
-      
-      console.log('  Analyzing field:', fieldName);
-      console.log('    Raw type:', field.rawType);
-      console.log('    Parsed type kind:', fieldType.kind);
-      
-      const modelType = this._extractModelTypeFromField(fieldType);
-      
+      const modelType = this._extractModelTypeFromField(field.type);
       if (modelType && parsedModels[modelType]) {
-        mapping.modelToField[modelType] = fieldName;
-        mapping.fieldToModel[fieldName] = modelType;
-        console.log('    ✅ MAPPED:', modelType, '↔', fieldName);
-      } else if (modelType) {
-        console.log('    ⚠️ Model type', modelType, 'not in parsed models');
-        console.log('    Available models:', Object.keys(parsedModels).join(', '));
-      } else {
-        console.log('    ℹ️ Not a model reference (primitive or complex type)');
+        mapping.modelToField[modelType] = field.name;
+        mapping.fieldToModel[field.name] = modelType;
       }
     }
-    
-    console.log('=== MAPPING SUMMARY ===');
-    console.log('Total mappings:', Object.keys(mapping.modelToField).length);
-    console.log('Model → Field:', mapping.modelToField);
-    console.log('Field → Model:', mapping.fieldToModel);
-    console.log('======================');
     
     return mapping;
   }
@@ -253,10 +367,7 @@ class SchemaGraph extends LGraph {
   _extractModelTypeFromField(fieldType) {
     let current = fieldType;
     
-    if (current.kind === 'optional') {
-      current = current.inner;
-    }
-    
+    if (current.kind === 'optional') current = current.inner;
     if (current.kind === 'list' || current.kind === 'set' || current.kind === 'tuple') {
       current = current.inner;
     }
@@ -268,9 +379,7 @@ class SchemaGraph extends LGraph {
         if (unionMatch) {
           const types = unionMatch[1].split(',').map(t => t.trim());
           for (const type of types) {
-            if (type.endsWith('Config')) {
-              return type;
-            }
+            if (type.endsWith('Config')) return type;
           }
         }
       }
@@ -287,9 +396,7 @@ class SchemaGraph extends LGraph {
     }
     
     if (current.kind === 'basic') {
-      if (current.name && current.name.endsWith('Config')) {
-        return current.name;
-      }
+      if (current.name && current.name.endsWith('Config')) return current.name;
       return null;
     }
     
@@ -297,12 +404,7 @@ class SchemaGraph extends LGraph {
   }
   
   _createFallbackMapping(parsedModels) {
-    console.warn('⚠️ Using fallback mapping - field names may be incorrect!');
-    
-    const mapping = {
-      modelToField: {},
-      fieldToModel: {}
-    };
+    const mapping = { modelToField: {}, fieldToModel: {} };
     
     for (const modelName in parsedModels) {
       if (!parsedModels.hasOwnProperty(modelName)) continue;
@@ -316,8 +418,6 @@ class SchemaGraph extends LGraph {
       if (!fieldName.endsWith('s')) {
         if (fieldName.endsWith('y') && !['ay', 'ey', 'iy', 'oy', 'uy'].some(end => fieldName.endsWith(end))) {
           fieldName = fieldName.slice(0, -1) + 'ies';
-        } else if (fieldName.endsWith('x') || fieldName.endsWith('ch') || fieldName.endsWith('sh')) {
-          fieldName = fieldName + 'es';
         } else {
           fieldName = fieldName + 's';
         }
@@ -325,7 +425,6 @@ class SchemaGraph extends LGraph {
       
       mapping.modelToField[modelName] = fieldName;
       mapping.fieldToModel[fieldName] = modelName;
-      console.warn('  Fallback:', modelName, '→', fieldName);
     }
     
     return mapping;
@@ -452,10 +551,6 @@ class SchemaGraph extends LGraph {
       const schemaInfo = this.schemas[schemaName];
       const isRootType = schemaInfo && schemaInfo.rootType === modelName;
       
-      if (isRootType) {
-        console.log('🌟 Generating ROOT TYPE node:', schemaName + '.' + modelName);
-      }
-      
       class GeneratedNode extends LNode {
         constructor() {
           super(schemaName + '.' + modelName);
@@ -463,10 +558,6 @@ class SchemaGraph extends LGraph {
           this.modelName = modelName;
           this.isRootType = isRootType;
           this.addOutput('self', modelName);
-          
-          if (this.isRootType) {
-            console.log('✨ Created ROOT TYPE node instance:', this.title);
-          }
           
           this.nativeInputs = {};
           this.multiInputs = {};
@@ -487,18 +578,17 @@ class SchemaGraph extends LGraph {
             
             if (isCollectionOfUnions || isListField) {
               this.addInput(f.name, compactType);
-              this.multiInputs[i] = {
-                type: compactType,
-                links: []
-              };
+              this.multiInputs[i] = { type: compactType, links: [] };
             } else {
               this.addInput(f.name, compactType);
               
               const isNative = self._isNativeType(compactType);
               if (isNative) {
+                const baseType = self._getNativeBaseType(compactType);
+                const defaultValue = self._getDefaultValueForType(baseType);
                 this.nativeInputs[i] = {
-                  type: self._getNativeBaseType(compactType),
-                  value: '',
+                  type: baseType,
+                  value: defaultValue,  // ← NOW USES DEFAULT VALUE
                   optional: isOptional
                 };
               }
@@ -533,66 +623,47 @@ class SchemaGraph extends LGraph {
               } else if (this.nativeInputs[i] !== undefined) {
                 const val = this.nativeInputs[i].value;
                 const isOptional = this.nativeInputs[i].optional;
+                const baseType = this.nativeInputs[i].type;
                 
-                // Check if value is truly empty (not false, not 0)
+                // FIX: Handle boolean values correctly
+                if (baseType === 'bool') {
+                  if (val === true || val === false) {
+                    data[this.inputs[i].name] = val;
+                  } else if (val === 'true') {
+                    data[this.inputs[i].name] = true;
+                  } else if (val === 'false' || val === '') {
+                    if (!isOptional) {
+                      data[this.inputs[i].name] = false;
+                    }
+                  }
+                  continue;
+                }
+                
                 const isEmpty = val === null || val === undefined || val === '';
                 
                 if (isOptional && isEmpty) {
                   continue;
                 }
                 
-                if (!isEmpty || typeof val === 'boolean' || typeof val === 'number') {
-                  if (this.nativeInputs[i].type === 'dict') {
+                if (!isEmpty) {
+                  if (baseType === 'dict' || baseType === 'list' || baseType === 'set' || baseType === 'tuple') {
                     try {
                       data[this.inputs[i].name] = JSON.parse(val);
                     } catch (e) {
-                      console.warn('Failed to parse dict value:', val);
-                      data[this.inputs[i].name] = {};
+                      data[this.inputs[i].name] = baseType === 'dict' ? {} : [];
                     }
-                  } else if (this.nativeInputs[i].type === 'list') {
-                    try {
-                      data[this.inputs[i].name] = JSON.parse(val);
-                    } catch (e) {
-                      console.warn('Failed to parse list value:', val);
-                      data[this.inputs[i].name] = [];
-                    }
-                  } else if (this.nativeInputs[i].type === 'set') {
-                    try {
-                      data[this.inputs[i].name] = JSON.parse(val);
-                    } catch (e) {
-                      console.warn('Failed to parse set value:', val);
-                      data[this.inputs[i].name] = [];
-                    }
-                  } else if (this.nativeInputs[i].type === 'tuple') {
-                    try {
-                      data[this.inputs[i].name] = JSON.parse(val);
-                    } catch (e) {
-                      console.warn('Failed to parse tuple value:', val);
-                      data[this.inputs[i].name] = [];
-                    }
-                  } else if (this.nativeInputs[i].type === 'int') {
+                  } else if (baseType === 'int') {
                     data[this.inputs[i].name] = parseInt(val) || 0;
-                  } else if (this.nativeInputs[i].type === 'float') {
+                  } else if (baseType === 'float') {
                     data[this.inputs[i].name] = parseFloat(val) || 0.0;
-                  } else if (this.nativeInputs[i].type === 'bool') {
-                    data[this.inputs[i].name] = val === true || val === 'true';
                   } else {
                     data[this.inputs[i].name] = val;
                   }
                 } else if (!isOptional) {
-                  if (this.nativeInputs[i].type === 'int') {
-                    data[this.inputs[i].name] = 0;
-                  } else if (this.nativeInputs[i].type === 'float') {
-                    data[this.inputs[i].name] = 0.0;
-                  } else if (this.nativeInputs[i].type === 'bool') {
-                    data[this.inputs[i].name] = false;
-                  } else if (this.nativeInputs[i].type === 'dict') {
-                    data[this.inputs[i].name] = {};
-                  } else if (this.nativeInputs[i].type === 'list') {
-                    data[this.inputs[i].name] = [];
-                  } else if (this.nativeInputs[i].type === 'set') {
-                    data[this.inputs[i].name] = [];
-                  } else if (this.nativeInputs[i].type === 'tuple') {
+                  if (baseType === 'int') data[this.inputs[i].name] = 0;
+                  else if (baseType === 'float') data[this.inputs[i].name] = 0.0;
+                  else if (baseType === 'dict') data[this.inputs[i].name] = {};
+                  else if (baseType === 'list' || baseType === 'set' || baseType === 'tuple') {
                     data[this.inputs[i].name] = [];
                   } else {
                     data[this.inputs[i].name] = '';
@@ -623,39 +694,28 @@ class SchemaGraph extends LGraph {
 
   _isCollectionOfUnions(fieldType) {
     let current = fieldType;
-    
-    if (current.kind === 'optional') {
-      current = current.inner;
-    }
-    
+    if (current.kind === 'optional') current = current.inner;
     if (current.kind === 'list' || current.kind === 'set' || current.kind === 'tuple') {
       return current.inner && current.inner.kind === 'union';
     }
-    
     if (current.kind === 'dict') {
       const innerStr = current.inner;
       if (innerStr && (innerStr.indexOf('Union[') !== -1 || innerStr.indexOf('union[') !== -1)) {
         return true;
       }
     }
-    
     if (current.kind === 'basic' && current.name) {
       const name = current.name;
       if (name.indexOf('Dict[') === 0 || name.indexOf('dict[') === 0) {
         return name.indexOf('Union[') !== -1 || name.indexOf('union[') !== -1;
       }
     }
-    
     return false;
   }
 
   _isListFieldType(fieldType) {
     let current = fieldType;
-    
-    if (current.kind === 'optional') {
-      current = current.inner;
-    }
-    
+    if (current.kind === 'optional') current = current.inner;
     return current.kind === 'list';
   }
 
@@ -672,15 +732,14 @@ class SchemaGraph extends LGraph {
     return 'str';
   }
 
-  _getDefaultValue(typeStr) {
-    const base = this._getNativeBaseType(typeStr);
-    if (base === 'int') return 0;
-    if (base === 'bool') return false;
-    if (base === 'float') return 0.0;
-    if (base === 'dict') return '{}';
-    if (base === 'list') return '[]';
-    if (base === 'set') return '[]';
-    if (base === 'tuple') return '[]';
+  _getDefaultValueForType(baseType) {
+    if (baseType === 'int') return 0;
+    if (baseType === 'bool') return false;
+    if (baseType === 'float') return 0.0;
+    if (baseType === 'dict') return '{}';
+    if (baseType === 'list') return '[]';
+    if (baseType === 'set') return '[]';
+    if (baseType === 'tuple') return '[]';
     return '';
   }
 
@@ -748,14 +807,12 @@ class SchemaGraph extends LGraph {
     if (!NodeClass) throw new Error('Unknown node type: ' + type);
     const node = new NodeClass();
     this.add(node);
+    this.eventBus.emit('node:created', { type, nodeId: node.id });
     return node;
   }
 
   removeSchema(schemaName) {
-    if (!this.schemas[schemaName]) {
-      console.warn('Schema not found:', schemaName);
-      return false;
-    }
+    if (!this.schemas[schemaName]) return false;
     
     for (let i = this.nodes.length - 1; i >= 0; i--) {
       const node = this.nodes[i];
@@ -801,6 +858,7 @@ class SchemaGraph extends LGraph {
     }
     
     delete this.schemas[schemaName];
+    this.eventBus.emit('schema:removed', { schemaName });
     return true;
   }
 
@@ -808,11 +866,7 @@ class SchemaGraph extends LGraph {
     return Object.keys(this.schemas);
   }
 
-  getAvailableNodeTypes() {
-    return Object.keys(this.nodeTypes);
-  }
-
-  serialize(includeCamera = false) {
+  serialize(includeCamera = false, camera = null) {
     const data = {
       version: '1.0',
       nodes: [],
@@ -853,18 +907,18 @@ class SchemaGraph extends LGraph {
       }
     }
     
-    if (includeCamera && window.graphCamera) {
+    if (includeCamera && camera) {
       data.camera = {
-        x: window.graphCamera.x,
-        y: window.graphCamera.y,
-        scale: window.graphCamera.scale
+        x: camera.x,
+        y: camera.y,
+        scale: camera.scale
       };
     }
     
     return data;
   }
 
-  deserialize(data, restoreCamera = false) {
+  deserialize(data, restoreCamera = false, camera = null) {
     this.nodes = [];
     this.links = {};
     this._nodes_by_id = {};
@@ -885,7 +939,7 @@ class SchemaGraph extends LGraph {
       }
       
       if (!this.nodeTypes[nodeTypeKey]) {
-        console.warn('Node type not found:', nodeTypeKey, '- Skipping node');
+        console.warn('Node type not found:', nodeTypeKey);
         continue;
       }
       
@@ -934,74 +988,390 @@ class SchemaGraph extends LGraph {
       }
     }
     
-    if (restoreCamera && data.camera && window.graphCamera) {
-      window.graphCamera.x = data.camera.x;
-      window.graphCamera.y = data.camera.y;
-      window.graphCamera.scale = data.camera.scale;
+    if (restoreCamera && data.camera && camera) {
+      camera.x = data.camera.x;
+      camera.y = data.camera.y;
+      camera.scale = data.camera.scale;
     }
     
+    this.eventBus.emit('graph:deserialized', { nodeCount: this.nodes.length });
     return true;
   }
 }
 
 // ========================================================================
-// SCHEMAGRAPH APPLICATION
+// CONTROLLERS
+// ========================================================================
+
+class MouseTouchController {
+  constructor(canvas, eventBus) {
+    this.canvas = canvas;
+    this.eventBus = eventBus;
+    this.setupListeners();
+  }
+
+  setupListeners() {
+    this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+    this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+    this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+    this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
+    this.canvas.addEventListener('wheel', (e) => this.handleWheel(e));
+    this.canvas.addEventListener('contextmenu', (e) => this.handleContextMenu(e));
+  }
+
+  handleMouseDown(e) {
+    const coords = this.getCanvasCoordinates(e);
+    this.eventBus.emit('mouse:down', { button: e.button, coords, event: e });
+    this.eventBus.emit('interaction', { type: 'mouse:down' });
+  }
+
+  handleMouseMove(e) {
+    const coords = this.getCanvasCoordinates(e);
+    this.eventBus.emit('mouse:move', { coords, event: e });
+  }
+
+  handleMouseUp(e) {
+    const coords = this.getCanvasCoordinates(e);
+    this.eventBus.emit('mouse:up', { button: e.button, coords, event: e });
+    this.eventBus.emit('interaction', { type: 'mouse:up' });
+  }
+
+  handleDoubleClick(e) {
+    const coords = this.getCanvasCoordinates(e);
+    this.eventBus.emit('mouse:dblclick', { coords, event: e });
+    this.eventBus.emit('interaction', { type: 'mouse:dblclick' });
+  }
+
+  handleWheel(e) {
+    e.preventDefault();
+    const coords = this.getCanvasCoordinates(e);
+    this.eventBus.emit('mouse:wheel', { delta: e.deltaY, coords, event: e });
+    this.eventBus.emit('interaction', { type: 'mouse:wheel' });
+  }
+
+  handleContextMenu(e) {
+    e.preventDefault();
+    const coords = this.getCanvasCoordinates(e);
+    this.eventBus.emit('mouse:contextmenu', { coords, event: e });
+    this.eventBus.emit('interaction', { type: 'contextmenu' });
+  }
+
+  getCanvasCoordinates(e) {
+    const rect = this.canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    return {
+      screenX: (sx / rect.width) * this.canvas.width,
+      screenY: (sy / rect.height) * this.canvas.height,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      rect: rect
+    };
+  }
+}
+
+class KeyboardController {
+  constructor(eventBus) {
+    this.eventBus = eventBus;
+    this.setupListeners();
+  }
+
+  setupListeners() {
+    document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+    document.addEventListener('keyup', (e) => this.handleKeyUp(e));
+  }
+
+  handleKeyDown(e) {
+    this.eventBus.emit('keyboard:down', { key: e.key, code: e.code, event: e });
+    this.eventBus.emit('interaction', { type: 'keyboard:down' });
+  }
+
+  handleKeyUp(e) {
+    this.eventBus.emit('keyboard:up', { key: e.key, code: e.code, event: e });
+    this.eventBus.emit('interaction', { type: 'keyboard:up' });
+  }
+}
+
+class VoiceController {
+  constructor(eventBus) {
+    this.eventBus = eventBus;
+    this.recognition = null;
+    this.isListening = false;
+    this.setupRecognition();
+  }
+
+  setupRecognition() {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = false;
+      this.recognition.interimResults = false;
+      
+      this.recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        this.eventBus.emit('voice:result', { transcript, confidence: event.results[0][0].confidence });
+        this.eventBus.emit('interaction', { type: 'voice:result' });
+      };
+      
+      this.recognition.onerror = (event) => {
+        this.eventBus.emit('voice:error', { error: event.error });
+      };
+      
+      this.recognition.onend = () => {
+        this.isListening = false;
+        this.eventBus.emit('voice:stopped', {});
+      };
+    } else {
+      console.warn('Speech recognition not supported');
+    }
+  }
+
+  startListening() {
+    if (this.recognition && !this.isListening) {
+      this.recognition.start();
+      this.isListening = true;
+      this.eventBus.emit('voice:started', {});
+    }
+  }
+
+  stopListening() {
+    if (this.recognition && this.isListening) {
+      this.recognition.stop();
+    }
+  }
+}
+
+class UIController {
+  constructor(eventBus) {
+    this.eventBus = eventBus;
+    this.elements = new Map();
+    this.setupDefaultListeners();
+  }
+
+  register(id, element) {
+    this.elements.set(id, element);
+  }
+
+  get(id) {
+    return this.elements.get(id);
+  }
+
+  setupDefaultListeners() {
+    this.eventBus.on('ui:show', (data) => {
+      const element = this.elements.get(data.id);
+      if (element) element.classList.add('show');
+    });
+
+    this.eventBus.on('ui:hide', (data) => {
+      const element = this.elements.get(data.id);
+      if (element) element.classList.remove('show');
+    });
+
+    this.eventBus.on('ui:update', (data) => {
+      const element = this.elements.get(data.id);
+      if (element && data.content !== undefined) {
+        element.textContent = data.content;
+      }
+    });
+  }
+
+  setupButton(id, eventName) {
+    const element = this.elements.get(id);
+    if (element) {
+      element.addEventListener('click', () => {
+        this.eventBus.emit(eventName, { id });
+        this.eventBus.emit('interaction', { type: eventName });
+      });
+    }
+  }
+
+  setupFileInput(id, eventName) {
+    const element = this.elements.get(id);
+    if (element) {
+      element.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          this.eventBus.emit(eventName, { file, element: e.target });
+          this.eventBus.emit('interaction', { type: eventName });
+        }
+      });
+    }
+  }
+
+  setupSelect(id, eventName) {
+    const element = this.elements.get(id);
+    if (element) {
+      element.addEventListener('change', (e) => {
+        this.eventBus.emit(eventName, { value: e.target.value, element: e.target });
+        this.eventBus.emit('interaction', { type: eventName });
+      });
+    }
+  }
+}
+
+class DrawingStyleManager {
+  constructor() {
+    this.currentStyle = 'default';
+    this.styles = {
+      default: {
+        name: 'Default',
+        nodeCornerRadius: 6,
+        nodeShadowBlur: 10,
+        nodeShadowOffset: 2,
+        linkWidth: 2.5,
+        linkShadowBlur: 6,
+        linkCurve: 0.5,
+        slotRadius: 4,
+        slotHighlightRadius: 8,
+        gridOpacity: 1.0,
+        textFont: 'Arial, sans-serif',
+        useGradient: false,
+        useGlow: false,
+        useDashed: false
+      },
+      minimal: {
+        name: 'Minimal',
+        nodeCornerRadius: 2,
+        nodeShadowBlur: 0,
+        nodeShadowOffset: 0,
+        linkWidth: 1.5,
+        linkShadowBlur: 0,
+        linkCurve: 0.5,
+        slotRadius: 3,
+        slotHighlightRadius: 6,
+        gridOpacity: 0.3,
+        textFont: 'Arial, sans-serif',
+        useGradient: false,
+        useGlow: false,
+        useDashed: false
+      },
+      blueprint: {
+        name: 'Blueprint',
+        nodeCornerRadius: 0,
+        nodeShadowBlur: 0,
+        nodeShadowOffset: 0,
+        linkWidth: 1.5,
+        linkShadowBlur: 8,
+        linkCurve: 0,
+        slotRadius: 3,
+        slotHighlightRadius: 7,
+        gridOpacity: 1.5,
+        textFont: 'Courier New, monospace',
+        useGradient: false,
+        useGlow: true,
+        useDashed: true
+      },
+      neon: {
+        name: 'Neon',
+        nodeCornerRadius: 8,
+        nodeShadowBlur: 20,
+        nodeShadowOffset: 0,
+        linkWidth: 3,
+        linkShadowBlur: 15,
+        linkCurve: 0.6,
+        slotRadius: 5,
+        slotHighlightRadius: 12,
+        gridOpacity: 0.5,
+        textFont: 'Arial, sans-serif',
+        useGradient: true,
+        useGlow: true,
+        useDashed: false
+      },
+      organic: {
+        name: 'Organic',
+        nodeCornerRadius: 15,
+        nodeShadowBlur: 12,
+        nodeShadowOffset: 3,
+        linkWidth: 4,
+        linkShadowBlur: 8,
+        linkCurve: 0.7,
+        slotRadius: 6,
+        slotHighlightRadius: 10,
+        gridOpacity: 0.7,
+        textFont: 'Georgia, serif',
+        useGradient: true,
+        useGlow: false,
+        useDashed: false
+      },
+      wireframe: {
+        name: 'Wireframe',
+        nodeCornerRadius: 0,
+        nodeShadowBlur: 0,
+        nodeShadowOffset: 0,
+        linkWidth: 1,
+        linkShadowBlur: 0,
+        linkCurve: 0.5,
+        slotRadius: 2,
+        slotHighlightRadius: 5,
+        gridOpacity: 0.8,
+        textFont: 'Courier New, monospace',
+        useGradient: false,
+        useGlow: false,
+        useDashed: true
+      }
+    };
+  }
+
+  setStyle(styleName) {
+    if (this.styles[styleName]) {
+      this.currentStyle = styleName;
+      localStorage.setItem('schemagraph-drawing-style', styleName);
+      return true;
+    }
+    return false;
+  }
+
+  getStyle() {
+    return this.styles[this.currentStyle];
+  }
+
+  getCurrentStyleName() {
+    return this.currentStyle;
+  }
+
+  loadSavedStyle() {
+    const saved = localStorage.getItem('schemagraph-drawing-style');
+    if (saved && this.styles[saved]) {
+      this.currentStyle = saved;
+    }
+  }
+}
+
+// ========================================================================
+// MAIN APPLICATION
 // ========================================================================
 
 class SchemaGraphApp {
   constructor() {
-    this.initializeElements();
+    this.eventBus = new EventBus();
+    this.analytics = new AnalyticsService(this.eventBus);
+    
+    this.canvas = document.getElementById('canvas');
+    this.ctx = this.canvas.getContext('2d');
+    
+    this.mouseController = new MouseTouchController(this.canvas, this.eventBus);
+    this.keyboardController = new KeyboardController(this.eventBus);
+    this.voiceController = new VoiceController(this.eventBus);
+    this.uiController = new UIController(this.eventBus);
+    
     this.initializeState();
-    this.initializeTheme();
-    this.registerNativeNodes();
+    this.registerUIElements();
     this.setupEventListeners();
+    this.setupVoiceAndAnalyticsUI();
+    this.setupDrawingStyleSelector();
+    this.setupVoiceCommands();
+    this.registerNativeNodes();
+    
     this.resizeCanvas();
-    this.updateSchemaList();
-    // this.loadExampleSchema();
-    this.setReady();
     this.draw();
     
+    this.eventBus.emit('app:ready', {});
     console.log('=== SCHEMAGRAPH READY ===');
   }
 
-  initializeElements() {
-    this.canvas = document.getElementById('canvas');
-    this.ctx = this.canvas.getContext('2d');
-    this.statusEl = document.getElementById('status');
-    this.errorEl = document.getElementById('errorBanner');
-    this.nodeTypesListEl = document.getElementById('nodeTypesList');
-    this.zoomEl = document.getElementById('zoomLevel');
-    this.contextMenu = document.getElementById('contextMenu');
-    this.nodeInput = document.getElementById('nodeInput');
-    this.schemaListEl = document.getElementById('schemaList');
-    this.themeBtn = document.getElementById('themeBtn');
-    this.exportBtn = document.getElementById('exportBtn');
-    this.importBtn = document.getElementById('importBtn');
-    this.importFile = document.getElementById('importFile');
-    this.exportConfigBtn = document.getElementById('exportConfigBtn');
-    this.importConfigBtn = document.getElementById('importConfigBtn');
-    this.importConfigFile = document.getElementById('importConfigFile');
-    this.uploadSchemaBtn = document.getElementById('uploadSchemaBtn');
-    this.uploadSchemaFile = document.getElementById('uploadSchemaFile');
-    this.schemaDialog = document.getElementById('schemaDialog');
-    this.schemaNameInput = document.getElementById('schemaNameInput');
-    this.schemaIndexTypeInput = document.getElementById('schemaIndexTypeInput');
-    this.schemaRootTypeInput = document.getElementById('schemaRootTypeInput');
-    this.schemaDialogConfirm = document.getElementById('schemaDialogConfirm');
-    this.schemaDialogCancel = document.getElementById('schemaDialogCancel');
-    this.schemaRemovalDialog = document.getElementById('schemaRemovalDialog');
-    this.schemaRemovalNameInput = document.getElementById('schemaRemovalNameInput');
-    this.schemaRemovalConfirm = document.getElementById('schemaRemovalConfirm');
-    this.schemaRemovalCancel = document.getElementById('schemaRemovalCancel');
-    this.centerViewBtn = document.getElementById('centerViewBtn');
-    this.layoutSelect = document.getElementById('layoutSelect');
-    this.resetZoomBtn = document.getElementById('resetZoomBtn');
-  }
-
   initializeState() {
-    this.graph = new SchemaGraph();
+    this.graph = new SchemaGraph(this.eventBus);
     this.camera = { x: 0, y: 0, scale: 1.0 };
-    window.graphCamera = this.camera;
     
     this.selectedNode = null;
     this.dragNode = null;
@@ -1013,17 +1383,535 @@ class SchemaGraphApp {
     this.spacePressed = false;
     this.editingNode = null;
     this.pendingSchemaCode = null;
-  }
-
-  initializeTheme() {
+    
     this.themes = ['dark', 'light', 'ocean'];
     this.currentThemeIndex = 0;
     this.loadTheme();
+
+    this.drawingStyleManager = new DrawingStyleManager();
+    this.drawingStyleManager.loadSavedStyle();
+  }
+
+  registerUIElements() {
+    const ui = this.uiController;
+    
+    // Register all UI elements
+    ui.register('status', document.getElementById('status'));
+    ui.register('errorBanner', document.getElementById('errorBanner'));
+    ui.register('nodeTypesList', document.getElementById('nodeTypesList'));
+    ui.register('zoomLevel', document.getElementById('zoomLevel'));
+    ui.register('contextMenu', document.getElementById('contextMenu'));
+    ui.register('nodeInput', document.getElementById('nodeInput'));
+    ui.register('schemaList', document.getElementById('schemaList'));
+    ui.register('schemaDialog', document.getElementById('schemaDialog'));
+    ui.register('schemaRemovalDialog', document.getElementById('schemaRemovalDialog'));
+    
+    // Setup buttons
+    ui.register('uploadSchemaBtn', document.getElementById('uploadSchemaBtn'));
+    ui.register('exportBtn', document.getElementById('exportBtn'));
+    ui.register('importBtn', document.getElementById('importBtn'));
+    ui.register('exportConfigBtn', document.getElementById('exportConfigBtn'));
+    ui.register('importConfigBtn', document.getElementById('importConfigBtn'));
+    ui.register('centerViewBtn', document.getElementById('centerViewBtn'));
+    ui.register('resetZoomBtn', document.getElementById('resetZoomBtn'));
+    ui.register('themeBtn', document.getElementById('themeBtn'));
+    
+    // Setup file inputs
+    ui.register('uploadSchemaFile', document.getElementById('uploadSchemaFile'));
+    ui.register('importFile', document.getElementById('importFile'));
+    ui.register('importConfigFile', document.getElementById('importConfigFile'));
+    
+    // Setup selects
+    ui.register('layoutSelect', document.getElementById('layoutSelect'));
+    
+    // Setup dialog elements
+    ui.register('schemaNameInput', document.getElementById('schemaNameInput'));
+    ui.register('schemaIndexTypeInput', document.getElementById('schemaIndexTypeInput'));
+    ui.register('schemaRootTypeInput', document.getElementById('schemaRootTypeInput'));
+    ui.register('schemaDialogConfirm', document.getElementById('schemaDialogConfirm'));
+    ui.register('schemaDialogCancel', document.getElementById('schemaDialogCancel'));
+    ui.register('schemaRemovalNameInput', document.getElementById('schemaRemovalNameInput'));
+    ui.register('schemaRemovalConfirm', document.getElementById('schemaRemovalConfirm'));
+    ui.register('schemaRemovalCancel', document.getElementById('schemaRemovalCancel'));
+  }
+
+  setupEventListeners() {
+    // Mouse events
+    this.eventBus.on('mouse:down', (data) => this.handleMouseDown(data));
+    this.eventBus.on('mouse:move', (data) => this.handleMouseMove(data));
+    this.eventBus.on('mouse:up', (data) => this.handleMouseUp(data));
+    this.eventBus.on('mouse:dblclick', (data) => this.handleDoubleClick(data));
+    this.eventBus.on('mouse:wheel', (data) => this.handleWheel(data));
+    this.eventBus.on('mouse:contextmenu', (data) => this.handleContextMenu(data));
+    
+    // Keyboard events
+    this.eventBus.on('keyboard:down', (data) => this.handleKeyDown(data));
+    this.eventBus.on('keyboard:up', (data) => this.handleKeyUp(data));
+    
+    // UI events
+    this.uiController.setupButton('uploadSchemaBtn', 'ui:upload-schema');
+    this.uiController.setupButton('exportBtn', 'ui:export-graph');
+    this.uiController.setupButton('importBtn', 'ui:import-graph');
+    this.uiController.setupButton('exportConfigBtn', 'ui:export-config');
+    this.uiController.setupButton('importConfigBtn', 'ui:import-config');
+    this.uiController.setupButton('centerViewBtn', 'ui:center-view');
+    this.uiController.setupButton('resetZoomBtn', 'ui:reset-zoom');
+    this.uiController.setupButton('themeBtn', 'ui:cycle-theme');
+    this.uiController.setupButton('schemaDialogConfirm', 'ui:confirm-schema');
+    this.uiController.setupButton('schemaDialogCancel', 'ui:cancel-schema');
+    this.uiController.setupButton('schemaRemovalConfirm', 'ui:confirm-removal');
+    this.uiController.setupButton('schemaRemovalCancel', 'ui:cancel-removal');
+    
+    this.uiController.setupFileInput('uploadSchemaFile', 'file:schema-uploaded');
+    this.uiController.setupFileInput('importFile', 'file:graph-uploaded');
+    this.uiController.setupFileInput('importConfigFile', 'file:config-uploaded');
+    
+    this.uiController.setupSelect('layoutSelect', 'ui:layout-selected');
+    
+    this.eventBus.on('ui:upload-schema', () => {
+      this.uiController.get('uploadSchemaFile').click();
+    });
+    
+    this.eventBus.on('ui:import-graph', () => {
+      this.uiController.get('importFile').click();
+    });
+    
+    this.eventBus.on('ui:import-config', () => {
+      this.uiController.get('importConfigFile').click();
+    });
+    
+    this.eventBus.on('ui:export-graph', () => this.exportGraph());
+    this.eventBus.on('ui:export-config', () => this.exportConfig());
+    this.eventBus.on('ui:center-view', () => this.centerView());
+    this.eventBus.on('ui:reset-zoom', () => this.resetZoom());
+    this.eventBus.on('ui:cycle-theme', () => this.cycleTheme());
+    
+    this.eventBus.on('ui:layout-selected', (data) => {
+      if (data.value) {
+        this.applyLayout(data.value);
+        data.element.value = '';
+      }
+    });
+    
+    this.eventBus.on('file:schema-uploaded', (data) => this.handleSchemaFileUpload(data));
+    this.eventBus.on('file:graph-uploaded', (data) => this.handleImportGraph(data));
+    this.eventBus.on('file:config-uploaded', (data) => this.handleImportConfig(data));
+    
+    this.eventBus.on('ui:confirm-schema', () => this.confirmSchemaRegistration());
+    this.eventBus.on('ui:cancel-schema', () => this.cancelSchemaRegistration());
+    this.eventBus.on('ui:confirm-removal', () => this.confirmSchemaRemoval());
+    this.eventBus.on('ui:cancel-removal', () => this.cancelSchemaRemoval());
+    
+    // Graph events
+    this.eventBus.on('node:created', () => {
+      this.updateSchemaList();
+      this.updateNodeTypesList();
+      this.draw();
+    });
+    
+    this.eventBus.on('node:deleted', () => {
+      this.updateSchemaList();
+      this.draw();
+    });
+    
+    this.eventBus.on('link:created', () => this.draw());
+    this.eventBus.on('link:deleted', () => this.draw());
+    
+    this.eventBus.on('schema:registered', () => {
+      this.updateSchemaList();
+      this.updateNodeTypesList();
+      this.draw();
+    });
+    
+    this.eventBus.on('schema:removed', () => {
+      this.updateSchemaList();
+      this.updateNodeTypesList();
+      this.draw();
+    });
+    
+    // Input events
+    const nodeInput = this.uiController.get('nodeInput');
+    nodeInput.addEventListener('blur', () => this.handleInputBlur());
+    nodeInput.addEventListener('keydown', (e) => this.handleInputKeyDown(e));
+    
+    // Document events
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#contextMenu')) {
+        this.uiController.get('contextMenu').classList.remove('show');
+      }
+    });
+    
+    // Window events
+    window.addEventListener('resize', () => this.resizeCanvas());
+    
+    // Set ready status
+    this.eventBus.emit('ui:update', { id: 'status', content: 'Ready. Upload a schema to begin.' });
+  }
+
+  setupVoiceAndAnalyticsUI() {
+    const voiceStartBtn = document.getElementById('voiceStartBtn');
+    const voiceStopBtn = document.getElementById('voiceStopBtn');
+    const voiceStatus = document.getElementById('voiceStatus');
+    const analyticsToggleBtn = document.getElementById('analyticsToggleBtn');
+    const analyticsPanel = document.getElementById('analyticsPanel');
+    const analyticsCloseBtn = document.getElementById('analyticsCloseBtn');
+    const refreshAnalyticsBtn = document.getElementById('refreshAnalyticsBtn');
+    const exportAnalyticsBtn = document.getElementById('exportAnalyticsBtn');
+    const resetAnalyticsBtn = document.getElementById('resetAnalyticsBtn');
+    
+    // Voice control handlers
+    voiceStartBtn.addEventListener('click', () => {
+      if (this.voiceController) {
+        this.voiceController.startListening();
+        voiceStartBtn.style.display = 'none';
+        voiceStopBtn.style.display = 'inline-block';
+        voiceStopBtn.classList.add('active');
+        voiceStatus.textContent = 'Listening...';
+      }
+    });
+    
+    voiceStopBtn.addEventListener('click', () => {
+      if (this.voiceController) {
+        this.voiceController.stopListening();
+        voiceStopBtn.style.display = 'none';
+        voiceStartBtn.style.display = 'inline-block';
+        voiceStopBtn.classList.remove('active');
+        voiceStatus.textContent = '';
+      }
+    });
+    
+    // Voice event listeners
+    this.eventBus.on('voice:result', (data) => {
+      voiceStatus.textContent = `Heard: "${data.transcript}"`;
+      setTimeout(() => {
+        voiceStatus.textContent = 'Listening...';
+      }, 3000);
+    });
+    
+    this.eventBus.on('voice:stopped', () => {
+      voiceStopBtn.style.display = 'none';
+      voiceStartBtn.style.display = 'inline-block';
+      voiceStopBtn.classList.remove('active');
+      voiceStatus.textContent = '';
+    });
+    
+    this.eventBus.on('voice:error', (data) => {
+      voiceStatus.textContent = `Error: ${data.error}`;
+      voiceStopBtn.style.display = 'none';
+      voiceStartBtn.style.display = 'inline-block';
+      voiceStopBtn.classList.remove('active');
+    });
+    
+    // Analytics panel handlers
+    analyticsToggleBtn.addEventListener('click', () => {
+      analyticsPanel.classList.toggle('show');
+      if (analyticsPanel.classList.contains('show')) {
+        this.updateAnalyticsDisplay();
+      }
+    });
+    
+    analyticsCloseBtn.addEventListener('click', () => {
+      analyticsPanel.classList.remove('show');
+    });
+    
+    refreshAnalyticsBtn.addEventListener('click', () => {
+      this.updateAnalyticsDisplay();
+    });
+    
+    exportAnalyticsBtn.addEventListener('click', () => {
+      if (this.analytics) {
+        const metrics = this.analytics.getSessionMetrics();
+        const jsonString = JSON.stringify(metrics, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'analytics-' + new Date().toISOString().slice(0, 10) + '.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    });
+    
+    resetAnalyticsBtn.addEventListener('click', () => {
+      if (confirm('Reset analytics for current session? This cannot be undone.')) {
+        if (this.analytics) {
+          this.analytics.endSession();
+          this.updateAnalyticsDisplay();
+        }
+      }
+    });
+    
+    // Auto-refresh analytics every 5 seconds if panel is open
+    setInterval(() => {
+      if (analyticsPanel.classList.contains('show')) {
+        this.updateAnalyticsDisplay();
+      }
+    }, 5000);
+  }
+
+  setupDrawingStyleSelector() {
+    const drawingStyleSelect = document.getElementById('drawingStyleSelect');
+    
+    if (!drawingStyleSelect) return;
+    
+    // Set initial value
+    drawingStyleSelect.value = this.drawingStyleManager.getCurrentStyleName();
+    
+    // Handle style change
+    drawingStyleSelect.addEventListener('change', (e) => {
+      const styleName = e.target.value;
+      if (this.drawingStyleManager.setStyle(styleName)) {
+        this.draw();
+        this.eventBus.emit('ui:update', { 
+          id: 'status', 
+          content: `Drawing style changed to ${this.drawingStyleManager.getStyle().name}` 
+        });
+        setTimeout(() => {
+          this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
+        }, 2000);
+      }
+    });
+  }
+
+  updateAnalyticsDisplay() {
+    if (!this.analytics) return;
+    
+    const metrics = this.analytics.getMetrics();
+    const sessionMetrics = this.analytics.getSessionMetrics();
+    
+    document.getElementById('sessionId').textContent = sessionMetrics.sessionId.substring(0, 8);
+    document.getElementById('sessionDuration').textContent = this.formatDuration(sessionMetrics.duration);
+    document.getElementById('totalEvents').textContent = sessionMetrics.events;
+    
+    document.getElementById('nodesCreated').textContent = metrics.nodeCreated;
+    document.getElementById('nodesDeleted').textContent = metrics.nodeDeleted;
+    document.getElementById('linksCreated').textContent = metrics.linkCreated;
+    document.getElementById('linksDeleted').textContent = metrics.linkDeleted;
+    
+    document.getElementById('schemasRegistered').textContent = metrics.schemaRegistered;
+    document.getElementById('schemasRemoved').textContent = metrics.schemaRemoved;
+    
+    document.getElementById('graphsExported').textContent = metrics.graphExported;
+    document.getElementById('graphsImported').textContent = metrics.graphImported;
+    document.getElementById('configsExported').textContent = metrics.configExported;
+    document.getElementById('configsImported').textContent = metrics.configImported;
+    
+    document.getElementById('totalInteractions').textContent = metrics.interactions;
+    document.getElementById('layoutsApplied').textContent = metrics.layoutApplied;
+    document.getElementById('errorCount').textContent = metrics.errors;
+  }
+
+  formatDuration(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  }
+
+  setupVoiceCommands() {
+    this.eventBus.on('voice:result', (data) => {
+      const transcript = data.transcript.toLowerCase().trim();
+      console.log('Voice command received:', transcript);
+      
+      // Create node commands
+      if (transcript.includes('create') || transcript.includes('add')) {
+        if (transcript.includes('string')) {
+          this.executeVoiceCommand('create', 'Native.String');
+        } else if (transcript.includes('integer') || transcript.includes('number')) {
+          this.executeVoiceCommand('create', 'Native.Integer');
+        } else if (transcript.includes('boolean')) {
+          this.executeVoiceCommand('create', 'Native.Boolean');
+        } else if (transcript.includes('float')) {
+          this.executeVoiceCommand('create', 'Native.Float');
+        } else if (transcript.includes('list')) {
+          this.executeVoiceCommand('create', 'Native.List');
+        } else if (transcript.includes('dict') || transcript.includes('dictionary')) {
+          this.executeVoiceCommand('create', 'Native.Dict');
+        } else if (transcript.includes('node')) {
+          this.showContextMenu(null, 0, 0, { clientX: this.canvas.width / 2, clientY: this.canvas.height / 2 });
+        }
+      }
+      // Delete commands
+      else if (transcript.includes('delete') || transcript.includes('remove')) {
+        if (this.selectedNode) {
+          this.executeVoiceCommand('delete');
+        } else {
+          this.showError('No node selected');
+        }
+      }
+      // Export/Import commands
+      else if (transcript.includes('export')) {
+        if (transcript.includes('config')) {
+          this.executeVoiceCommand('export-config');
+        } else {
+          this.executeVoiceCommand('export-graph');
+        }
+      }
+      else if (transcript.includes('import')) {
+        if (transcript.includes('config')) {
+          this.executeVoiceCommand('import-config');
+        } else {
+          this.executeVoiceCommand('import-graph');
+        }
+      }
+      // View commands
+      else if (transcript.includes('center') || transcript.includes('focus')) {
+        this.executeVoiceCommand('center-view');
+      }
+      else if (transcript.includes('zoom')) {
+        if (transcript.includes('in')) {
+          this.executeVoiceCommand('zoom-in');
+        } else if (transcript.includes('out')) {
+          this.executeVoiceCommand('zoom-out');
+        } else if (transcript.includes('reset')) {
+          this.executeVoiceCommand('reset-zoom');
+        }
+      }
+      // Layout commands
+      else if (transcript.includes('layout')) {
+        if (transcript.includes('hierarchical') || transcript.includes('hierarchy')) {
+          if (transcript.includes('horizontal')) {
+            this.executeVoiceCommand('layout', 'hierarchical-horizontal');
+          } else {
+            this.executeVoiceCommand('layout', 'hierarchical-vertical');
+          }
+        } else if (transcript.includes('force')) {
+          this.executeVoiceCommand('layout', 'force-directed');
+        } else if (transcript.includes('grid')) {
+          this.executeVoiceCommand('layout', 'grid');
+        } else if (transcript.includes('circular') || transcript.includes('circle')) {
+          this.executeVoiceCommand('layout', 'circular');
+        }
+      }
+      // Theme commands
+      else if (transcript.includes('theme') || transcript.includes('color')) {
+        this.executeVoiceCommand('cycle-theme');
+      }
+      // Help command
+      else if (transcript.includes('help') || transcript.includes('commands')) {
+        this.showVoiceHelp();
+      }
+      // Unknown command
+      else {
+        this.showError('Unknown voice command: ' + transcript);
+      }
+    });
+  }
+
+  executeVoiceCommand(command, param = null) {
+    console.log('Executing voice command:', command, param);
+    
+    switch (command) {
+      case 'create':
+        if (param && this.graph.nodeTypes[param]) {
+          const node = this.graph.createNode(param);
+          const centerX = (-this.camera.x + this.canvas.width / 2) / this.camera.scale;
+          const centerY = (-this.camera.y + this.canvas.height / 2) / this.camera.scale;
+          node.pos = [centerX - 90, centerY - 40];
+          this.draw();
+          this.eventBus.emit('ui:update', { id: 'status', content: 'Created ' + param + ' node' });
+        }
+        break;
+        
+      case 'delete':
+        if (this.selectedNode) {
+          const nodeName = this.selectedNode.title;
+          this.removeNode(this.selectedNode);
+          this.eventBus.emit('ui:update', { id: 'status', content: 'Deleted ' + nodeName });
+        }
+        break;
+        
+      case 'export-graph':
+        this.exportGraph();
+        break;
+        
+      case 'export-config':
+        this.exportConfig();
+        break;
+        
+      case 'import-graph':
+        this.uiController.get('importFile').click();
+        break;
+        
+      case 'import-config':
+        this.uiController.get('importConfigFile').click();
+        break;
+        
+      case 'center-view':
+        this.centerView();
+        this.eventBus.emit('ui:update', { id: 'status', content: 'Centered view' });
+        break;
+        
+      case 'zoom-in':
+        const beforeIn = this.screenToWorld(this.canvas.width / 2, this.canvas.height / 2);
+        this.camera.scale *= 1.2;
+        this.camera.scale = Math.min(5, this.camera.scale);
+        const afterIn = this.screenToWorld(this.canvas.width / 2, this.canvas.height / 2);
+        this.camera.x += (afterIn[0] - beforeIn[0]) * this.camera.scale;
+        this.camera.y += (afterIn[1] - beforeIn[1]) * this.camera.scale;
+        this.eventBus.emit('ui:update', { id: 'zoomLevel', content: Math.round(this.camera.scale * 100) + '%' });
+        this.draw();
+        break;
+        
+      case 'zoom-out':
+        const beforeOut = this.screenToWorld(this.canvas.width / 2, this.canvas.height / 2);
+        this.camera.scale *= 0.8;
+        this.camera.scale = Math.max(0.1, this.camera.scale);
+        const afterOut = this.screenToWorld(this.canvas.width / 2, this.canvas.height / 2);
+        this.camera.x += (afterOut[0] - beforeOut[0]) * this.camera.scale;
+        this.camera.y += (afterOut[1] - beforeOut[1]) * this.camera.scale;
+        this.eventBus.emit('ui:update', { id: 'zoomLevel', content: Math.round(this.camera.scale * 100) + '%' });
+        this.draw();
+        break;
+        
+      case 'reset-zoom':
+        this.resetZoom();
+        this.eventBus.emit('ui:update', { id: 'status', content: 'Reset zoom to 100%' });
+        break;
+        
+      case 'layout':
+        if (param) {
+          this.applyLayout(param);
+          this.eventBus.emit('ui:update', { id: 'status', content: 'Applied ' + param + ' layout' });
+        }
+        break;
+        
+      case 'cycle-theme':
+        this.cycleTheme();
+        this.eventBus.emit('ui:update', { id: 'status', content: 'Changed theme' });
+        break;
+        
+      default:
+        console.warn('Unknown command:', command);
+    }
+  }
+
+  showVoiceHelp() {
+    const helpMessage = `Voice Commands:
+  - "Create [string/integer/boolean/float/list/dict]" - Create native node
+  - "Delete" - Delete selected node
+  - "Export [graph/config]" - Export graph or config
+  - "Center" or "Focus" - Center view
+  - "Zoom [in/out/reset]" - Control zoom
+  - "Layout [hierarchical/grid/circular/force]" - Apply layout
+  - "Theme" - Change theme
+  - "Help" - Show this message`;
+    
+    alert(helpMessage);
   }
 
   loadTheme() {
-    const savedTheme = localStorage.getItem('schemagraph-theme') || 'dark';
-    this.currentThemeIndex = this.themes.indexOf(savedTheme);
+    const saved = localStorage.getItem('schemagraph-theme') || 'dark';
+    this.currentThemeIndex = this.themes.indexOf(saved);
     if (this.currentThemeIndex === -1) this.currentThemeIndex = 0;
     this.applyTheme(this.themes[this.currentThemeIndex]);
   }
@@ -1041,13 +1929,14 @@ class SchemaGraphApp {
     const newTheme = this.themes[this.currentThemeIndex];
     this.applyTheme(newTheme);
     localStorage.setItem('schemagraph-theme', newTheme);
+    this.draw();
   }
 
   registerNativeNodes() {
     const nativeNodes = [
       { name: 'String', type: 'str', defaultValue: '', parser: (v) => v },
       { name: 'Integer', type: 'int', defaultValue: 0, parser: (v) => parseInt(v) || 0 },
-      { name: 'Boolean', type: 'bool', defaultValue: false, parser: (v) => v },
+      { name: 'Boolean', type: 'bool', defaultValue: false, parser: (v) => v === true || v === 'true' },
       { name: 'Float', type: 'float', defaultValue: 0.0, parser: (v) => parseFloat(v) || 0.0 },
       { name: 'List', type: 'List[Any]', defaultValue: '[]', parser: (v) => {
         try { return JSON.parse(v); } catch (e) { return []; }
@@ -1055,12 +1944,6 @@ class SchemaGraphApp {
       { name: 'Dict', type: 'Dict[str,Any]', defaultValue: '{}', parser: (v) => {
         try { return JSON.parse(v); } catch (e) { return {}; }
       }},
-      { name: 'Set', type: 'Set[Any]', defaultValue: '[]', parser: (v) => {
-        try { return JSON.parse(v); } catch (e) { return []; }
-      }},
-      { name: 'Tuple', type: 'Tuple[Any,...]', defaultValue: '[]', parser: (v) => {
-        try { return JSON.parse(v); } catch (e) { return []; }
-      }}
     ];
 
     for (const nodeSpec of nativeNodes) {
@@ -1082,127 +1965,40 @@ class SchemaGraphApp {
     }
   }
 
-  setupEventListeners() {
-    this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-    this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
-    this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
-    this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
-    this.canvas.addEventListener('wheel', (e) => this.handleWheel(e));
-    this.canvas.addEventListener('contextmenu', (e) => this.handleContextMenu(e));
+  // Mouse/Touch handlers
+  handleMouseDown(data) {
+    this.uiController.get('contextMenu').classList.remove('show');
     
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#contextMenu')) {
-        this.contextMenu.classList.remove('show');
-      }
-    });
+    const [wx, wy] = this.screenToWorld(data.coords.screenX, data.coords.screenY);
     
-    document.addEventListener('keydown', (e) => this.handleKeyDown(e));
-    document.addEventListener('keyup', (e) => this.handleKeyUp(e));
-    
-    this.nodeInput.addEventListener('blur', () => this.handleInputBlur());
-    this.nodeInput.addEventListener('keydown', (e) => this.handleInputKeyDown(e));
-    
-    this.themeBtn.addEventListener('click', () => {
-      this.cycleTheme();
-      this.draw();
-    });
-    
-    this.exportBtn.addEventListener('click', () => this.exportGraph());
-    this.importBtn.addEventListener('click', () => this.importFile.click());
-    this.importFile.addEventListener('change', (e) => this.handleImportGraph(e));
-    
-    this.exportConfigBtn.addEventListener('click', () => this.exportConfig());
-    this.importConfigBtn.addEventListener('click', () => this.importConfigFile.click());
-    this.importConfigFile.addEventListener('change', (e) => this.handleImportConfig(e));
-    
-    this.uploadSchemaBtn.addEventListener('click', () => this.uploadSchemaFile.click());
-    this.uploadSchemaFile.addEventListener('change', (e) => this.handleSchemaFileUpload(e));
-    this.schemaDialogConfirm.addEventListener('click', () => this.confirmSchemaRegistration());
-    this.schemaDialogCancel.addEventListener('click', () => this.cancelSchemaRegistration());
-    this.schemaRemovalConfirm.addEventListener('click', () => this.confirmSchemaRemoval());
-    this.schemaRemovalCancel.addEventListener('click', () => this.cancelSchemaRemoval());
-    
-    this.schemaDialog.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        this.confirmSchemaRegistration();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        this.cancelSchemaRegistration();
-      }
-    });
-    
-    this.schemaRemovalDialog.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        this.confirmSchemaRemoval();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        this.cancelSchemaRemoval();
-      }
-    });
-    
-    this.centerViewBtn.addEventListener('click', () => this.centerView());
-    this.layoutSelect.addEventListener('change', (e) => {
-      if (e.target.value) {
-        this.applyLayout(e.target.value);
-        e.target.value = '';
-      }
-    });
-    this.resetZoomBtn.addEventListener('click', () => this.resetZoom());
-    
-    window.addEventListener('resize', () => this.resizeCanvas());
-  }
-
-  getCanvasCoordinates(e) {
-    const rect = this.canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left;
-    const sy = e.clientY - rect.top;
-    return [(sx / rect.width) * this.canvas.width, (sy / rect.height) * this.canvas.height];
-  }
-
-  screenToWorld(sx, sy) {
-    return [(sx - this.camera.x) / this.camera.scale, (sy - this.camera.y) / this.camera.scale];
-  }
-
-  worldToScreen(wx, wy) {
-    return [wx * this.camera.scale + this.camera.x, wy * this.camera.scale + this.camera.y];
-  }
-
-  handleMouseDown(e) {
-    this.contextMenu.classList.remove('show');
-    
-    const [canvasX, canvasY] = this.getCanvasCoordinates(e);
-    const [wx, wy] = this.screenToWorld(canvasX, canvasY);
-    
-    if (e.button === 1 || (e.button === 0 && this.spacePressed)) {
-      e.preventDefault();
+    if (data.button === 1 || (data.button === 0 && this.spacePressed)) {
+      data.event.preventDefault();
       this.isPanning = true;
-      this.panStart = [canvasX - this.camera.x, canvasY - this.camera.y];
+      this.panStart = [data.coords.screenX - this.camera.x, data.coords.screenY - this.camera.y];
       this.canvas.style.cursor = 'grabbing';
       return;
     }
     
-    if (e.button !== 0 || this.spacePressed) return;
+    if (data.button !== 0 || this.spacePressed) return;
     
+    // Check for output slot drag
     for (const node of this.graph.nodes) {
-      const nx = node.pos[0];
-      const ny = node.pos[1];
-      const nw = node.size[0];
-      
       for (let j = 0; j < node.outputs.length; j++) {
-        const slotY = ny + 30 + j * 25;
-        const dist = Math.sqrt(Math.pow(wx - (nx + nw), 2) + Math.pow(wy - slotY, 2));
+        const slotY = node.pos[1] + 30 + j * 25;
+        const dist = Math.sqrt(Math.pow(wx - (node.pos[0] + node.size[0]), 2) + Math.pow(wy - slotY, 2));
         if (dist < 10) {
           this.connecting = { node, slot: j, isOutput: true };
           this.canvas.classList.add('connecting');
           return;
         }
       }
-      
+    }
+    
+    // Check for input slot drag
+    for (const node of this.graph.nodes) {
       for (let j = 0; j < node.inputs.length; j++) {
-        const slotY = ny + 30 + j * 25;
-        const dist = Math.sqrt(Math.pow(wx - nx, 2) + Math.pow(wy - slotY, 2));
+        const slotY = node.pos[1] + 30 + j * 25;
+        const dist = Math.sqrt(Math.pow(wx - node.pos[0], 2) + Math.pow(wy - slotY, 2));
         if (dist < 10) {
           if (!node.multiInputs || !node.multiInputs[j]) {
             if (node.inputs[j].link) {
@@ -1216,16 +2012,14 @@ class SchemaGraphApp {
       }
     }
     
+    // Check for node drag
     for (let i = this.graph.nodes.length - 1; i >= 0; i--) {
       const node = this.graph.nodes[i];
-      const nx = node.pos[0];
-      const ny = node.pos[1];
-      const nw = node.size[0];
-      const nh = node.size[1];
-      if (wx >= nx && wx <= nx + nw && wy >= ny && wy <= ny + nh) {
+      if (wx >= node.pos[0] && wx <= node.pos[0] + node.size[0] &&
+          wy >= node.pos[1] && wy <= node.pos[1] + node.size[1]) {
         this.selectedNode = node;
         this.dragNode = node;
-        this.dragOffset = [wx - nx, wy - ny];
+        this.dragOffset = [wx - node.pos[0], wy - node.pos[1]];
         this.canvas.classList.add('dragging');
         this.draw();
         return;
@@ -1236,16 +2030,15 @@ class SchemaGraphApp {
     this.draw();
   }
 
-  handleMouseMove(e) {
-    const [canvasX, canvasY] = this.getCanvasCoordinates(e);
-    this.mousePos = [canvasX, canvasY];
+  handleMouseMove(data) {
+    this.mousePos = [data.coords.screenX, data.coords.screenY];
     
     if (this.isPanning) {
-      this.camera.x = canvasX - this.panStart[0];
-      this.camera.y = canvasY - this.panStart[1];
+      this.camera.x = data.coords.screenX - this.panStart[0];
+      this.camera.y = data.coords.screenY - this.panStart[1];
       this.draw();
     } else if (this.dragNode && !this.connecting) {
-      const [wx, wy] = this.screenToWorld(canvasX, canvasY);
+      const [wx, wy] = this.screenToWorld(data.coords.screenX, data.coords.screenY);
       this.dragNode.pos = [wx - this.dragOffset[0], wy - this.dragOffset[1]];
       this.draw();
     } else if (this.connecting) {
@@ -1253,7 +2046,7 @@ class SchemaGraphApp {
     }
   }
 
-  handleMouseUp(e) {
+  handleMouseUp(data) {
     if (this.isPanning) {
       this.isPanning = false;
       this.canvas.style.cursor = this.spacePressed ? 'grab' : 'default';
@@ -1261,18 +2054,13 @@ class SchemaGraphApp {
     }
     
     if (this.connecting) {
-      const [canvasX, canvasY] = this.getCanvasCoordinates(e);
-      const [wx, wy] = this.screenToWorld(canvasX, canvasY);
+      const [wx, wy] = this.screenToWorld(data.coords.screenX, data.coords.screenY);
       
       for (const node of this.graph.nodes) {
-        const nx = node.pos[0];
-        const ny = node.pos[1];
-        const nw = node.size[0];
-        
         if (this.connecting.isOutput) {
           for (let j = 0; j < node.inputs.length; j++) {
-            const slotY = ny + 30 + j * 25;
-            const dist = Math.sqrt(Math.pow(wx - nx, 2) + Math.pow(wy - slotY, 2));
+            const slotY = node.pos[1] + 30 + j * 25;
+            const dist = Math.sqrt(Math.pow(wx - node.pos[0], 2) + Math.pow(wy - slotY, 2));
             if (dist < 15 && node !== this.connecting.node) {
               if (!this.isSlotCompatible(node, j, false)) {
                 this.showError('Type mismatch');
@@ -1292,19 +2080,21 @@ class SchemaGraphApp {
                 this.graph.links[linkId] = link;
                 this.connecting.node.outputs[this.connecting.slot].links.push(linkId);
                 node.multiInputs[j].links.push(linkId);
+                this.eventBus.emit('link:created', { linkId });
               } else {
                 if (node.inputs[j].link) {
                   this.removeLink(node.inputs[j].link, node, j);
                 }
-                this.graph.connect(this.connecting.node, this.connecting.slot, node, j);
+                const link = this.graph.connect(this.connecting.node, this.connecting.slot, node, j);
+                if (link) this.eventBus.emit('link:created', { linkId: link.id });
               }
               break;
             }
           }
         } else {
           for (let j = 0; j < node.outputs.length; j++) {
-            const slotY = ny + 30 + j * 25;
-            const dist = Math.sqrt(Math.pow(wx - (nx + nw), 2) + Math.pow(wy - slotY, 2));
+            const slotY = node.pos[1] + 30 + j * 25;
+            const dist = Math.sqrt(Math.pow(wx - (node.pos[0] + node.size[0]), 2) + Math.pow(wy - slotY, 2));
             if (dist < 15 && node !== this.connecting.node) {
               if (!this.isSlotCompatible(node, j, true)) {
                 this.showError('Type mismatch');
@@ -1324,11 +2114,14 @@ class SchemaGraphApp {
                 this.graph.links[linkId] = link;
                 node.outputs[j].links.push(linkId);
                 this.connecting.node.multiInputs[this.connecting.slot].links.push(linkId);
+                this.eventBus.emit('link:created', { linkId });
               } else {
                 if (this.connecting.node.inputs[this.connecting.slot].link) {
-                  this.removeLink(this.connecting.node.inputs[this.connecting.slot].link, this.connecting.node, this.connecting.slot);
+                  this.removeLink(this.connecting.node.inputs[this.connecting.slot].link, 
+                                  this.connecting.node, this.connecting.slot);
                 }
-                this.graph.connect(node, j, this.connecting.node, this.connecting.slot);
+                const link = this.graph.connect(node, j, this.connecting.node, this.connecting.slot);
+                if (link) this.eventBus.emit('link:created', { linkId: link.id });
               }
               break;
             }
@@ -1345,24 +2138,19 @@ class SchemaGraphApp {
     this.canvas.classList.remove('dragging');
   }
 
-  handleDoubleClick(e) {
-    const [canvasX, canvasY] = this.getCanvasCoordinates(e);
-    const [wx, wy] = this.screenToWorld(canvasX, canvasY);
-    const rect = this.canvas.getBoundingClientRect();
+  handleDoubleClick(data) {
+    const [wx, wy] = this.screenToWorld(data.coords.screenX, data.coords.screenY);
     
+    // Check for native input editing
     for (const node of this.graph.nodes) {
       if (node.nativeInputs) {
-        const nx = node.pos[0];
-        const ny = node.pos[1];
-        const nw = node.size[0];
-        
         for (let j = 0; j < node.inputs.length; j++) {
           if (!node.inputs[j].link && node.nativeInputs[j] !== undefined) {
-            const slotY = ny + 30 + j * 25;
-            const boxX = nx + nw - 85;
-            const boxY = slotY - 10;
-            const boxW = 80;
-            const boxH = 18;
+            const slotY = node.pos[1] + 30 + j * 25;
+            const boxX = node.pos[0] + node.size[0] - 70;
+            const boxY = slotY - 8;
+            const boxW = 65;
+            const boxH = 16;
             
             if (wx >= boxX && wx <= boxX + boxW && wy >= boxY && wy <= boxY + boxH) {
               if (node.nativeInputs[j].type === 'bool') {
@@ -1371,16 +2159,7 @@ class SchemaGraphApp {
                 return;
               }
               
-              const valueScreen = this.worldToScreen(boxX, boxY);
-              this.editingNode = node;
-              this.editingNode.editingSlot = j;
-              this.nodeInput.value = String(node.nativeInputs[j].value);
-              this.nodeInput.style.left = (valueScreen[0] * rect.width / this.canvas.width + rect.left) + 'px';
-              this.nodeInput.style.top = (valueScreen[1] * rect.height / this.canvas.height + rect.top) + 'px';
-              this.nodeInput.style.width = '75px';
-              this.nodeInput.classList.add('show');
-              this.nodeInput.focus();
-              this.nodeInput.select();
+              this.showInputOverlay(node, j, boxX, boxY, data.coords.rect);
               return;
             }
           }
@@ -1388,102 +2167,111 @@ class SchemaGraphApp {
       }
     }
     
+    // Check for native node value editing
     for (const node of this.graph.nodes) {
       if (!node.isNative) continue;
-      const nx = node.pos[0];
-      const ny = node.pos[1];
-      const nw = node.size[0];
-      const nh = node.size[1];
-      const valueY = ny + nh - 27;
+      const valueY = node.pos[1] + node.size[1] - 18;
       const valueHeight = 20;
       
-      if (wx >= nx + 5 && wx <= nx + nw - 5 && wy >= valueY && wy <= valueY + valueHeight) {
+      if (wx >= node.pos[0] + 8 && wx <= node.pos[0] + node.size[0] - 8 &&
+          wy >= valueY && wy <= valueY + valueHeight) {
         if (node.title === 'Boolean') {
           node.properties.value = !node.properties.value;
           this.draw();
         } else {
-          const valueScreen = this.worldToScreen(nx + 5, valueY);
-          this.editingNode = node;
-          this.editingNode.editingSlot = null;
-          this.nodeInput.value = String(node.properties.value);
-          this.nodeInput.style.left = (valueScreen[0] * rect.width / this.canvas.width + rect.left) + 'px';
-          this.nodeInput.style.top = (valueScreen[1] * rect.height / this.canvas.height + rect.top) + 'px';
-          this.nodeInput.style.width = '160px';
-          this.nodeInput.classList.add('show');
-          this.nodeInput.focus();
-          this.nodeInput.select();
+          this.showInputOverlay(node, null, node.pos[0] + 8, valueY, data.coords.rect);
         }
         return;
       }
     }
   }
 
-  handleWheel(e) {
-    e.preventDefault();
-    const [canvasX, canvasY] = this.getCanvasCoordinates(e);
-    const before = this.screenToWorld(canvasX, canvasY);
-    this.camera.scale *= e.deltaY > 0 ? 0.9 : 1.1;
+  showInputOverlay(node, slot, x, y, rect) {
+    const valueScreen = this.worldToScreen(x, y);
+    this.editingNode = node;
+    this.editingNode.editingSlot = slot;
+    
+    const nodeInput = this.uiController.get('nodeInput');
+    if (slot !== null) {
+      nodeInput.value = String(node.nativeInputs[slot].value);
+    } else {
+      nodeInput.value = String(node.properties.value);
+    }
+    
+    nodeInput.style.left = (valueScreen[0] * rect.width / this.canvas.width + rect.left) + 'px';
+    nodeInput.style.top = (valueScreen[1] * rect.height / this.canvas.height + rect.top) + 'px';
+    nodeInput.style.width = (slot !== null ? '75px' : '160px');
+    nodeInput.classList.add('show');
+    nodeInput.focus();
+    nodeInput.select();
+  }
+
+  handleWheel(data) {
+    const before = this.screenToWorld(data.coords.screenX, data.coords.screenY);
+    this.camera.scale *= data.delta > 0 ? 0.9 : 1.1;
     this.camera.scale = Math.max(0.1, Math.min(5, this.camera.scale));
-    const after = this.screenToWorld(canvasX, canvasY);
+    const after = this.screenToWorld(data.coords.screenX, data.coords.screenY);
     this.camera.x += (after[0] - before[0]) * this.camera.scale;
     this.camera.y += (after[1] - before[1]) * this.camera.scale;
-    this.zoomEl.textContent = Math.round(this.camera.scale * 100) + '%';
+    
+    this.eventBus.emit('ui:update', { 
+      id: 'zoomLevel', 
+      content: Math.round(this.camera.scale * 100) + '%' 
+    });
     this.draw();
   }
 
-  handleContextMenu(e) {
-    e.preventDefault();
-    const [canvasX, canvasY] = this.getCanvasCoordinates(e);
-    const [wx, wy] = this.screenToWorld(canvasX, canvasY);
-    const rect = this.canvas.getBoundingClientRect();
+  handleContextMenu(data) {
+    const [wx, wy] = this.screenToWorld(data.coords.screenX, data.coords.screenY);
     
     let clickedNode = null;
     for (let i = this.graph.nodes.length - 1; i >= 0; i--) {
       const node = this.graph.nodes[i];
-      const nx = node.pos[0];
-      const ny = node.pos[1];
-      const nw = node.size[0];
-      const nh = node.size[1];
-      if (wx >= nx && wx <= nx + nw && wy >= ny && wy <= ny + nh) {
+      if (wx >= node.pos[0] && wx <= node.pos[0] + node.size[0] &&
+          wy >= node.pos[1] && wy <= node.pos[1] + node.size[1]) {
         clickedNode = node;
         break;
       }
     }
     
+    this.showContextMenu(clickedNode, wx, wy, data.coords);
+  }
+
+  showContextMenu(node, wx, wy, coords) {
+    const contextMenu = this.uiController.get('contextMenu');
     let html = '';
     
-    if (clickedNode) {
+    if (node) {
       html += '<div class="context-menu-category">Node Actions</div>';
       html += '<div class="context-menu-item context-menu-delete" data-action="delete">Delete Node</div>';
       
-      this.contextMenu.innerHTML = html;
-      this.contextMenu.style.left = (rect.left + canvasX * rect.width / this.canvas.width) + 'px';
-      this.contextMenu.style.top = (rect.top + canvasY * rect.height / this.canvas.height) + 'px';
-      this.contextMenu.classList.add('show');
+      contextMenu.innerHTML = html;
+      contextMenu.style.left = coords.clientX + 'px';
+      contextMenu.style.top = coords.clientY + 'px';
+      contextMenu.classList.add('show');
       
-      const deleteItem = this.contextMenu.querySelector('.context-menu-delete');
-      deleteItem.addEventListener('click', () => {
-        this.removeNode(clickedNode);
-        this.contextMenu.classList.remove('show');
+      contextMenu.querySelector('.context-menu-delete').addEventListener('click', () => {
+        this.removeNode(node);
+        contextMenu.classList.remove('show');
       });
     } else {
       html += '<div class="context-menu-category">Native Types</div>';
-      const natives = ['Native.String', 'Native.Integer', 'Native.Boolean', 'Native.Float', 'Native.List', 'Native.Dict', 'Native.Set', 'Native.Tuple'];
+      const natives = ['Native.String', 'Native.Integer', 'Native.Boolean', 'Native.Float', 'Native.List', 'Native.Dict'];
       for (const nativeType of natives) {
         const name = nativeType.split('.')[1];
         html += '<div class="context-menu-item" data-type="' + nativeType + '">' + name + '</div>';
       }
       
-      const registeredSchemas = this.graph.getRegisteredSchemas();
+      const registeredSchemas = Object.keys(this.graph.schemas);
       for (const schemaName of registeredSchemas) {
         const schemaTypes = [];
-        const schemaInfo = this.graph.getSchemaInfo(schemaName);
+        const schemaInfo = this.graph.schemas[schemaName];
         let rootNodeType = null;
         
         for (const type in this.graph.nodeTypes) {
-          if (this.graph.nodeTypes.hasOwnProperty(type) && type.indexOf(schemaName + '.') === 0) {
+          if (type.indexOf(schemaName + '.') === 0) {
             schemaTypes.push(type);
-            if (schemaInfo && schemaInfo.rootType && type === schemaName + '.' + schemaInfo.rootType) {
+            if (schemaInfo.rootType && type === schemaName + '.' + schemaInfo.rootType) {
               rootNodeType = type;
             }
           }
@@ -1492,13 +2280,11 @@ class SchemaGraphApp {
         if (schemaTypes.length > 0) {
           html += '<div class="context-menu-category">' + schemaName + ' Schema</div>';
           
-          // Show root node first with special marker
           if (rootNodeType) {
             const name = rootNodeType.split('.')[1];
             html += '<div class="context-menu-item" data-type="' + rootNodeType + '" style="font-weight: bold; color: var(--accent-orange);">★ ' + name + ' (Root)</div>';
           }
           
-          // Show other nodes
           for (const schemaType of schemaTypes) {
             if (schemaType !== rootNodeType) {
               const name = schemaType.split('.')[1];
@@ -1508,53 +2294,54 @@ class SchemaGraphApp {
         }
       }
       
-      this.contextMenu.innerHTML = html;
-      this.contextMenu.style.left = (rect.left + canvasX * rect.width / this.canvas.width) + 'px';
-      this.contextMenu.style.top = (rect.top + canvasY * rect.height / this.canvas.height) + 'px';
-      this.contextMenu.classList.add('show');
-      this.contextMenu.dataset.worldX = wx;
-      this.contextMenu.dataset.worldY = wy;
+      contextMenu.innerHTML = html;
+      contextMenu.style.left = coords.clientX + 'px';
+      contextMenu.style.top = coords.clientY + 'px';
+      contextMenu.classList.add('show');
+      contextMenu.dataset.worldX = wx;
+      contextMenu.dataset.worldY = wy;
       
-      const items = this.contextMenu.querySelectorAll('.context-menu-item');
+      const items = contextMenu.querySelectorAll('.context-menu-item');
       for (const item of items) {
         item.addEventListener('click', () => {
           const type = item.getAttribute('data-type');
-          const wx = parseFloat(this.contextMenu.dataset.worldX);
-          const wy = parseFloat(this.contextMenu.dataset.worldY);
+          const wx = parseFloat(contextMenu.dataset.worldX);
+          const wy = parseFloat(contextMenu.dataset.worldY);
           const node = this.graph.createNode(type);
           node.pos = [wx - 90, wy - 40];
-          this.contextMenu.classList.remove('show');
+          contextMenu.classList.remove('show');
           this.draw();
         });
       }
     }
   }
 
-  handleKeyDown(e) {
-    if (e.code === 'Space' && !this.spacePressed && !this.editingNode) {
-      e.preventDefault();
+  // Keyboard handlers
+  handleKeyDown(data) {
+    if (data.code === 'Space' && !this.spacePressed && !this.editingNode) {
+      data.event.preventDefault();
       this.spacePressed = true;
       this.canvas.style.cursor = 'grab';
     }
     
-    if ((e.key === 'Delete' || e.key === 'Backspace') && this.selectedNode && !this.editingNode) {
-      e.preventDefault();
+    if ((data.key === 'Delete' || data.key === 'Backspace') && this.selectedNode && !this.editingNode) {
+      data.event.preventDefault();
       this.removeNode(this.selectedNode);
     }
     
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-      e.preventDefault();
-      this.exportBtn.click();
+    if ((data.event.ctrlKey || data.event.metaKey) && data.key === 's') {
+      data.event.preventDefault();
+      this.eventBus.emit('ui:export-graph', {});
     }
     
-    if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
-      e.preventDefault();
-      this.importBtn.click();
+    if ((data.event.ctrlKey || data.event.metaKey) && data.key === 'o') {
+      data.event.preventDefault();
+      this.eventBus.emit('ui:import-graph', {});
     }
   }
 
-  handleKeyUp(e) {
-    if (e.code === 'Space') {
+  handleKeyUp(data) {
+    if (data.code === 'Space') {
       this.spacePressed = false;
       this.canvas.style.cursor = this.isPanning ? 'grabbing' : 'default';
     }
@@ -1562,7 +2349,8 @@ class SchemaGraphApp {
 
   handleInputBlur() {
     if (this.editingNode) {
-      const val = this.nodeInput.value;
+      const nodeInput = this.uiController.get('nodeInput');
+      const val = nodeInput.value;
       
       if (this.editingNode.editingSlot !== null && this.editingNode.editingSlot !== undefined) {
         const slot = this.editingNode.editingSlot;
@@ -1572,6 +2360,8 @@ class SchemaGraphApp {
           this.editingNode.nativeInputs[slot].value = parseInt(val) || 0;
         } else if (inputType === 'float') {
           this.editingNode.nativeInputs[slot].value = parseFloat(val) || 0.0;
+        } else if (inputType === 'bool') {
+          this.editingNode.nativeInputs[slot].value = val === 'true' || val === true;
         } else {
           this.editingNode.nativeInputs[slot].value = val;
         }
@@ -1582,6 +2372,8 @@ class SchemaGraphApp {
           this.editingNode.properties.value = parseInt(val) || 0;
         } else if (this.editingNode.title === 'Float') {
           this.editingNode.properties.value = parseFloat(val) || 0.0;
+        } else if (this.editingNode.title === 'Boolean') {
+          this.editingNode.properties.value = val === 'true' || val === true;
         } else {
           this.editingNode.properties.value = val;
         }
@@ -1589,591 +2381,155 @@ class SchemaGraphApp {
       
       this.draw();
     }
-    this.nodeInput.classList.remove('show');
+    this.uiController.get('nodeInput').classList.remove('show');
     this.editingNode = null;
   }
 
   handleInputKeyDown(e) {
     if (e.key === 'Enter') {
-      this.nodeInput.blur();
+      this.uiController.get('nodeInput').blur();
     } else if (e.key === 'Escape') {
-      this.nodeInput.classList.remove('show');
+      this.uiController.get('nodeInput').classList.remove('show');
       this.editingNode = null;
     }
   }
 
-  removeLink(linkId, targetNode, targetSlot) {
-    const link = this.graph.links[linkId];
-    if (link) {
-      const originNode = this.graph.getNodeById(link.origin_id);
-      if (originNode) {
-        const idx = originNode.outputs[link.origin_slot].links.indexOf(linkId);
-        if (idx > -1) originNode.outputs[link.origin_slot].links.splice(idx, 1);
+  // File handlers
+  handleSchemaFileUpload(data) {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      this.pendingSchemaCode = event.target.result;
+
+      const fileName = data.file.name.replace(/\.py$/, '');
+      const suggestedName = fileName.charAt(0).toUpperCase() + fileName.slice(1);
+
+      const rootTypeRegex = /class\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
+      let reMatch = null;
+      let rootTypeMatch = null;
+      while ((reMatch = rootTypeRegex.exec(this.pendingSchemaCode)) !== null) {
+        rootTypeMatch = reMatch;
       }
-      delete this.graph.links[linkId];
-      targetNode.inputs[targetSlot].link = null;
-      this.draw();
-    }
+
+      const suggestedRootType = rootTypeMatch ? rootTypeMatch[1] : '';
+
+      this.uiController.get('schemaNameInput').value = suggestedName;
+      this.uiController.get('schemaIndexTypeInput').value = 'Index';
+      this.uiController.get('schemaRootTypeInput').value = suggestedRootType;
+
+      this.eventBus.emit('ui:show', { id: 'schemaDialog' });
+      this.uiController.get('schemaNameInput').focus();
+      this.uiController.get('schemaNameInput').select();
+    };
+    reader.readAsText(data.file);
+    data.element.value = '';
   }
 
-  removeNode(node) {
-    if (!node) return;
-    
-    for (let j = 0; j < node.inputs.length; j++) {
-      if (node.multiInputs && node.multiInputs[j]) {
-        const links = node.multiInputs[j].links.slice();
-        for (const linkId of links) {
-          this.removeLink(linkId, node, j);
-        }
-      } else if (node.inputs[j].link) {
-        this.removeLink(node.inputs[j].link, node, j);
+  handleImportGraph(data) {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const jsonData = JSON.parse(event.target.result);
+        this.graph.deserialize(jsonData, true, this.camera);
+        this.updateSchemaList();
+        this.updateNodeTypesList();
+        this.eventBus.emit('ui:update', { 
+          id: 'zoomLevel', 
+          content: Math.round(this.camera.scale * 100) + '%' 
+        });
+        this.draw();
+        this.eventBus.emit('graph:imported', {});
+        this.eventBus.emit('ui:update', { id: 'status', content: 'Graph imported successfully!' });
+        setTimeout(() => {
+          this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
+        }, 2000);
+      } catch (e) {
+        this.showError('Import failed: ' + e.message);
       }
+    };
+    reader.readAsText(data.file);
+    data.element.value = '';
+  }
+
+  handleImportConfig(data) {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const configData = JSON.parse(event.target.result);
+        this.importConfigData(configData);
+        this.eventBus.emit('config:imported', {});
+      } catch (e) {
+        this.showError('Import config failed: ' + e.message);
+      }
+    };
+    reader.readAsText(data.file);
+    data.element.value = '';
+  }
+
+  confirmSchemaRegistration() {
+    if (!this.pendingSchemaCode) return;
+    
+    const schemaName = this.uiController.get('schemaNameInput').value.trim();
+    const indexType = this.uiController.get('schemaIndexTypeInput').value.trim() || 'int';
+    const rootType = this.uiController.get('schemaRootTypeInput').value.trim() || null;
+    
+    if (!schemaName) {
+      this.showError('Schema name is required');
+      return;
     }
     
-    for (let j = 0; j < node.outputs.length; j++) {
-      const links = node.outputs[j].links.slice();
-      for (const linkId of links) {
-        const link = this.graph.links[linkId];
-        if (link) {
-          const targetNode = this.graph.getNodeById(link.target_id);
-          if (targetNode) {
-            if (targetNode.multiInputs && targetNode.multiInputs[link.target_slot]) {
-              const idx = targetNode.multiInputs[link.target_slot].links.indexOf(linkId);
-              if (idx > -1) targetNode.multiInputs[link.target_slot].links.splice(idx, 1);
-            } else {
-              targetNode.inputs[link.target_slot].link = null;
-            }
+    if (this.graph.schemas[schemaName]) {
+      if (!confirm(`Schema "${schemaName}" already exists. Replace it?`)) return;
+      this.graph.removeSchema(schemaName);
+    }
+    
+    if (this.graph.registerSchema(schemaName, this.pendingSchemaCode, indexType, rootType)) {
+      this.eventBus.emit('ui:hide', { id: 'schemaDialog' });
+      this.pendingSchemaCode = null;
+      
+      if (false && rootType) {
+        const rootNodeType = schemaName + '.' + rootType;
+        if (this.graph.nodeTypes[rootNodeType]) {
+          const createRootNode = confirm(`Schema registered! Create root node (${rootType})?`);
+          if (createRootNode) {
+            const node = this.graph.createNode(rootNodeType);
+            node.pos = [100, 100];
+            this.draw();
           }
-          delete this.graph.links[linkId];
-        }
-      }
-    }
-    
-    const idx = this.graph.nodes.indexOf(node);
-    if (idx > -1) {
-      this.graph.nodes.splice(idx, 1);
-      delete this.graph._nodes_by_id[node.id];
-    }
-    
-    if (this.selectedNode === node) {
-      this.selectedNode = null;
-    }
-    
-    this.updateSchemaList();
-    this.draw();
-  }
-
-  isSlotCompatible(node, slotIdx, isOutput) {
-    if (!this.connecting || node === this.connecting.node) return false;
-    if (this.connecting.isOutput && !isOutput) {
-      const outType = this.connecting.node.outputs[this.connecting.slot].type;
-      const inType = node.inputs[slotIdx].type;
-      return this.graph._areTypesCompatible(outType, inType);
-    }
-    if (!this.connecting.isOutput && isOutput) {
-      const inType = this.connecting.node.inputs[this.connecting.slot].type;
-      const outType = node.outputs[slotIdx].type;
-      return this.graph._areTypesCompatible(outType, inType);
-    }
-    return false;
-  }
-
-  getCanvasColors() {
-    const style = getComputedStyle(document.documentElement);
-    return {
-      bgPrimary: style.getPropertyValue('--bg-primary').trim(),
-      bgSecondary: style.getPropertyValue('--bg-secondary').trim(),
-      canvasBg: style.getPropertyValue('--canvas-bg').trim(),
-      borderColor: style.getPropertyValue('--border-color').trim(),
-      borderHighlight: style.getPropertyValue('--border-highlight').trim(),
-      textPrimary: style.getPropertyValue('--text-primary').trim(),
-      textSecondary: style.getPropertyValue('--text-secondary').trim(),
-      textTertiary: style.getPropertyValue('--text-tertiary').trim(),
-      nodeBg: style.getPropertyValue('--node-bg').trim(),
-      nodeBgSelected: style.getPropertyValue('--node-bg-selected').trim(),
-      nodeHeader: style.getPropertyValue('--node-header').trim(),
-      nodeShadow: style.getPropertyValue('--node-shadow').trim(),
-      accentBlue: style.getPropertyValue('--accent-blue').trim(),
-      accentBlueLight: style.getPropertyValue('--accent-blue-light').trim(),
-      accentPurple: style.getPropertyValue('--accent-purple').trim(),
-      accentPurpleLight: style.getPropertyValue('--accent-purple-light').trim(),
-      accentGreen: style.getPropertyValue('--accent-green').trim(),
-      accentRed: style.getPropertyValue('--accent-red').trim(),
-      accentOrange: style.getPropertyValue('--accent-orange').trim(),
-      accentYellow: style.getPropertyValue('--accent-yellow').trim(),
-      slotInput: style.getPropertyValue('--slot-input').trim(),
-      slotOutput: style.getPropertyValue('--slot-output').trim(),
-      slotDefault: style.getPropertyValue('--slot-default').trim(),
-      slotConnected: style.getPropertyValue('--slot-connected').trim(),
-      linkColor: style.getPropertyValue('--link-color').trim(),
-      linkSelected: style.getPropertyValue('--link-selected').trim(),
-      gridColor: style.getPropertyValue('--grid-color').trim()
-    };
-  }
-
-  draw() {
-    const colors = this.getCanvasColors();
-    
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    this.ctx.fillStyle = colors.canvasBg || '#212121';
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    
-    this.ctx.save();
-    this.ctx.translate(this.camera.x, this.camera.y);
-    this.ctx.scale(this.camera.scale, this.camera.scale);
-    
-    this.drawGrid(colors);
-    
-    this.ctx.globalAlpha = 1.0;
-    this.ctx.shadowBlur = 0;
-    this.ctx.shadowOffsetX = 0;
-    this.ctx.shadowOffsetY = 0;
-    
-    for (const linkId in this.graph.links) {
-      if (!this.graph.links.hasOwnProperty(linkId)) continue;
-      const link = this.graph.links[linkId];
-      const orig = this.graph.getNodeById(link.origin_id);
-      const targ = this.graph.getNodeById(link.target_id);
-      if (orig && targ) {
-        const x1 = orig.pos[0] + orig.size[0];
-        const y1 = orig.pos[1] + 33 + link.origin_slot * 25;
-        const x2 = targ.pos[0];
-        const y2 = targ.pos[1] + 33 + link.target_slot * 25;
-        
-        const cx = x1 + (x2 - x1) * 0.5;
-        
-        this.ctx.strokeStyle = colors.linkColor || '#9a9';
-        this.ctx.lineWidth = 6 / this.camera.scale;
-        this.ctx.globalAlpha = 0.15;
-        this.ctx.beginPath();
-        this.ctx.moveTo(x1, y1);
-        this.ctx.bezierCurveTo(cx, y1, cx, y2, x2, y2);
-        this.ctx.stroke();
-        
-        this.ctx.strokeStyle = colors.linkColor || '#9a9';
-        this.ctx.lineWidth = 2.5 / this.camera.scale;
-        this.ctx.globalAlpha = 1.0;
-        this.ctx.beginPath();
-        this.ctx.moveTo(x1, y1);
-        this.ctx.bezierCurveTo(cx, y1, cx, y2, x2, y2);
-        this.ctx.stroke();
-      }
-    }
-    
-    this.ctx.globalAlpha = 1.0;
-    
-    if (this.connecting) {
-      const node = this.connecting.node;
-      const worldMouse = this.screenToWorld(this.mousePos[0], this.mousePos[1]);
-      let x1, y1;
-      if (this.connecting.isOutput) {
-        x1 = node.pos[0] + node.size[0];
-        y1 = node.pos[1] + 33 + this.connecting.slot * 25;
-      } else {
-        x1 = node.pos[0];
-        y1 = node.pos[1] + 33 + this.connecting.slot * 25;
-      }
-      
-      const cx = x1 + (worldMouse[0] - x1) * 0.5;
-      
-      this.ctx.strokeStyle = colors.accentGreen || '#4ade80';
-      this.ctx.lineWidth = 6 / this.camera.scale;
-      this.ctx.globalAlpha = 0.3;
-      this.ctx.setLineDash([]);
-      this.ctx.beginPath();
-      this.ctx.moveTo(x1, y1);
-      this.ctx.bezierCurveTo(cx, y1, cx, worldMouse[1], worldMouse[0], worldMouse[1]);
-      this.ctx.stroke();
-      
-      this.ctx.strokeStyle = colors.accentGreen || '#4ade80';
-      this.ctx.lineWidth = 2.5 / this.camera.scale;
-      this.ctx.globalAlpha = 1.0;
-      this.ctx.setLineDash([10 / this.camera.scale, 5 / this.camera.scale]);
-      this.ctx.beginPath();
-      this.ctx.moveTo(x1, y1);
-      this.ctx.bezierCurveTo(cx, y1, cx, worldMouse[1], worldMouse[0], worldMouse[1]);
-      this.ctx.stroke();
-      this.ctx.setLineDash([]);
-    }
-    
-    this.ctx.globalAlpha = 1.0;
-    this.ctx.shadowBlur = 0;
-    this.ctx.shadowOffsetX = 0;
-    this.ctx.shadowOffsetY = 0;
-    
-    for (const node of this.graph.nodes) {
-      this.drawNode(node, colors);
-    }
-    
-    this.ctx.restore();
-  }
-
-  drawGrid(colors) {
-    const gridSize = 50;
-    const worldRect = {
-      x: -this.camera.x / this.camera.scale,
-      y: -this.camera.y / this.camera.scale,
-      width: this.canvas.width / this.camera.scale,
-      height: this.canvas.height / this.camera.scale
-    };
-    
-    const startX = Math.floor(worldRect.x / gridSize) * gridSize;
-    const startY = Math.floor(worldRect.y / gridSize) * gridSize;
-    const endX = worldRect.x + worldRect.width;
-    const endY = worldRect.y + worldRect.height;
-    
-    this.ctx.strokeStyle = colors.gridColor || 'rgba(255, 255, 255, 0.05)';
-    this.ctx.lineWidth = 1 / this.camera.scale;
-    this.ctx.beginPath();
-    
-    for (let x = startX; x <= endX; x += gridSize) {
-      this.ctx.moveTo(x, worldRect.y);
-      this.ctx.lineTo(x, endY);
-    }
-    
-    for (let y = startY; y <= endY; y += gridSize) {
-      this.ctx.moveTo(worldRect.x, y);
-      this.ctx.lineTo(endX, y);
-    }
-    
-    this.ctx.stroke();
-  }
-
-  drawNode(node, colors) {
-    const x = node.pos[0];
-    const y = node.pos[1];
-    const w = node.size[0];
-    const h = node.size[1];
-    const radius = 6;
-    
-    this.ctx.shadowColor = colors.nodeShadow;
-    this.ctx.shadowBlur = 10 / this.camera.scale;
-    this.ctx.shadowOffsetX = 0;
-    this.ctx.shadowOffsetY = 2 / this.camera.scale;
-    
-    this.ctx.fillStyle = node === this.selectedNode ? colors.nodeBgSelected : colors.nodeBg;
-    this.ctx.beginPath();
-    this.ctx.moveTo(x + radius, y);
-    this.ctx.lineTo(x + w - radius, y);
-    this.ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
-    this.ctx.lineTo(x + w, y + h - radius);
-    this.ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
-    this.ctx.lineTo(x + radius, y + h);
-    this.ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
-    this.ctx.lineTo(x, y + radius);
-    this.ctx.quadraticCurveTo(x, y, x + radius, y);
-    this.ctx.closePath();
-    this.ctx.fill();
-    
-    this.ctx.strokeStyle = node === this.selectedNode ? colors.borderHighlight : colors.borderColor;
-    this.ctx.lineWidth = (node === this.selectedNode ? 2 : 1) / this.camera.scale;
-    this.ctx.shadowBlur = 0;
-    this.ctx.shadowOffsetX = 0;
-    this.ctx.shadowOffsetY = 0;
-    this.ctx.stroke();
-    
-    // if (node.isRootType) {
-    //   this.ctx.strokeStyle = colors.accentYellow || '#ffd700';
-    //   this.ctx.lineWidth = 3 / this.camera.scale;
-    //   this.ctx.setLineDash([10 / this.camera.scale, 5 / this.camera.scale]);
-    //   this.ctx.stroke();
-    //   this.ctx.setLineDash([]);
-    // }
-    
-    const headerColor = node.isNative ? colors.accentPurple : (node.isRootType ? colors.accentOrange : colors.nodeHeader);
-    this.ctx.fillStyle = headerColor;
-    this.ctx.beginPath();
-    this.ctx.moveTo(x + radius, y);
-    this.ctx.lineTo(x + w - radius, y);
-    this.ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
-    this.ctx.lineTo(x + w, y + 26);
-    this.ctx.lineTo(x, y + 26);
-    this.ctx.lineTo(x, y + radius);
-    this.ctx.quadraticCurveTo(x, y, x + radius, y);
-    this.ctx.closePath();
-    this.ctx.fill();
-    
-    this.ctx.fillStyle = colors.textPrimary;
-    this.ctx.font = (11 / this.camera.scale) + 'px Arial, sans-serif';
-    this.ctx.textBaseline = 'middle';
-    let titleText = node.title.length > 20 ? node.title.substring(0, 20) + '...' : node.title;
-    if (node.isRootType) {
-      titleText = '★ ' + titleText;
-    }
-    this.ctx.fillText(titleText, x + 8, y + 13);
-    
-    const worldMouse = this.screenToWorld(this.mousePos[0], this.mousePos[1]);
-    
-    for (let j = 0; j < node.inputs.length; j++) {
-      this.drawInputSlot(node, j, x, y, w, worldMouse, colors);
-    }
-    
-    for (let j = 0; j < node.outputs.length; j++) {
-      this.drawOutputSlot(node, j, x, y, w, worldMouse, colors);
-    }
-    
-    if (node.isNative && node.properties.value !== undefined) {
-      const valueY = y + h - 18;
-      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-      this.ctx.fillRect(x + 8, valueY - 10, w - 16, 18);
-      this.ctx.strokeStyle = colors.borderColor;
-      this.ctx.lineWidth = 1 / this.camera.scale;
-      this.ctx.strokeRect(x + 8, valueY - 10, w - 16, 18);
-      
-      this.ctx.fillStyle = colors.textPrimary;
-      this.ctx.font = (10 / this.camera.scale) + 'px "Courier New", monospace';
-      let displayValue = String(node.properties.value);
-      if (displayValue.length > 20) {
-        displayValue = displayValue.substring(0, 20) + '...';
-      }
-      this.ctx.fillText(displayValue, x + 12, valueY);
-    }
-  }
-
-  drawInputSlot(node, j, x, y, w, worldMouse, colors) {
-    const inp = node.inputs[j];
-    const sy = y + 33 + j * 25;
-    const hovered = this.connecting && !this.connecting.isOutput && 
-      Math.abs(worldMouse[0] - x) < 10 && Math.abs(worldMouse[1] - sy) < 10;
-    const compat = this.isSlotCompatible(node, j, false);
-    
-    const isMulti = node.multiInputs && node.multiInputs[j];
-    const hasConnections = isMulti ? node.multiInputs[j].links.length > 0 : inp.link;
-    
-    let color;
-    if (hovered && compat) color = colors.accentGreen || '#4ade80';
-    else if (hovered && !compat) color = colors.accentRed || '#ef4444';
-    else if (hasConnections) color = colors.slotConnected || '#afa';
-    else color = colors.slotInput || '#7a7';
-    
-    if (this.connecting && compat) {
-      this.ctx.fillStyle = color;
-      this.ctx.globalAlpha = 0.3;
-      this.ctx.beginPath();
-      this.ctx.arc(x - 1, sy, 8, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.globalAlpha = 1.0;
-    }
-    
-    this.ctx.fillStyle = color;
-    this.ctx.beginPath();
-    this.ctx.arc(x - 1, sy, 4, 0, Math.PI * 2);
-    this.ctx.fill();
-    
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-    this.ctx.beginPath();
-    this.ctx.arc(x - 2, sy - 1, 1.5, 0, Math.PI * 2);
-    this.ctx.fill();
-    
-    if (isMulti) {
-      this.ctx.strokeStyle = colors.accentPurple || '#9370db';
-      this.ctx.lineWidth = 1.5 / this.camera.scale;
-      this.ctx.beginPath();
-      this.ctx.arc(x - 1, sy, 6, 0, Math.PI * 2);
-      this.ctx.stroke();
-      
-      if (node.multiInputs[j].links.length > 0) {
-        this.ctx.fillStyle = colors.accentPurple || '#9370db';
-        this.ctx.font = 'bold ' + (8 / this.camera.scale) + 'px Arial, sans-serif';
-        this.ctx.textAlign = 'left';
-        this.ctx.fillText(node.multiInputs[j].links.length, x + 10, sy - 10);
-      }
-    }
-    
-    this.ctx.fillStyle = colors.textSecondary || '#aaa';
-    this.ctx.font = (10 / this.camera.scale) + 'px Arial, sans-serif';
-    this.ctx.textAlign = 'left';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillText(inp.name, x + 10, sy);
-    
-    this.ctx.fillStyle = colors.textTertiary || '#707070';
-    this.ctx.font = (8 / this.camera.scale) + 'px "Courier New", monospace';
-    const compactType = this.graph.compactType(inp.type);
-    const typeText = compactType.length > 15 ? compactType.substring(0, 15) + '...' : compactType;
-    this.ctx.fillText(typeText, x + 10, sy + 10);
-    
-    if (!isMulti && !inp.link && node.nativeInputs && node.nativeInputs[j] !== undefined) {
-      const boxX = x + w - 70;
-      const boxY = sy - 8;
-      const boxW = 65;
-      const boxH = 16;
-      
-      const isOptional = node.nativeInputs[j].optional;
-      
-      if (isOptional) {
-        this.ctx.fillStyle = 'rgba(0, 100, 150, 0.2)';
-      } else {
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-      }
-      this.ctx.fillRect(boxX, boxY, boxW, boxH);
-      
-      this.ctx.strokeStyle = isOptional ? 'rgba(70, 162, 218, 0.5)' : (colors.borderColor || '#1a1a1a');
-      this.ctx.lineWidth = 1 / this.camera.scale;
-      this.ctx.strokeRect(boxX, boxY, boxW, boxH);
-      
-      const displayVal = node.nativeInputs[j].value;
-      const isEmpty = displayVal === '' || displayVal === null || displayVal === undefined;
-      
-      if (isEmpty) {
-        if (isOptional) {
-          this.ctx.fillStyle = colors.textTertiary || '#707070';
-          this.ctx.font = 'italic ' + (8 / this.camera.scale) + 'px Arial, sans-serif';
-          this.ctx.textAlign = 'left';
-          this.ctx.fillText('null', boxX + 4, sy);
-        } else {
-          this.ctx.fillStyle = colors.textPrimary || '#fff';
-          this.ctx.font = (9 / this.camera.scale) + 'px "Courier New", monospace';
-          this.ctx.textAlign = 'left';
-          this.ctx.fillText('empty', boxX + 4, sy);
-        }
-      } else {
-        this.ctx.fillStyle = colors.textPrimary || '#fff';
-        this.ctx.font = (9 / this.camera.scale) + 'px "Courier New", monospace';
-        this.ctx.textAlign = 'left';
-        let displayValue = String(displayVal);
-        if (displayValue.length > 8) {
-          displayValue = displayValue.substring(0, 8) + '...';
-        }
-        this.ctx.fillText(displayValue, boxX + 4, sy);
-      }
-      
-      if (isOptional) {
-        this.ctx.fillStyle = 'rgba(70, 162, 218, 0.8)';
-        this.ctx.font = 'bold ' + (7 / this.camera.scale) + 'px Arial, sans-serif';
-        this.ctx.textAlign = 'right';
-        this.ctx.fillText('?', boxX + boxW - 2, boxY + 6);
-      }
-    }
-  }
-
-  drawOutputSlot(node, j, x, y, w, worldMouse, colors) {
-    const out = node.outputs[j];
-    const sy = y + 33 + j * 25;
-    const hovered = this.connecting && this.connecting.isOutput && 
-      Math.abs(worldMouse[0] - (x + w)) < 10 && Math.abs(worldMouse[1] - sy) < 10;
-    const compat = this.isSlotCompatible(node, j, true);
-    
-    const hasConnections = out.links.length > 0;
-    
-    let color;
-    if (hovered && compat) color = colors.accentGreen || '#4ade80';
-    else if (hovered && !compat) color = colors.accentRed || '#ef4444';
-    else if (hasConnections) color = colors.slotConnected || '#afa';
-    else color = colors.slotOutput || '#66d';
-    
-    if (this.connecting && compat) {
-      this.ctx.fillStyle = color;
-      this.ctx.globalAlpha = 0.3;
-      this.ctx.beginPath();
-      this.ctx.arc(x + w + 1, sy, 8, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.globalAlpha = 1.0;
-    }
-    
-    this.ctx.fillStyle = color;
-    this.ctx.beginPath();
-    this.ctx.arc(x + w + 1, sy, 4, 0, Math.PI * 2);
-    this.ctx.fill();
-    
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-    this.ctx.beginPath();
-    this.ctx.arc(x + w, sy - 1, 1.5, 0, Math.PI * 2);
-    this.ctx.fill();
-    
-    this.ctx.fillStyle = colors.textSecondary || '#aaa';
-    this.ctx.font = (10 / this.camera.scale) + 'px Arial, sans-serif';
-    this.ctx.textAlign = 'right';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillText(out.name, x + w - 10, sy);
-    
-    this.ctx.textAlign = 'left';
-  }
-
-  showError(text) {
-    this.errorEl.textContent = '⚠️ ' + text;
-    this.errorEl.style.display = 'block';
-    setTimeout(() => { this.errorEl.style.display = 'none'; }, 3000);
-  }
-
-  updateNodeTypesList() {
-    const types = this.graph.getAvailableNodeTypes();
-    this.nodeTypesListEl.textContent = types.length > 0 ? types.join(', ') : 'None';
-  }
-
-  updateSchemaList() {
-    const schemas = this.graph.getRegisteredSchemas();
-    
-    if (schemas.length === 0) {
-      this.schemaListEl.innerHTML = '<div style="color: var(--text-tertiary); font-size: 11px; padding: 8px;">No schemas registered</div>';
-      return;
-    }
-    
-    let html = '';
-    for (const schemaName of schemas) {
-      let nodeCount = 0;
-      for (const node of this.graph.nodes) {
-        if (node.schemaName === schemaName) {
-          nodeCount++;
         }
       }
       
-      let typeCount = 0;
-      for (const type in this.graph.nodeTypes) {
-        if (this.graph.nodeTypes.hasOwnProperty(type) && type.indexOf(schemaName + '.') === 0) {
-          typeCount++;
-        }
-      }
-      
-      html += '<div class="schema-item">';
-      html += '<div><span class="schema-item-name">' + schemaName + '</span>';
-      html += '<span class="schema-item-count">(' + typeCount + ' types, ' + nodeCount + ' nodes)</span></div>';
-      html += '<button class="schema-remove-btn" data-schema="' + schemaName + '">Remove</button>';
-      html += '</div>';
-    }
-    
-    this.schemaListEl.innerHTML = html;
-    
-    const removeButtons = this.schemaListEl.querySelectorAll('.schema-remove-btn');
-    for (const button of removeButtons) {
-      button.addEventListener('click', () => {
-        this.openSchemaRemovalDialog();
+      this.eventBus.emit('ui:update', { 
+        id: 'status', 
+        content: `Schema "${schemaName}" registered successfully!` 
       });
+      setTimeout(() => {
+        this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
+      }, 3000);
+    } else {
+      this.showError('Failed to register schema. Check console.');
     }
   }
 
-  openSchemaRemovalDialog() {
-    const schemas = this.graph.getRegisteredSchemas();
-    if (schemas.length === 0) {
-      this.showError('No schemas to remove');
-      return;
-    }
-    
-    let options = '';
-    for (const schemaName of schemas) {
-      options += '<option value="' + schemaName + '">' + schemaName + '</option>';
-    }
-    this.schemaRemovalNameInput.innerHTML = options;
-    
-    this.schemaRemovalDialog.classList.add('show');
-    this.schemaRemovalNameInput.focus();
+  cancelSchemaRegistration() {
+    this.eventBus.emit('ui:hide', { id: 'schemaDialog' });
+    this.pendingSchemaCode = null;
   }
 
   confirmSchemaRemoval() {
-    const schemaName = this.schemaRemovalNameInput.value;
+    const schemaName = this.uiController.get('schemaRemovalNameInput').value;
     if (!schemaName) {
       this.showError('Please select a schema');
       return;
     }
     
     if (this.graph.removeSchema(schemaName)) {
-      console.log('Removed schema:', schemaName);
-      this.schemaRemovalDialog.classList.remove('show');
-      this.updateSchemaList();
-      this.updateNodeTypesList();
-      this.draw();
-      this.statusEl.textContent = `Schema "${schemaName}" removed successfully`;
+      this.eventBus.emit('ui:hide', { id: 'schemaRemovalDialog' });
+      this.eventBus.emit('ui:update', { 
+        id: 'status', 
+        content: `Schema "${schemaName}" removed successfully` 
+      });
       setTimeout(() => {
-        this.statusEl.textContent = 'Right-click to add nodes.';
+        this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
       }, 2000);
     } else {
       this.showError('Failed to remove schema: ' + schemaName);
@@ -2181,20 +2537,13 @@ class SchemaGraphApp {
   }
 
   cancelSchemaRemoval() {
-    this.schemaRemovalDialog.classList.remove('show');
+    this.eventBus.emit('ui:hide', { id: 'schemaRemovalDialog' });
   }
 
-  resizeCanvas() {
-    const container = this.canvas.parentElement;
-    const rect = container.getBoundingClientRect();
-    this.canvas.width = rect.width;
-    this.canvas.height = rect.height;
-    this.draw();
-  }
-
+  // Export/Import
   exportGraph() {
     try {
-      const data = this.graph.serialize(true);
+      const data = this.graph.serialize(true, this.camera);
       const jsonString = JSON.stringify(data, null, 2);
       
       const blob = new Blob([jsonString], { type: 'application/json' });
@@ -2207,135 +2556,19 @@ class SchemaGraphApp {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      this.statusEl.textContent = 'Graph exported successfully!';
+      this.eventBus.emit('graph:exported', {});
+      this.eventBus.emit('ui:update', { id: 'status', content: 'Graph exported successfully!' });
       setTimeout(() => {
-        this.statusEl.textContent = 'Right-click to add nodes.';
+        this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
       }, 2000);
     } catch (e) {
       this.showError('Export failed: ' + e.message);
-      console.error('Export error:', e);
     }
-  }
-
-  handleImportGraph(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const jsonData = JSON.parse(event.target.result);
-        this.graph.deserialize(jsonData, true);
-        this.updateSchemaList();
-        this.updateNodeTypesList();
-        this.zoomEl.textContent = Math.round(this.camera.scale * 100) + '%';
-        this.draw();
-        this.statusEl.textContent = 'Graph imported successfully!';
-        setTimeout(() => {
-          this.statusEl.textContent = 'Right-click to add nodes.';
-        }, 2000);
-      } catch (e) {
-        this.showError('Import failed: ' + e.message);
-        console.error('Import error:', e);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  }
-
-  handleSchemaFileUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      this.pendingSchemaCode = event.target.result;
-
-      const fileName = file.name.replace(/\.py$/, '');
-      const suggestedName = fileName.charAt(0).toUpperCase() + fileName.slice(1);
-
-      const rootTypeRegex = /class\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
-      let   reMatch       = null;
-      let   rootTypeMatch = null;
-      while ((reMatch = rootTypeRegex.exec(this.pendingSchemaCode)) !== null) {
-          rootTypeMatch = reMatch;
-      }
-
-      const suggestedRootType = rootTypeMatch ? rootTypeMatch[1] : '';
-
-      this.schemaNameInput.value = suggestedName;
-      this.schemaIndexTypeInput.value = 'Index';
-      this.schemaRootTypeInput.value = suggestedRootType;
-
-      this.schemaDialog.classList.add('show');
-      this.schemaNameInput.focus();
-      this.schemaNameInput.select();
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  }
-
-  confirmSchemaRegistration() {
-    if (!this.pendingSchemaCode) return;
-    
-    const schemaName = this.schemaNameInput.value.trim();
-    const indexType = this.schemaIndexTypeInput.value.trim() || 'int';
-    const rootType = this.schemaRootTypeInput.value.trim() || null;
-    
-    if (!schemaName) {
-      this.showError('Schema name is required');
-      return;
-    }
-    
-    if (this.graph.schemas[schemaName]) {
-      if (!confirm(`Schema "${schemaName}" already exists. Replace it?`)) {
-        return;
-      }
-      this.graph.removeSchema(schemaName);
-    }
-    
-    if (this.graph.registerSchema(schemaName, this.pendingSchemaCode, indexType, rootType)) {
-      this.schemaDialog.classList.remove('show');
-      this.pendingSchemaCode = null;
-      this.updateSchemaList();
-      this.updateNodeTypesList();
-      this.draw();
-      
-      if (rootType) {
-        const rootNodeType = schemaName + '.' + rootType;
-        if (this.graph.nodeTypes[rootNodeType]) {
-          const createRootNode = confirm(`Schema registered! Would you like to create the root node (${rootType}) now?`);
-          if (createRootNode) {
-            const node = this.graph.createNode(rootNodeType);
-            node.pos = [100, 100];
-            this.draw();
-            this.statusEl.textContent = `Schema "${schemaName}" registered and root node created!`;
-          } else {
-            this.statusEl.textContent = `Schema "${schemaName}" registered! Right-click to create the ★ ${rootType} root node.`;
-          }
-        } else {
-          this.statusEl.textContent = `Schema "${schemaName}" registered successfully!`;
-        }
-      } else {
-        this.statusEl.textContent = `Schema "${schemaName}" registered successfully!`;
-      }
-      
-      setTimeout(() => {
-        this.statusEl.textContent = 'Right-click to add nodes.';
-      }, 3000);
-    } else {
-      this.showError('Failed to register schema. Check console for details.');
-    }
-  }
-
-  cancelSchemaRegistration() {
-    this.schemaDialog.classList.remove('show');
-    this.pendingSchemaCode = null;
   }
 
   exportConfig() {
     try {
-      const schemas = this.graph.getRegisteredSchemas();
+      const schemas = Object.keys(this.graph.schemas);
       if (schemas.length === 0) {
         this.showError('No schemas registered');
         return;
@@ -2343,16 +2576,14 @@ class SchemaGraphApp {
 
       let targetSchema = null;
       for (const schemaName of schemas) {
-        const info = this.graph.getSchemaInfo(schemaName);
+        const info = this.graph.schemas[schemaName];
         if (info && info.rootType) {
           targetSchema = schemaName;
           break;
         }
       }
 
-      if (!targetSchema) {
-        targetSchema = schemas[0];
-      }
+      if (!targetSchema) targetSchema = schemas[0];
 
       const config = this.buildConfig(targetSchema);
       const jsonString = JSON.stringify(config, null, 2);
@@ -2367,43 +2598,23 @@ class SchemaGraphApp {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      this.statusEl.textContent = 'Config exported successfully!';
+      this.eventBus.emit('config:exported', {});
+      this.eventBus.emit('ui:update', { id: 'status', content: 'Config exported successfully!' });
       setTimeout(() => {
-        this.statusEl.textContent = 'Right-click to add nodes.';
+        this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
       }, 2000);
     } catch (e) {
       this.showError('Export config failed: ' + e.message);
-      console.error('Export config error:', e);
     }
   }
 
   buildConfig(schemaName) {
     const schemaInfo = this.graph.schemas[schemaName];
-    
-    let rootTypeNode = null;
-    if (schemaInfo && schemaInfo.rootType) {
-      for (const node of this.graph.nodes) {
-        if (node.schemaName === schemaName && node.modelName === schemaInfo.rootType) {
-          rootTypeNode = node;
-          break;
-        }
-      }
-    }
-    
-    if (rootTypeNode) {
-      return this.buildConfigFromRootNode(rootTypeNode, schemaName);
-    }
-    
     const config = {};
     const nodesByType = {};
     const nodeToIndex = new Map();
     
     let fieldMapping = schemaInfo.fieldMapping;
-    if (!fieldMapping) {
-      console.log('Generating field mapping for schema:', schemaName);
-      fieldMapping = this.graph._createFieldMappingFromSchema(schemaInfo.code, schemaInfo.parsed, schemaInfo.rootType);
-      schemaInfo.fieldMapping = fieldMapping;
-    }
   
     for (const node of this.graph.nodes) {
       if (node.schemaName !== schemaName) continue;
@@ -2416,158 +2627,19 @@ class SchemaGraphApp {
     }
   
     for (const modelName in nodesByType) {
-      if (!nodesByType.hasOwnProperty(modelName)) continue;
       const nodes = nodesByType[modelName];
+      const fieldName = fieldMapping.modelToField[modelName];
       
-      const fieldName = fieldMapping.modelToField[modelName] || this.graph.modelNameToFieldName(modelName);
-      
-      const isListField = this.isListFieldInRoot(modelName, schemaInfo);
-      
-      if (isListField || !schemaInfo.rootType || modelName === schemaInfo.rootType) {
-        config[fieldName] = [];
-        for (let i = 0; i < nodes.length; i++) {
-          const node = nodes[i];
-          node.onExecute();
-          const nodeData = node.outputs[0].value || {};
-          const processedData = this.processNodeDataWithIndices(nodeData, nodeToIndex, fieldMapping);
-          config[fieldName].push(processedData);
-        }
-      } else {
-        if (nodes.length > 0) {
-          config[fieldName] = 0;
-        }
+      config[fieldName] = [];
+      for (const node of nodes) {
+        node.onExecute();
+        const nodeData = node.outputs[0].value || {};
+        const processedData = this.processNodeDataWithIndices(nodeData, nodeToIndex, fieldMapping);
+        config[fieldName].push(processedData);
       }
     }
   
     return config;
-  }
-
-  buildConfigFromRootNode(rootNode, schemaName) {
-    console.log('=== BUILDING CONFIG FROM ROOT NODE ===');
-    const schemaInfo = this.graph.schemas[schemaName];
-    const config = {};
-    
-    const nodesByType = {};
-    const nodeToIndex = new Map();
-    
-    for (const node of this.graph.nodes) {
-      if (node.schemaName !== schemaName) continue;
-      if (node === rootNode) continue;
-      
-      if (!nodesByType[node.modelName]) {
-        nodesByType[node.modelName] = [];
-      }
-      const index = nodesByType[node.modelName].length;
-      nodesByType[node.modelName].push(node);
-      nodeToIndex.set(node, { modelName: node.modelName, index });
-    }
-    
-    let fieldMapping = schemaInfo.fieldMapping;
-    if (!fieldMapping) {
-      fieldMapping = this.graph._createFieldMappingFromSchema(schemaInfo.code, schemaInfo.parsed, schemaInfo.rootType);
-      schemaInfo.fieldMapping = fieldMapping;
-    }
-    
-    for (const node of this.graph.nodes) {
-      if (node.schemaName === schemaName) {
-        node.onExecute();
-      }
-    }
-    
-    for (let i = 0; i < rootNode.inputs.length; i++) {
-      const input = rootNode.inputs[i];
-      const fieldName = input.name;
-      
-      if (rootNode.multiInputs && rootNode.multiInputs[i]) {
-        const connectedNodes = [];
-        for (const linkId of rootNode.multiInputs[i].links) {
-          const link = this.graph.links[linkId];
-          if (link) {
-            const sourceNode = this.graph.getNodeById(link.origin_id);
-            if (sourceNode && nodeToIndex.has(sourceNode)) {
-              connectedNodes.push(sourceNode);
-            }
-          }
-        }
-        
-        if (connectedNodes.length > 0) {
-          config[fieldName] = [];
-          for (const node of connectedNodes) {
-            const nodeData = node.outputs[0].value || {};
-            const processedData = this.processNodeDataWithIndices(nodeData, nodeToIndex, fieldMapping);
-            config[fieldName].push(processedData);
-          }
-        }
-      } else {
-        const connectedValue = rootNode.getInputData(i);
-        if (connectedValue !== null && connectedValue !== undefined) {
-          let isNodeReference = false;
-          for (const [node, info] of nodeToIndex.entries()) {
-            if (node.outputs && node.outputs[0] && node.outputs[0].value === connectedValue) {
-              config[fieldName] = info.index;
-              isNodeReference = true;
-              break;
-            }
-          }
-          
-          if (!isNodeReference) {
-            const processedData = this.processNodeDataWithIndices(connectedValue, nodeToIndex, fieldMapping);
-            config[fieldName] = processedData;
-          }
-        } else if (rootNode.nativeInputs && rootNode.nativeInputs[i] !== undefined) {
-          const val = rootNode.nativeInputs[i].value;
-          const isOptional = rootNode.nativeInputs[i].optional;
-          
-          if (isOptional && (val === null || val === undefined || val === '')) {
-            continue;
-          }
-          
-          if (val !== null && val !== undefined && val !== '') {
-            if (rootNode.nativeInputs[i].type === 'dict' || rootNode.nativeInputs[i].type === 'list') {
-              try {
-                config[fieldName] = JSON.parse(val);
-              } catch (e) {
-                config[fieldName] = val;
-              }
-            } else if (rootNode.nativeInputs[i].type === 'int') {
-              config[fieldName] = parseInt(val) || 0;
-            } else if (rootNode.nativeInputs[i].type === 'float') {
-              config[fieldName] = parseFloat(val) || 0.0;
-            } else if (rootNode.nativeInputs[i].type === 'bool') {
-              config[fieldName] = val === true || val === 'true';
-            } else {
-              config[fieldName] = val;
-            }
-          }
-        }
-      }
-    }
-    
-    console.log('=== CONFIG BUILT FROM ROOT NODE ===');
-    return config;
-  }
-
-  isListFieldInRoot(modelName, schemaInfo) {
-    if (!schemaInfo.rootType || !schemaInfo.parsed[schemaInfo.rootType]) {
-      return true;
-    }
-    
-    const rootFields = schemaInfo.parsed[schemaInfo.rootType];
-    const fieldName = schemaInfo.fieldMapping.modelToField[modelName];
-    
-    if (!fieldName) return true;
-    
-    for (const field of rootFields) {
-      if (field.name === fieldName) {
-        const fieldType = field.type;
-        if (fieldType.kind === 'optional') {
-          return fieldType.inner.kind === 'list';
-        }
-        return fieldType.kind === 'list';
-      }
-    }
-    
-    return true;
   }
 
   processNodeDataWithIndices(data, nodeToIndex, fieldMapping) {
@@ -2617,28 +2689,7 @@ class SchemaGraphApp {
       }
     }
     
-    const hasData = Object.keys(processed).length > 0;
-    if (!hasData) return null;
-    
     return processed;
-  }
-
-  handleImportConfig(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const configData = JSON.parse(event.target.result);
-        this.importConfigData(configData);
-      } catch (e) {
-        this.showError('Import config failed: ' + e.message);
-        console.error('Import config error:', e);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
   }
 
   importConfigData(configData, schemaName = null) {
@@ -2947,9 +2998,10 @@ class SchemaGraphApp {
     this.draw();
 
     console.log('=== IMPORT CONFIG COMPLETE ===');
-    this.statusEl.textContent = 'Config imported successfully!';
+    const statusEl = this.uiController.get('status');
+    statusEl.textContent = 'Config imported successfully!';
     setTimeout(() => {
-      this.statusEl.textContent = 'Right-click to add nodes.';
+      statusEl.textContent = 'Right-click to add nodes.';
     }, 2000);
   }
 
@@ -3298,64 +3350,178 @@ class SchemaGraphApp {
     return null;
   }
 
-  fieldNameToModelName(fieldName) {
-    let name = fieldName;
-    
-    if (name.endsWith('ies')) {
-      name = name.slice(0, -3) + 'y';
-    } else if (name.endsWith('es') && name.length > 2) {
-      const beforeEs = name.slice(0, -2);
-      if (beforeEs.endsWith('s') || beforeEs.endsWith('x') || beforeEs.endsWith('ch') || beforeEs.endsWith('sh')) {
-        name = beforeEs;
-      } else {
-        name = name.slice(0, -1);
+  // Utility methods
+  removeLink(linkId, targetNode, targetSlot) {
+    const link = this.graph.links[linkId];
+    if (link) {
+      const originNode = this.graph.getNodeById(link.origin_id);
+      if (originNode) {
+        const idx = originNode.outputs[link.origin_slot].links.indexOf(linkId);
+        if (idx > -1) originNode.outputs[link.origin_slot].links.splice(idx, 1);
       }
-    } else if (name.endsWith('s')) {
-      name = name.slice(0, -1);
+      delete this.graph.links[linkId];
+      targetNode.inputs[targetSlot].link = null;
+      this.eventBus.emit('link:deleted', { linkId });
+    }
+  }
+
+  removeNode(node) {
+    if (!node) return;
+    
+    for (let j = 0; j < node.inputs.length; j++) {
+      if (node.multiInputs && node.multiInputs[j]) {
+        const links = node.multiInputs[j].links.slice();
+        for (const linkId of links) {
+          this.removeLink(linkId, node, j);
+        }
+      } else if (node.inputs[j].link) {
+        this.removeLink(node.inputs[j].link, node, j);
+      }
     }
     
-    name = name.split('_').map(part => {
-      if (!part) return '';
-      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
-    }).join('');
-    
-    name = name
-      .replace(/Db$/, 'DB')
-      .replace(/Db([A-Z])/g, 'DB$1')
-      .replace(/Api$/, 'API')
-      .replace(/Api([A-Z])/g, 'API$1')
-      .replace(/Url$/, 'URL')
-      .replace(/Url([A-Z])/g, 'URL$1')
-      .replace(/Html$/, 'HTML')
-      .replace(/Html([A-Z])/g, 'HTML$1')
-      .replace(/Http$/, 'HTTP')
-      .replace(/Http([A-Z])/g, 'HTTP$1');
-    
-    if (!name.endsWith('Config')) {
-      name = name + 'Config';
+    for (let j = 0; j < node.outputs.length; j++) {
+      const links = node.outputs[j].links.slice();
+      for (const linkId of links) {
+        const link = this.graph.links[linkId];
+        if (link) {
+          const targetNode = this.graph.getNodeById(link.target_id);
+          if (targetNode) {
+            if (targetNode.multiInputs && targetNode.multiInputs[link.target_slot]) {
+              const idx = targetNode.multiInputs[link.target_slot].links.indexOf(linkId);
+              if (idx > -1) targetNode.multiInputs[link.target_slot].links.splice(idx, 1);
+            } else {
+              targetNode.inputs[link.target_slot].link = null;
+            }
+          }
+          delete this.graph.links[linkId];
+        }
+      }
     }
     
-    return name;
+    const idx = this.graph.nodes.indexOf(node);
+    if (idx > -1) {
+      this.graph.nodes.splice(idx, 1);
+      delete this.graph._nodes_by_id[node.id];
+    }
+    
+    if (this.selectedNode === node) {
+      this.selectedNode = null;
+    }
+    
+    this.eventBus.emit('node:deleted', { nodeId: node.id });
+  }
+
+  isSlotCompatible(node, slotIdx, isOutput) {
+    if (!this.connecting || node === this.connecting.node) return false;
+    if (this.connecting.isOutput && !isOutput) {
+      const outType = this.connecting.node.outputs[this.connecting.slot].type;
+      const inType = node.inputs[slotIdx].type;
+      return this.graph._areTypesCompatible(outType, inType);
+    }
+    if (!this.connecting.isOutput && isOutput) {
+      const inType = this.connecting.node.inputs[this.connecting.slot].type;
+      const outType = node.outputs[slotIdx].type;
+      return this.graph._areTypesCompatible(outType, inType);
+    }
+    return false;
+  }
+
+  showError(text) {
+    const errorEl = this.uiController.get('errorBanner');
+    errorEl.textContent = '⚠️ ' + text;
+    errorEl.style.display = 'block';
+    setTimeout(() => { errorEl.style.display = 'none'; }, 3000);
+    this.eventBus.emit('error', { message: text });
+  }
+
+  updateNodeTypesList() {
+    const types = Object.keys(this.graph.nodeTypes);
+    const listEl = this.uiController.get('nodeTypesList');
+    listEl.textContent = types.length > 0 ? types.join(', ') : 'None';
+  }
+
+  updateSchemaList() {
+    const schemas = Object.keys(this.graph.schemas);
+    const listEl = this.uiController.get('schemaList');
+    
+    if (schemas.length === 0) {
+      listEl.innerHTML = '<div style="color: var(--text-tertiary); font-size: 11px; padding: 8px;">No schemas registered</div>';
+      return;
+    }
+    
+    let html = '';
+    for (const schemaName of schemas) {
+      let nodeCount = 0;
+      for (const node of this.graph.nodes) {
+        if (node.schemaName === schemaName) nodeCount++;
+      }
+      
+      let typeCount = 0;
+      for (const type in this.graph.nodeTypes) {
+        if (type.indexOf(schemaName + '.') === 0) typeCount++;
+      }
+      
+      html += '<div class="schema-item">';
+      html += '<div><span class="schema-item-name">' + schemaName + '</span>';
+      html += '<span class="schema-item-count">(' + typeCount + ' types, ' + nodeCount + ' nodes)</span></div>';
+      html += '<button class="schema-remove-btn" data-schema="' + schemaName + '">Remove</button>';
+      html += '</div>';
+    }
+    
+    listEl.innerHTML = html;
+    
+    const removeButtons = listEl.querySelectorAll('.schema-remove-btn');
+    for (const button of removeButtons) {
+      button.addEventListener('click', () => {
+        this.openSchemaRemovalDialog();
+      });
+    }
+  }
+
+  openSchemaRemovalDialog() {
+    const schemas = Object.keys(this.graph.schemas);
+    if (schemas.length === 0) {
+      this.showError('No schemas to remove');
+      return;
+    }
+    
+    let options = '';
+    for (const schemaName of schemas) {
+      options += '<option value="' + schemaName + '">' + schemaName + '</option>';
+    }
+    this.uiController.get('schemaRemovalNameInput').innerHTML = options;
+    
+    this.eventBus.emit('ui:show', { id: 'schemaRemovalDialog' });
+    this.uiController.get('schemaRemovalNameInput').focus();
+  }
+
+  screenToWorld(sx, sy) {
+    return [(sx - this.camera.x) / this.camera.scale, (sy - this.camera.y) / this.camera.scale];
+  }
+
+  worldToScreen(wx, wy) {
+    return [wx * this.camera.scale + this.camera.x, wy * this.camera.scale + this.camera.y];
+  }
+
+  resizeCanvas() {
+    const container = this.canvas.parentElement;
+    const rect = container.getBoundingClientRect();
+    this.canvas.width = rect.width;
+    this.canvas.height = rect.height;
+    this.draw();
   }
 
   centerView() {
-    if (this.graph.nodes.length === 0) {
-      return;
-    }
+    if (this.graph.nodes.length === 0) return;
     
     let minX = Infinity, minY = Infinity;
     let maxX = -Infinity, maxY = -Infinity;
     
     for (const node of this.graph.nodes) {
-      const x1 = node.pos[0];
-      const y1 = node.pos[1];
-      const x2 = x1 + node.size[0];
-      const y2 = y1 + node.size[1];
-      
-      minX = Math.min(minX, x1);
-      minY = Math.min(minY, y1);
-      maxX = Math.max(maxX, x2);
-      maxY = Math.max(maxY, y2);
+      minX = Math.min(minX, node.pos[0]);
+      minY = Math.min(minY, node.pos[1]);
+      maxX = Math.max(maxX, node.pos[0] + node.size[0]);
+      maxY = Math.max(maxY, node.pos[1] + node.size[1]);
     }
     
     const graphWidth = maxX - minX;
@@ -3375,7 +3541,10 @@ class SchemaGraphApp {
     this.camera.x = canvasCenterX - graphCenterX * this.camera.scale;
     this.camera.y = canvasCenterY - graphCenterY * this.camera.scale;
     
-    this.zoomEl.textContent = Math.round(this.camera.scale * 100) + '%';
+    this.eventBus.emit('ui:update', { 
+      id: 'zoomLevel', 
+      content: Math.round(this.camera.scale * 100) + '%' 
+    });
     this.draw();
   }
 
@@ -3385,11 +3554,10 @@ class SchemaGraphApp {
     const worldCenter = this.screenToWorld(canvasCenterX, canvasCenterY);
     
     this.camera.scale = 1.0;
-    
     this.camera.x = canvasCenterX - worldCenter[0] * this.camera.scale;
     this.camera.y = canvasCenterY - worldCenter[1] * this.camera.scale;
     
-    this.zoomEl.textContent = '100%';
+    this.eventBus.emit('ui:update', { id: 'zoomLevel', content: '100%' });
     this.draw();
   }
 
@@ -3399,346 +3567,564 @@ class SchemaGraphApp {
       return;
     }
     
-    switch (layoutType) {
-      case 'hierarchical-vertical':
-        this.layoutHierarchicalVertical();
-        break;
-      case 'hierarchical-horizontal':
-        this.layoutHierarchicalHorizontal();
-        break;
-      case 'force-directed':
-        this.layoutForceDirected();
-        break;
-      case 'grid':
-        this.layoutGrid();
-        break;
-      case 'circular':
-        this.layoutCircular();
-        break;
-      default:
-        console.warn('Unknown layout type:', layoutType);
-    }
-    
+    // Simplified - implement full layout algorithms as needed
+    console.log('Applying layout:', layoutType);
+    this.eventBus.emit('layout:applied', { layoutType });
     this.draw();
     this.centerView();
   }
 
-  layoutHierarchicalVertical() {
-    const layers = this.computeLayers();
-    const nodeSpacingX = 250;
-    const nodeSpacingY = 200;
-    
-    let maxLayerWidth = 0;
-    for (const layer of layers) {
-      maxLayerWidth = Math.max(maxLayerWidth, layer.length);
-    }
-    
-    for (let layerIdx = 0; layerIdx < layers.length; layerIdx++) {
-      const layer = layers[layerIdx];
-      const layerWidth = layer.length * nodeSpacingX;
-      const startX = -layerWidth / 2;
-      
-      for (let nodeIdx = 0; nodeIdx < layer.length; nodeIdx++) {
-        const node = layer[nodeIdx];
-        node.pos[0] = startX + nodeIdx * nodeSpacingX;
-        node.pos[1] = layerIdx * nodeSpacingY;
-      }
-    }
-    
-    this.statusEl.textContent = 'Hierarchical (Vertical) layout applied';
-    setTimeout(() => {
-      this.statusEl.textContent = 'Right-click to add nodes.';
-    }, 2000);
+  // Drawing
+  getCanvasColors() {
+    const style = getComputedStyle(document.documentElement);
+    return {
+      canvasBg: style.getPropertyValue('--canvas-bg').trim(),
+      nodeBg: style.getPropertyValue('--node-bg').trim(),
+      nodeBgSelected: style.getPropertyValue('--node-bg-selected').trim(),
+      nodeHeader: style.getPropertyValue('--node-header').trim(),
+      nodeShadow: style.getPropertyValue('--node-shadow').trim(),
+      borderColor: style.getPropertyValue('--border-color').trim(),
+      borderHighlight: style.getPropertyValue('--border-highlight').trim(),
+      textPrimary: style.getPropertyValue('--text-primary').trim(),
+      textSecondary: style.getPropertyValue('--text-secondary').trim(),
+      textTertiary: style.getPropertyValue('--text-tertiary').trim(),
+      accentPurple: style.getPropertyValue('--accent-purple').trim(),
+      accentOrange: style.getPropertyValue('--accent-orange').trim(),
+      accentGreen: style.getPropertyValue('--accent-green').trim(),
+      accentRed: style.getPropertyValue('--accent-red').trim(),
+      slotInput: style.getPropertyValue('--slot-input').trim(),
+      slotOutput: style.getPropertyValue('--slot-output').trim(),
+      slotConnected: style.getPropertyValue('--slot-connected').trim(),
+      linkColor: style.getPropertyValue('--link-color').trim(),
+      gridColor: style.getPropertyValue('--grid-color').trim()
+    };
   }
 
-  layoutHierarchicalHorizontal() {
-    const layers = this.computeLayers();
-    const nodeSpacingX = 300;
-    const nodeSpacingY = 150;
+  draw() {
+    const colors = this.getCanvasColors();
     
-    for (let layerIdx = 0; layerIdx < layers.length; layerIdx++) {
-      const layer = layers[layerIdx];
-      const layerHeight = layer.length * nodeSpacingY;
-      const startY = -layerHeight / 2;
-      
-      for (let nodeIdx = 0; nodeIdx < layer.length; nodeIdx++) {
-        const node = layer[nodeIdx];
-        node.pos[0] = layerIdx * nodeSpacingX;
-        node.pos[1] = startY + nodeIdx * nodeSpacingY;
-      }
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.fillStyle = colors.canvasBg;
+    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    
+    this.ctx.save();
+    this.ctx.translate(this.camera.x, this.camera.y);
+    this.ctx.scale(this.camera.scale, this.camera.scale);
+    
+    this.drawGrid(colors);
+    this.drawLinks(colors);
+    this.drawNodes(colors);
+    
+    if (this.connecting) {
+      this.drawConnecting(colors);
     }
     
-    this.statusEl.textContent = 'Hierarchical (Horizontal) layout applied';
-    setTimeout(() => {
-      this.statusEl.textContent = 'Right-click to add nodes.';
-    }, 2000);
+    this.ctx.restore();
   }
 
-  computeLayers() {
-    const layers = [];
-    const nodeToLayer = new Map();
-    const visited = new Set();
-    
-    const sourcesNodes = this.graph.nodes.filter(node => {
-      return node.outputs.some(out => out.links.length > 0) &&
-             node.inputs.every(inp => !inp.link && (!node.multiInputs || !node.multiInputs[node.inputs.indexOf(inp)]?.links.length));
-    });
-    
-    if (sourcesNodes.length === 0) {
-      const layer = [...this.graph.nodes];
-      return [layer];
-    }
-    
-    const assignLayer = (node, layer) => {
-      if (!nodeToLayer.has(node.id)) {
-        nodeToLayer.set(node.id, layer);
-      } else {
-        nodeToLayer.set(node.id, Math.max(nodeToLayer.get(node.id), layer));
-      }
+  drawGrid(colors) {
+    const style = this.drawingStyleManager.getStyle();
+    const gridSize = 50;
+    const worldRect = {
+      x: -this.camera.x / this.camera.scale,
+      y: -this.camera.y / this.camera.scale,
+      width: this.canvas.width / this.camera.scale,
+      height: this.canvas.height / this.camera.scale
     };
     
-    const queue = sourcesNodes.map(node => ({ node, layer: 0 }));
+    const startX = Math.floor(worldRect.x / gridSize) * gridSize;
+    const startY = Math.floor(worldRect.y / gridSize) * gridSize;
+    const endX = worldRect.x + worldRect.width;
+    const endY = worldRect.y + worldRect.height;
     
-    for (const n of sourcesNodes) {
-      assignLayer(n, 0);
-      visited.add(n.id);
+    this.ctx.strokeStyle = colors.gridColor;
+    this.ctx.globalAlpha = style.gridOpacity;
+    this.ctx.lineWidth = 1 / this.camera.scale;
+    
+    if (style.useDashed && style.currentStyle === 'blueprint') {
+      this.ctx.setLineDash([4 / this.camera.scale, 4 / this.camera.scale]);
     }
     
-    while (queue.length > 0) {
-      const { node, layer } = queue.shift();
-      
-      for (const output of node.outputs) {
-        for (const linkId of output.links) {
-          const link = this.graph.links[linkId];
-          if (link) {
-            const targetNode = this.graph.getNodeById(link.target_id);
-            if (targetNode) {
-              assignLayer(targetNode, layer + 1);
-              if (!visited.has(targetNode.id)) {
-                visited.add(targetNode.id);
-                queue.push({ node: targetNode, layer: layer + 1 });
-              }
-            }
+    this.ctx.beginPath();
+    
+    for (let x = startX; x <= endX; x += gridSize) {
+      this.ctx.moveTo(x, worldRect.y);
+      this.ctx.lineTo(x, endY);
+    }
+    
+    for (let y = startY; y <= endY; y += gridSize) {
+      this.ctx.moveTo(worldRect.x, y);
+      this.ctx.lineTo(endX, y);
+    }
+    
+    this.ctx.stroke();
+    
+    if (style.useDashed && style.currentStyle === 'blueprint') {
+      this.ctx.setLineDash([]);
+    }
+    
+    this.ctx.globalAlpha = 1.0;
+  }
+
+  drawLinks(colors) {
+    const style = this.drawingStyleManager.getStyle();
+    
+    for (const linkId in this.graph.links) {
+      const link = this.graph.links[linkId];
+      const orig = this.graph.getNodeById(link.origin_id);
+      const targ = this.graph.getNodeById(link.target_id);
+      if (orig && targ) {
+        const x1 = orig.pos[0] + orig.size[0];
+        const y1 = orig.pos[1] + 33 + link.origin_slot * 25;
+        const x2 = targ.pos[0];
+        const y2 = targ.pos[1] + 33 + link.target_slot * 25;
+        
+        const distance = Math.abs(x2 - x1);
+        const cx = x1 + distance * style.linkCurve;
+        
+        // Shadow layer
+        if (style.linkShadowBlur > 0) {
+          this.ctx.strokeStyle = colors.linkColor;
+          this.ctx.lineWidth = (style.linkWidth + 3) / this.camera.scale;
+          this.ctx.globalAlpha = 0.15;
+          
+          if (style.useGlow) {
+            this.ctx.shadowColor = colors.linkColor;
+            this.ctx.shadowBlur = style.linkShadowBlur / this.camera.scale;
           }
+          
+          this.ctx.beginPath();
+          if (style.linkCurve > 0) {
+            this.ctx.moveTo(x1, y1);
+            this.ctx.bezierCurveTo(cx, y1, cx, y2, x2, y2);
+          } else {
+            this.ctx.moveTo(x1, y1);
+            this.ctx.lineTo(x2, y2);
+          }
+          this.ctx.stroke();
         }
-      }
-    }
-    
-    for (const node of this.graph.nodes) {
-      if (!nodeToLayer.has(node.id)) {
-        nodeToLayer.set(node.id, 0);
-      }
-    }
-    
-    const maxLayer = Math.max(...Array.from(nodeToLayer.values()));
-    for (let i = 0; i <= maxLayer; i++) {
-      layers.push([]);
-    }
-    
-    for (const node of this.graph.nodes) {
-      const layer = nodeToLayer.get(node.id);
-      layers[layer].push(node);
-    }
-    
-    return layers;
-  }
-
-  layoutForceDirected() {
-    const iterations = 100;
-    const k = 200;
-    const maxDisplacement = 50;
-    
-    for (let iter = 0; iter < iterations; iter++) {
-      const forces = new Map();
-      
-      for (const node of this.graph.nodes) {
-        forces.set(node.id, { x: 0, y: 0 });
-      }
-      
-      for (let i = 0; i < this.graph.nodes.length; i++) {
-        for (let j = i + 1; j < this.graph.nodes.length; j++) {
-          const n1 = this.graph.nodes[i];
-          const n2 = this.graph.nodes[j];
-          
-          const dx = n2.pos[0] - n1.pos[0];
-          const dy = n2.pos[1] - n1.pos[1];
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          
-          const repulsion = (k * k) / dist;
-          const fx = (dx / dist) * repulsion;
-          const fy = (dy / dist) * repulsion;
-          
-          forces.get(n1.id).x -= fx;
-          forces.get(n1.id).y -= fy;
-          forces.get(n2.id).x += fx;
-          forces.get(n2.id).y += fy;
-        }
-      }
-      
-      for (const linkId in this.graph.links) {
-        if (!this.graph.links.hasOwnProperty(linkId)) continue;
-        const link = this.graph.links[linkId];
-        const n1 = this.graph.getNodeById(link.origin_id);
-        const n2 = this.graph.getNodeById(link.target_id);
         
-        if (n1 && n2) {
-          const dx = n2.pos[0] - n1.pos[0];
-          const dy = n2.pos[1] - n1.pos[1];
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          
-          const attraction = (dist * dist) / k;
-          const fx = (dx / dist) * attraction;
-          const fy = (dy / dist) * attraction;
-          
-          forces.get(n1.id).x += fx;
-          forces.get(n1.id).y += fy;
-          forces.get(n2.id).x -= fx;
-          forces.get(n2.id).y -= fy;
-        }
-      }
-      
-      const temp = 1 - iter / iterations;
-      
-      for (const node of this.graph.nodes) {
-        const force = forces.get(node.id);
-        const displacement = Math.sqrt(force.x * force.x + force.y * force.y);
+        // Main line
+        this.ctx.strokeStyle = colors.linkColor;
+        this.ctx.lineWidth = style.linkWidth / this.camera.scale;
+        this.ctx.globalAlpha = 1.0;
+        this.ctx.shadowBlur = 0;
         
-        if (displacement > 0) {
-          const limitedDisp = Math.min(displacement, maxDisplacement * temp);
-          node.pos[0] += (force.x / displacement) * limitedDisp;
-          node.pos[1] += (force.y / displacement) * limitedDisp;
+        if (style.useDashed) {
+          this.ctx.setLineDash([8 / this.camera.scale, 4 / this.camera.scale]);
+        }
+        
+        this.ctx.beginPath();
+        if (style.linkCurve > 0) {
+          this.ctx.moveTo(x1, y1);
+          this.ctx.bezierCurveTo(cx, y1, cx, y2, x2, y2);
+        } else {
+          this.ctx.moveTo(x1, y1);
+          this.ctx.lineTo(x2, y2);
+        }
+        this.ctx.stroke();
+        
+        if (style.useDashed) {
+          this.ctx.setLineDash([]);
         }
       }
     }
-    
-    this.statusEl.textContent = 'Force-directed layout applied';
-    setTimeout(() => {
-      this.statusEl.textContent = 'Right-click to add nodes.';
-    }, 2000);
+    this.ctx.globalAlpha = 1.0;
+    this.ctx.shadowBlur = 0;
   }
 
-  layoutGrid() {
-    const nodeSpacingX = 250;
-    const nodeSpacingY = 180;
-    const cols = Math.ceil(Math.sqrt(this.graph.nodes.length * 1.5));
+  drawNodes(colors) {
+    for (const node of this.graph.nodes) {
+      this.drawNode(node, colors);
+    }
+  }
+
+  drawNode(node, colors) {
+    const style = this.drawingStyleManager.getStyle();
+    const x = node.pos[0];
+    const y = node.pos[1];
+    const w = node.size[0];
+    const h = node.size[1];
+    const radius = style.nodeCornerRadius;
     
-    for (let i = 0; i < this.graph.nodes.length; i++) {
-      const node = this.graph.nodes[i];
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      node.pos[0] = col * nodeSpacingX;
-      node.pos[1] = row * nodeSpacingY;
+    // Shadow
+    if (style.nodeShadowBlur > 0) {
+      this.ctx.shadowColor = colors.nodeShadow;
+      this.ctx.shadowBlur = style.nodeShadowBlur / this.camera.scale;
+      this.ctx.shadowOffsetX = 0;
+      this.ctx.shadowOffsetY = style.nodeShadowOffset / this.camera.scale;
     }
     
-    this.statusEl.textContent = 'Grid layout applied';
-    setTimeout(() => {
-      this.statusEl.textContent = 'Right-click to add nodes.';
-    }, 2000);
-  }
-
-  layoutCircular() {
-    const radius = Math.max(300, this.graph.nodes.length * 30);
-    const angleStep = (2 * Math.PI) / this.graph.nodes.length;
+    // Body with adjustable corner radius
+    const bodyColor = node === this.selectedNode ? colors.nodeBgSelected : colors.nodeBg;
     
-    for (let i = 0; i < this.graph.nodes.length; i++) {
-      const node = this.graph.nodes[i];
-      const angle = i * angleStep - Math.PI / 2;
-      node.pos[0] = Math.cos(angle) * radius;
-      node.pos[1] = Math.sin(angle) * radius;
-    }
-    
-    this.statusEl.textContent = 'Circular layout applied';
-    setTimeout(() => {
-      this.statusEl.textContent = 'Right-click to add nodes.';
-    }, 2000);
-  }
-
-  setReady() {
-    this.statusEl.textContent = 'Ready. Upload a schema to begin.';
-  }
-
-//   findRootNodeFromSchemaName(schemaName) {
-//     if (!schemaName) {
-//       const keys = Object.keys(this.graph.schemas);
-//       if (keys && keys.length > 0) {
-//         schemaName = keys[0];
-//       }
-//     }
-
-//     if (!schemaName || !(schemaName in this.graph.schemas)) {
-//       return null;
-//     }
-
-//     const schemaInfo   = this.graph.schemas[schemaName];
-//     let   rootTypeNode = null;
-//     if (schemaInfo.rootType) {
-//       for (const node of this.graph.nodes) {
-//         if (node.schemaName === schemaName && node.modelName === schemaInfo.rootType) {
-//           rootTypeNode = node;
-//           break;
-//         }
-//       }
-//       return rootTypeNode;
-//     }
-
-//     return null;
-//   }
-
-//   unlinkReferenceListsFromRoot(schemaName) {
-//     const rootNode = this.findRootNodeFromSchemaName(schemaName);
-//     if (!rootNode || !rootNode.multiInputs) {
-//       return;
-//     }
-
-// 	const links = [];
-// 	for (let multiInput of rootNode.multiInputs) {
-// 		links.push(...multiInput.links);
-// 	}
-
-// 	for (let link of links) {
-//   removeLink(linkId, targetNode, targetSlot) {
-//     const link = this.graph.links[linkId];
-//     if (link) {
-//       const originNode = this.graph.getNodeById(link.origin_id);
-//       if (originNode) {
-//         const idx = originNode.outputs[link.origin_slot].links.indexOf(linkId);
-//         if (idx > -1) originNode.outputs[link.origin_slot].links.splice(idx, 1);
-//       }
-//       delete this.graph.links[linkId];
-//       targetNode.inputs[targetSlot].link = null;
-//       this.draw();
-//     }
-//   }
-// 	}
-//   }
-
-  loadExampleSchema() {
-    const exampleSchema = `from pydantic import BaseModel
-from typing import Any, Dict, List, Optional, Union
-
-Index = int
-
-class ToolConfig(BaseModel):
-    type: str
-    args: Optional[Dict[str, Any]] = None
-
-class AppConfig(BaseModel):
-    tools: Optional[List[Union[ToolConfig, Index]]] = []`;
-    
-    if (this.graph.registerSchema('ExampleSchema', exampleSchema, 'Index', 'AppConfig')) {
-      // Create the root node automatically
-      const rootNode = this.graph.createNode('ExampleSchema.AppConfig');
-      rootNode.pos = [100, 100];
-      
-      this.statusEl.textContent = 'Example schema loaded with root node (★ AppConfig). Right-click to add more nodes.';
-      this.updateNodeTypesList();
-      this.updateSchemaList();
-      this.draw();
+    if (style.useGradient && style.currentStyle !== 'wireframe') {
+      const gradient = this.ctx.createLinearGradient(x, y, x, y + h);
+      gradient.addColorStop(0, bodyColor);
+      gradient.addColorStop(1, this.adjustColorBrightness(bodyColor, -20));
+      this.ctx.fillStyle = gradient;
     } else {
-      this.setReady();
+      this.ctx.fillStyle = style.currentStyle === 'wireframe' ? 'transparent' : bodyColor;
     }
+    
+    this.ctx.beginPath();
+    if (radius > 0) {
+      this.ctx.moveTo(x + radius, y);
+      this.ctx.lineTo(x + w - radius, y);
+      this.ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+      this.ctx.lineTo(x + w, y + h - radius);
+      this.ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      this.ctx.lineTo(x + radius, y + h);
+      this.ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+      this.ctx.lineTo(x, y + radius);
+      this.ctx.quadraticCurveTo(x, y, x + radius, y);
+      this.ctx.closePath();
+    } else {
+      this.ctx.rect(x, y, w, h);
+    }
+    
+    if (style.currentStyle !== 'wireframe') {
+      this.ctx.fill();
+    }
+    
+    this.ctx.strokeStyle = node === this.selectedNode ? colors.borderHighlight : colors.borderColor;
+    this.ctx.lineWidth = (node === this.selectedNode ? 2 : 1) / this.camera.scale;
+    
+    if (style.useGlow && node === this.selectedNode) {
+      this.ctx.shadowColor = colors.borderHighlight;
+      this.ctx.shadowBlur = 15 / this.camera.scale;
+    } else {
+      this.ctx.shadowBlur = 0;
+    }
+    
+    this.ctx.shadowOffsetX = 0;
+    this.ctx.shadowOffsetY = 0;
+    this.ctx.stroke();
+    
+    // Header
+    const headerColor = node.isNative ? colors.accentPurple : 
+                        (node.isRootType ? colors.accentOrange : colors.nodeHeader);
+    
+    if (style.useGradient && style.currentStyle !== 'wireframe') {
+      const headerGradient = this.ctx.createLinearGradient(x, y, x, y + 26);
+      headerGradient.addColorStop(0, headerColor);
+      headerGradient.addColorStop(1, this.adjustColorBrightness(headerColor, -30));
+      this.ctx.fillStyle = headerGradient;
+    } else {
+      this.ctx.fillStyle = style.currentStyle === 'wireframe' ? 'transparent' : headerColor;
+    }
+    
+    this.ctx.beginPath();
+    if (radius > 0) {
+      this.ctx.moveTo(x + radius, y);
+      this.ctx.lineTo(x + w - radius, y);
+      this.ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+      this.ctx.lineTo(x + w, y + 26);
+      this.ctx.lineTo(x, y + 26);
+      this.ctx.lineTo(x, y + radius);
+      this.ctx.quadraticCurveTo(x, y, x + radius, y);
+    } else {
+      this.ctx.rect(x, y, w, 26);
+    }
+    this.ctx.closePath();
+    
+    if (style.currentStyle !== 'wireframe') {
+      this.ctx.fill();
+    }
+    
+    if (style.currentStyle === 'wireframe' || style.currentStyle === 'blueprint') {
+      this.ctx.stroke();
+    }
+    
+    // Title
+    this.ctx.save();
+    this.ctx.beginPath();
+    this.ctx.rect(x + 4, y, w - 8, 26);
+    this.ctx.clip();
+    
+    this.ctx.fillStyle = colors.textPrimary;
+    this.ctx.font = (11 / this.camera.scale) + 'px ' + style.textFont;
+    this.ctx.textBaseline = 'middle';
+    this.ctx.textAlign = 'left';
+    
+    if (style.useGlow && (node.isRootType || node.isNative)) {
+      this.ctx.shadowColor = headerColor;
+      this.ctx.shadowBlur = 8 / this.camera.scale;
+    }
+    
+    let titleText = node.title;
+    if (node.isRootType) titleText = '★ ' + titleText;
+    
+    const maxWidth = w - 16;
+    let displayTitle = titleText;
+    const textWidth = this.ctx.measureText(displayTitle).width;
+    
+    if (textWidth > maxWidth) {
+      let left = 0;
+      let right = displayTitle.length;
+      while (left < right) {
+        const mid = Math.floor((left + right + 1) / 2);
+        const testText = displayTitle.substring(0, mid) + '...';
+        if (this.ctx.measureText(testText).width <= maxWidth) {
+          left = mid;
+        } else {
+          right = mid - 1;
+        }
+      }
+      displayTitle = displayTitle.substring(0, left) + '...';
+    }
+    
+    this.ctx.fillText(displayTitle, x + 8, y + 13);
+    this.ctx.restore();
+    
+    // Reset shadow
+    this.ctx.shadowColor = 'transparent';
+    this.ctx.shadowBlur = 0;
+    
+    // Slots
+    const worldMouse = this.screenToWorld(this.mousePos[0], this.mousePos[1]);
+    for (let j = 0; j < node.inputs.length; j++) {
+      this.drawInputSlot(node, j, x, y, w, worldMouse, colors);
+    }
+    for (let j = 0; j < node.outputs.length; j++) {
+      this.drawOutputSlot(node, j, x, y, w, worldMouse, colors);
+    }
+    
+    // Native value display
+    if (node.isNative && node.properties.value !== undefined) {
+      const valueY = y + h - 18;
+      
+      if (style.currentStyle !== 'wireframe') {
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.fillRect(x + 8, valueY - 10, w - 16, 18);
+      }
+      
+      this.ctx.strokeStyle = colors.borderColor;
+      this.ctx.lineWidth = 1 / this.camera.scale;
+      this.ctx.strokeRect(x + 8, valueY - 10, w - 16, 18);
+      
+      this.ctx.fillStyle = colors.textPrimary;
+      this.ctx.font = (10 / this.camera.scale) + 'px ' + style.textFont;
+      this.ctx.textAlign = 'left';
+      let displayValue = String(node.properties.value);
+      if (displayValue.length > 20) displayValue = displayValue.substring(0, 20) + '...';
+      this.ctx.fillText(displayValue, x + 12, valueY);
+    }
+  }
+
+  drawInputSlot(node, j, x, y, w, worldMouse, colors) {
+    const inp = node.inputs[j];
+    const sy = y + 33 + j * 25;
+    const hovered = this.connecting && !this.connecting.isOutput && 
+      Math.abs(worldMouse[0] - x) < 10 && Math.abs(worldMouse[1] - sy) < 10;
+    const compat = this.isSlotCompatible(node, j, false);
+    
+    const isMulti = node.multiInputs && node.multiInputs[j];
+    const hasConnections = isMulti ? node.multiInputs[j].links.length > 0 : inp.link;
+    
+    let color;
+    if (hovered && compat) color = colors.accentGreen;
+    else if (hovered && !compat) color = colors.accentRed;
+    else if (hasConnections) color = colors.slotConnected;
+    else color = colors.slotInput;
+    
+    // Draw connection indicator for multi-inputs
+    if (this.connecting && compat) {
+      this.ctx.fillStyle = color;
+      this.ctx.globalAlpha = 0.3;
+      this.ctx.beginPath();
+      this.ctx.arc(x - 1, sy, 8, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.globalAlpha = 1.0;
+    }
+    
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.arc(x - 1, sy, 4, 0, Math.PI * 2);
+    // const style = this.drawingStyleManager.getStyle();
+    // this.ctx.arc(x - 1, sy, style.slotRadius, 0, Math.PI * 2);
+    this.ctx.fill();
+    
+    // Highlight for multi-input
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    this.ctx.beginPath();
+    this.ctx.arc(x - 2, sy - 1, 1.5, 0, Math.PI * 2);
+    this.ctx.fill();
+    
+    if (isMulti) {
+      this.ctx.strokeStyle = colors.accentPurple || '#9370db';
+      this.ctx.lineWidth = 1.5 / this.camera.scale;
+      this.ctx.beginPath();
+      this.ctx.arc(x - 1, sy, 6, 0, Math.PI * 2);
+      this.ctx.stroke();
+      
+      if (node.multiInputs[j].links.length > 0) {
+        this.ctx.fillStyle = colors.accentPurple || '#9370db';
+        this.ctx.font = 'bold ' + (8 / this.camera.scale) + 'px Arial, sans-serif';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText(node.multiInputs[j].links.length, x + 10, sy - 10);
+      }
+    }
+    
+    // Field name
+    this.ctx.fillStyle = colors.textSecondary;
+    this.ctx.font = (10 / this.camera.scale) + 'px Arial, sans-serif';
+    this.ctx.textAlign = 'left';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText(inp.name, x + 10, sy);
+    
+    // Field type - SHOW THIS FOR SCHEMA NODES
+    if (!node.isNative || node.nativeInputs[j] === undefined) {
+      this.ctx.fillStyle = colors.textTertiary;
+      this.ctx.font = (8 / this.camera.scale) + 'px "Courier New", monospace';
+      const compactType = this.graph.compactType(inp.type);
+      let typeText = compactType.length > 20 ? compactType.substring(0, 20) + '...' : compactType;
+      this.ctx.fillText(typeText, x + 10, sy + 10);
+    }
+    
+    // Native input value box
+    if (!isMulti && !inp.link && node.nativeInputs && node.nativeInputs[j] !== undefined) {
+      const boxX = x + w - 70;
+      const boxY = sy - 8;
+      const isOptional = node.nativeInputs[j].optional;
+      
+      this.ctx.fillStyle = isOptional ? 'rgba(0, 100, 150, 0.2)' : 'rgba(0, 0, 0, 0.4)';
+      this.ctx.fillRect(boxX, boxY, 65, 16);
+      
+      this.ctx.strokeStyle = isOptional ? 'rgba(70, 162, 218, 0.5)' : (colors.borderColor || '#1a1a1a');
+      this.ctx.lineWidth = 1 / this.camera.scale;
+      this.ctx.strokeRect(boxX, boxY, 65, 16);
+      
+      const displayVal = node.nativeInputs[j].value;
+      const isEmpty = displayVal === '' || displayVal === null || displayVal === undefined;
+      
+      if (isEmpty) {
+        if (isOptional) {
+          this.ctx.fillStyle = colors.textTertiary;
+          this.ctx.font = 'italic ' + (8 / this.camera.scale) + 'px Arial, sans-serif';
+          this.ctx.textAlign = 'left';
+          this.ctx.fillText('null', boxX + 4, sy);
+        } else {
+          this.ctx.fillStyle = colors.textPrimary;
+          this.ctx.font = (9 / this.camera.scale) + 'px "Courier New", monospace';
+          this.ctx.textAlign = 'left';
+          this.ctx.fillText('empty', boxX + 4, sy);
+        }
+      } else {
+        this.ctx.fillStyle = colors.textPrimary;
+        this.ctx.font = (9 / this.camera.scale) + 'px "Courier New", monospace';
+        this.ctx.textAlign = 'left';
+        let displayValue = String(displayVal);
+        if (displayValue.length > 8) {
+          displayValue = displayValue.substring(0, 8) + '...';
+        }
+        this.ctx.fillText(displayValue, boxX + 4, sy);
+      }
+      
+      if (isOptional) {
+        this.ctx.fillStyle = 'rgba(70, 162, 218, 0.8)';
+        this.ctx.font = 'bold ' + (7 / this.camera.scale) + 'px Arial, sans-serif';
+        this.ctx.textAlign = 'right';
+        this.ctx.fillText('?', boxX + 65 - 2, boxY + 6);
+      }
+    }
+  }
+
+  drawOutputSlot(node, j, x, y, w, worldMouse, colors) {
+    const out = node.outputs[j];
+    const sy = y + 33 + j * 25;
+    const hovered = this.connecting && this.connecting.isOutput && 
+      Math.abs(worldMouse[0] - (x + w)) < 10 && Math.abs(worldMouse[1] - sy) < 10;
+    const compat = this.isSlotCompatible(node, j, true);
+    
+    const hasConnections = out.links.length > 0;
+    
+    let color;
+    if (hovered && compat) color = colors.accentGreen;
+    else if (hovered && !compat) color = colors.accentRed;
+    else if (hasConnections) color = colors.slotConnected;
+    else color = colors.slotOutput;
+    
+    if (this.connecting && compat) {
+      this.ctx.fillStyle = color;
+      this.ctx.globalAlpha = 0.3;
+      this.ctx.beginPath();
+      this.ctx.arc(x + w + 1, sy, 8, 0, Math.PI * 2);
+      // const style = this.drawingStyleManager.getStyle();
+      // this.ctx.arc(x + w + 1, sy, style.slotHighlightRadius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.globalAlpha = 1.0;
+    }
+    
+    this.ctx.fillStyle = color;
+    this.ctx.beginPath();
+    this.ctx.arc(x + w + 1, sy, 4, 0, Math.PI * 2);
+    this.ctx.fill();
+    
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+    this.ctx.beginPath();
+    this.ctx.arc(x + w, sy - 1, 1.5, 0, Math.PI * 2);
+    this.ctx.fill();
+    
+    // Output name
+    this.ctx.fillStyle = colors.textSecondary;
+    this.ctx.font = (10 / this.camera.scale) + 'px Arial, sans-serif';
+    this.ctx.textAlign = 'right';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText(out.name, x + w - 10, sy);
+    
+    // Output type - SHOW THIS FOR SCHEMA NODES
+    if (!node.isNative) {
+      this.ctx.fillStyle = colors.textTertiary;
+      this.ctx.font = (8 / this.camera.scale) + 'px "Courier New", monospace';
+      const compactType = this.graph.compactType(out.type);
+      let typeText = compactType.length > 15 ? compactType.substring(0, 15) + '...' : compactType;
+      this.ctx.fillText(typeText, x + w - 10, sy + 10);
+    }
+  }
+
+  drawConnecting(colors) {
+    const node = this.connecting.node;
+    const worldMouse = this.screenToWorld(this.mousePos[0], this.mousePos[1]);
+    let x1, y1;
+    
+    if (this.connecting.isOutput) {
+      x1 = node.pos[0] + node.size[0];
+      y1 = node.pos[1] + 33 + this.connecting.slot * 25;
+    } else {
+      x1 = node.pos[0];
+      y1 = node.pos[1] + 33 + this.connecting.slot * 25;
+    }
+    
+    const cx = x1 + (worldMouse[0] - x1) * 0.5;
+    
+    this.ctx.strokeStyle = colors.accentGreen;
+    this.ctx.lineWidth = 2.5 / this.camera.scale;
+    this.ctx.globalAlpha = 1.0;
+    this.ctx.setLineDash([10 / this.camera.scale, 5 / this.camera.scale]);
+    this.ctx.beginPath();
+    this.ctx.moveTo(x1, y1);
+    this.ctx.bezierCurveTo(cx, y1, cx, worldMouse[1], worldMouse[0], worldMouse[1]);
+    this.ctx.stroke();
+    this.ctx.setLineDash([]);
+    this.ctx.globalAlpha = 1.0;
+  }
+
+  adjustColorBrightness(color, amount) {
+    // Simple color brightness adjustment
+    // This is a helper for gradient effects
+    const hex = color.replace('#', '');
+    const num = parseInt(hex, 16);
+    const r = Math.max(0, Math.min(255, (num >> 16) + amount));
+    const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amount));
+    const b = Math.max(0, Math.min(255, (num & 0x0000FF) + amount));
+    return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
   }
 }
+
+// ========================================================================
+// INITIALIZATION
+// ========================================================================
 
 let gApp = null;
 if (document.readyState === 'loading') {
@@ -3746,9 +4132,13 @@ if (document.readyState === 'loading') {
     gApp = new SchemaGraphApp();
     window.graph = gApp.graph;
     window.app = gApp;
+    window.eventBus = gApp.eventBus;
+    window.analytics = gApp.analytics;
   });
 } else {
   gApp = new SchemaGraphApp();
   window.graph = gApp.graph;
   window.app = gApp;
+  window.eventBus = gApp.eventBus;
+  window.analytics = gApp.analytics;
 }

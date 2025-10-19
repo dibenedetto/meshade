@@ -3,22 +3,43 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SchemaGraph - Complete</title>
+  <title>SchemaGraph - Complete Interface</title>
   <link rel="stylesheet" href="schemagraph.css">
 </head>
 <body>
   <div class="header">
     <div class="header-top">
-      <h1>SchemaGraph - LiteGraph Clone with Pydantic Support</h1>
-      <div class="header-actions">
+      <h1>SchemaGraph - Complete Interface with Voice & Analytics</h1>
+      <div class="header-actions control-panel">
+        <!-- Voice Controls -->
+        <div class="voice-controls">
+          <span style="font-size: 10px; color: var(--text-tertiary); margin-right: 4px;">🎤 Voice:</span>
+          <button id="voiceStartBtn" class="voice-btn">Start</button>
+          <button id="voiceStopBtn" class="voice-btn" style="display: none;">Stop</button>
+          <span id="voiceStatus" class="voice-status"></span>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <!-- Analytics Toggle -->
+        <button id="analyticsToggleBtn" class="action-btn">📊 Analytics</button>
+        
+        <div class="divider"></div>
+        
+        <!-- Schema Controls -->
         <button id="uploadSchemaBtn" class="action-btn action-btn-primary" title="Upload Pydantic schema">📤 Upload Schema</button>
         <button id="exportBtn" class="action-btn" title="Export graph">Export Graph</button>
         <button id="importBtn" class="action-btn" title="Import graph">Import Graph</button>
         <button id="exportConfigBtn" class="action-btn" title="Export as config JSON">Export Config</button>
         <button id="importConfigBtn" class="action-btn" title="Import config JSON">Import Config</button>
+        
         <input type="file" id="uploadSchemaFile" accept=".py" style="display: none;" />
         <input type="file" id="importFile" accept=".json" style="display: none;" />
         <input type="file" id="importConfigFile" accept=".json" style="display: none;" />
+        
+        <div class="divider"></div>
+        
+        <!-- View Controls -->
         <button id="centerViewBtn" class="action-btn" title="Center view on graph">🎯 Center</button>
         <select id="layoutSelect" class="layout-select" title="Apply layout algorithm">
           <option value="">🔧 Layout...</option>
@@ -28,6 +49,17 @@
           <option value="grid">Grid</option>
           <option value="circular">Circular</option>
         </select>
+        
+        <!-- Drawing Style Selector -->
+        <select id="drawingStyleSelect" class="drawing-style-select" title="Change drawing style">
+          <option value="default">🎨 Default</option>
+          <option value="minimal">✨ Minimal</option>
+          <option value="blueprint">📐 Blueprint</option>
+          <option value="neon">💫 Neon</option>
+          <option value="organic">🌿 Organic</option>
+          <option value="wireframe">📊 Wireframe</option>
+        </select>
+        
         <button id="themeBtn" class="theme-btn" title="Switch theme">🎨</button>
       </div>
     </div>
@@ -38,6 +70,102 @@
       <div class="schema-manager-title">📋 Registered Schemas:</div>
       <div id="schemaList"></div>
     </div>
+  </div>
+  
+  <!-- Analytics Panel -->
+  <div id="analyticsPanel" class="analytics-panel">
+    <div class="analytics-header">
+      <div class="analytics-title">📊 Analytics Dashboard</div>
+      <button id="analyticsCloseBtn" class="analytics-close">✕</button>
+    </div>
+    
+    <div class="analytics-section">
+      <div class="analytics-section-title">Session Info</div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Session ID:</span>
+        <span class="analytics-metric-value" id="sessionId">-</span>
+      </div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Duration:</span>
+        <span class="analytics-metric-value" id="sessionDuration">-</span>
+      </div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Total Events:</span>
+        <span class="analytics-metric-value" id="totalEvents">-</span>
+      </div>
+    </div>
+    
+    <div class="analytics-section">
+      <div class="analytics-section-title">Graph Operations</div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Nodes Created:</span>
+        <span class="analytics-metric-value" id="nodesCreated">0</span>
+      </div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Nodes Deleted:</span>
+        <span class="analytics-metric-value" id="nodesDeleted">0</span>
+      </div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Links Created:</span>
+        <span class="analytics-metric-value" id="linksCreated">0</span>
+      </div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Links Deleted:</span>
+        <span class="analytics-metric-value" id="linksDeleted">0</span>
+      </div>
+    </div>
+    
+    <div class="analytics-section">
+      <div class="analytics-section-title">Schema Operations</div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Schemas Registered:</span>
+        <span class="analytics-metric-value" id="schemasRegistered">0</span>
+      </div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Schemas Removed:</span>
+        <span class="analytics-metric-value" id="schemasRemoved">0</span>
+      </div>
+    </div>
+    
+    <div class="analytics-section">
+      <div class="analytics-section-title">File Operations</div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Graphs Exported:</span>
+        <span class="analytics-metric-value" id="graphsExported">0</span>
+      </div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Graphs Imported:</span>
+        <span class="analytics-metric-value" id="graphsImported">0</span>
+      </div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Configs Exported:</span>
+        <span class="analytics-metric-value" id="configsExported">0</span>
+      </div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Configs Imported:</span>
+        <span class="analytics-metric-value" id="configsImported">0</span>
+      </div>
+    </div>
+    
+    <div class="analytics-section">
+      <div class="analytics-section-title">User Interactions</div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Total Interactions:</span>
+        <span class="analytics-metric-value" id="totalInteractions">0</span>
+      </div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Layouts Applied:</span>
+        <span class="analytics-metric-value" id="layoutsApplied">0</span>
+      </div>
+      <div class="analytics-metric">
+        <span class="analytics-metric-name">Errors:</span>
+        <span class="analytics-metric-value" id="errorCount">0</span>
+      </div>
+    </div>
+    
+    <button id="refreshAnalyticsBtn" class="analytics-btn">🔄 Refresh</button>
+    <button id="exportAnalyticsBtn" class="analytics-btn">💾 Export Analytics</button>
+    <button id="resetAnalyticsBtn" class="analytics-btn">🗑️ Reset Session</button>
   </div>
   
   <!-- Schema Registration Dialog -->
@@ -100,26 +228,16 @@
     <ul>
       <li><strong>Upload schema:</strong> Click "Upload Schema" button to upload a Pydantic .py file</li>
       <li><strong>Create nodes:</strong> Right-click on canvas (all registered schemas appear in menu)</li>
-      <li><strong>Root Type Nodes:</strong> Nodes with a ★ prefix and orange header are root config nodes - they represent the main configuration class and their list fields accept multiple connections</li>
-      <li><strong>Delete node:</strong> Select a node and press Delete/Backspace, or right-click on node and choose "Delete Node"</li>
-      <li><strong>Remove schema:</strong> Click "Remove" button in schema manager (removes all nodes of that schema)</li>
-      <li><strong>Edit values:</strong> Double-click value boxes on schema nodes or native node value boxes</li>
+      <li><strong>Root Type Nodes:</strong> Nodes with a ★ prefix and orange header are root config nodes</li>
+      <li><strong>Delete node:</strong> Select a node and press Delete/Backspace, or right-click and choose "Delete Node"</li>
+      <li><strong>Edit values:</strong> Double-click value boxes on nodes (boolean values toggle on double-click)</li>
       <li><strong>Pan:</strong> Middle-click and drag, or Space+drag</li>
       <li><strong>Zoom:</strong> Mouse wheel</li>
-      <li><strong>Connect:</strong> Drag from output (purple) to input (blue)</li>
-      <li><strong>Remove link:</strong> Click connected input slot</li>
-      <li><strong>Center View:</strong> Click "🎯 Center" button to center and fit all nodes in view</li>
-      <li><strong>Reset Zoom:</strong> Click "⟲" button next to zoom indicator to reset to 100%</li>
-      <li><strong>Apply Layout:</strong> Select a layout algorithm from the dropdown to organize nodes (Hierarchical, Force-Directed, Grid, or Circular)</li>
-      <li><strong>Export Graph:</strong> Click "Export Graph" button or press Ctrl/Cmd+S (saves node positions and connections)</li>
-      <li><strong>Import Graph:</strong> Click "Import Graph" button or press Ctrl/Cmd+O (restores saved graph)</li>
-      <li><strong>Export Config:</strong> Click "Export Config" button to convert graph to JSON configuration</li>
-      <li><strong>Import Config:</strong> Click "Import Config" button to load JSON configuration as graph</li>
+      <li><strong>Connect:</strong> Drag from output (right side) to input (left side)</li>
+      <li><strong>Drawing Styles:</strong> Select different visual styles from the dropdown (Default, Minimal, Blueprint, Neon, Organic, Wireframe)</li>
+      <li><strong>Voice Commands:</strong> Click "Start" to enable voice recognition (experimental)</li>
+      <li><strong>Analytics:</strong> Click "📊 Analytics" to view session metrics and statistics</li>
     </ul>
-    <strong>Schema Registration:</strong>
-    <p style="margin: 10px 0; color: var(--text-secondary); font-size: 12px;">
-      Upload a Pydantic schema file (.py) and specify the schema name, index type (e.g., 'Index' or 'int'), and root type (the main config class like 'AppConfig' that contains lists of other models). The system will parse the schema and generate node types automatically.
-    </p>
   </div>
 
   <script src="schemagraph.js"></script>
