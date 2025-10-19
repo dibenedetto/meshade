@@ -2125,6 +2125,9 @@ class SchemaGraphApp {
       this.draw();
     } else if (this.connecting) {
       this.draw();
+    } else {
+      // Redraw to update hover effects on editable fields
+      this.draw();
     }
   }
 
@@ -2324,8 +2327,35 @@ class SchemaGraphApp {
     let html = '';
     
     if (node) {
+      console.log('📋 Opening context menu for node:', node.title);
+      
       html += '<div class="context-menu-category">Node Actions</div>';
-      html += '<div class="context-menu-item context-menu-delete" data-action="delete">Delete Node</div>';
+      html += '<div class="context-menu-item context-menu-delete" data-action="delete">❌ Delete Node</div>';
+      
+      // Check if node has multi-input slots with connections
+      let hasMultiInputs = false;
+      let multiInputCount = 0;
+      if (node.multiInputs) {
+        console.log('   Checking multiInputs:', Object.keys(node.multiInputs));
+        for (const slotIdx in node.multiInputs) {
+          if (node.multiInputs.hasOwnProperty(slotIdx)) {
+            const links = node.multiInputs[slotIdx].links;
+            console.log(`   Slot ${slotIdx} (${node.inputs[slotIdx]?.name}):`, links ? links.length : 0, 'links');
+            if (links && links.length > 0) {
+              hasMultiInputs = true;
+              multiInputCount += links.length;
+            }
+          }
+        }
+      } else {
+        console.log('   No multiInputs property on this node');
+      }
+      
+      console.log('   hasMultiInputs:', hasMultiInputs, 'total count:', multiInputCount);
+      
+      if (hasMultiInputs) {
+        html += '<div class="context-menu-item" data-action="clear-multi-inputs">🗑️ Clear ' + multiInputCount + ' Multi-Input Link(s)</div>';
+      }
       
       contextMenu.innerHTML = html;
       contextMenu.style.left = coords.clientX + 'px';
@@ -2336,7 +2366,19 @@ class SchemaGraphApp {
         this.removeNode(node);
         contextMenu.classList.remove('show');
       });
+      
+      if (hasMultiInputs) {
+        const clearBtn = contextMenu.querySelector('[data-action="clear-multi-inputs"]');
+        if (clearBtn) {
+          clearBtn.addEventListener('click', () => {
+            console.log('🗑️ Clear multi-inputs clicked');
+            this.clearAllMultiInputLinks(node);
+            contextMenu.classList.remove('show');
+          });
+        }
+      }
     } else {
+      // Canvas context menu (rest remains the same)
       html += '<div class="context-menu-category">Native Types</div>';
       const natives = ['Native.String', 'Native.Integer', 'Native.Boolean', 'Native.Float', 'Native.List', 'Native.Dict'];
       for (const nativeType of natives) {
@@ -3447,6 +3489,112 @@ class SchemaGraphApp {
     }
   }
 
+  disconnectLink(linkId) {
+    const link = this.graph.links[linkId];
+    if (!link) {
+      console.warn('❌ Link not found:', linkId);
+      return false;
+    }
+
+    const originNode = this.graph.getNodeById(link.origin_id);
+    const targetNode = this.graph.getNodeById(link.target_id);
+
+    console.log(`🔗 Disconnecting link ${linkId}: ${originNode?.title} → ${targetNode?.title}`);
+
+    if (originNode) {
+      const idx = originNode.outputs[link.origin_slot].links.indexOf(linkId);
+      if (idx > -1) {
+        originNode.outputs[link.origin_slot].links.splice(idx, 1);
+      }
+    }
+
+    if (targetNode) {
+      if (targetNode.multiInputs && targetNode.multiInputs[link.target_slot]) {
+        const multiIdx = targetNode.multiInputs[link.target_slot].links.indexOf(linkId);
+        if (multiIdx > -1) {
+          targetNode.multiInputs[link.target_slot].links.splice(multiIdx, 1);
+        }
+      } else {
+        targetNode.inputs[link.target_slot].link = null;
+      }
+    }
+
+    delete this.graph.links[linkId];
+    this.eventBus.emit('link:deleted', { linkId });
+    return true;
+  }
+
+  clearMultiInputLinks(node, slotIdx) {
+    if (!node || !node.multiInputs || !node.multiInputs[slotIdx]) {
+      console.warn('❌ Not a multi-input slot');
+      return false;
+    }
+
+    const links = node.multiInputs[slotIdx].links.slice();
+    const slotName = node.inputs[slotIdx] ? node.inputs[slotIdx].name : 'slot' + slotIdx;
+    let cleared = 0;
+
+    for (const linkId of links) {
+      if (this.disconnectLink(linkId)) {
+        cleared++;
+      }
+    }
+
+    console.log(`✅ Cleared ${cleared} links from slot "${slotName}" on node "${node.title}"`);
+    
+    if (cleared > 0) {
+      this.eventBus.emit('ui:update', { 
+        id: 'status', 
+        content: `Cleared ${cleared} link(s) from ${slotName}` 
+      });
+      setTimeout(() => {
+        this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
+      }, 2000);
+    }
+    
+    this.draw();
+    return cleared > 0;
+  }
+
+  clearAllMultiInputLinks(node) {
+    if (!node || !node.multiInputs) {
+      console.warn('❌ Node has no multi-input slots', node);
+      return false;
+    }
+
+    let totalCleared = 0;
+    const slotInfo = [];
+    
+    for (const slotIdx in node.multiInputs) {
+      if (node.multiInputs.hasOwnProperty(slotIdx)) {
+        const links = node.multiInputs[slotIdx].links.slice();
+        const slotName = node.inputs[slotIdx] ? node.inputs[slotIdx].name : 'slot' + slotIdx;
+        slotInfo.push(`${slotName}: ${links.length} links`);
+        
+        for (const linkId of links) {
+          if (this.disconnectLink(linkId)) {
+            totalCleared++;
+          }
+        }
+      }
+    }
+
+    console.log(`✅ Cleared ${totalCleared} total links from node "${node.title}"`, slotInfo);
+    
+    if (totalCleared > 0) {
+      this.eventBus.emit('ui:update', { 
+        id: 'status', 
+        content: `Cleared ${totalCleared} multi-input link(s) from ${node.title}` 
+      });
+      setTimeout(() => {
+        this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
+      }, 2000);
+    }
+    
+    this.draw();
+    return totalCleared > 0;
+  }
+
   removeNode(node) {
     if (!node) return;
     
@@ -3949,6 +4097,11 @@ class SchemaGraphApp {
     this.ctx.translate(this.camera.x, this.camera.y);
     this.ctx.scale(this.camera.scale, this.camera.scale);
     
+    // Reset cursor at start of draw
+    if (!this.connecting && !this.dragNode && !this.isPanning) {
+      this.canvas.style.cursor = 'default';
+    }
+    
     this.drawGrid(colors);
     this.drawLinks(colors);
     this.drawNodes(colors);
@@ -4229,25 +4382,65 @@ class SchemaGraphApp {
       this.drawOutputSlot(node, j, x, y, w, worldMouse, colors);
     }
     
-    // Native value display with text scaling
+    // Native value display with rounded corners
     if (node.isNative && node.properties.value !== undefined) {
       const valueY = y + h - 18;
+      const valueX = x + 8;
+      const valueW = w - 16;
+      const valueH = 18;
+      const valueRadius = 4;
       
+      // Check if mouse is hovering over the value box
+      const isValueHovered = !this.connecting && 
+        worldMouse[0] >= valueX && worldMouse[0] <= valueX + valueW &&
+        worldMouse[1] >= valueY - 10 && worldMouse[1] <= valueY - 10 + valueH;
+      
+      // Background with rounded corners
       if (style.currentStyle !== 'wireframe') {
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.fillRect(x + 8, valueY - 10, w - 16, 18);
+        this.ctx.fillStyle = isValueHovered ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.4)';
+        this.ctx.beginPath();
+        this.ctx.moveTo(valueX + valueRadius, valueY - 10);
+        this.ctx.lineTo(valueX + valueW - valueRadius, valueY - 10);
+        this.ctx.quadraticCurveTo(valueX + valueW, valueY - 10, valueX + valueW, valueY - 10 + valueRadius);
+        this.ctx.lineTo(valueX + valueW, valueY - 10 + valueH - valueRadius);
+        this.ctx.quadraticCurveTo(valueX + valueW, valueY - 10 + valueH, valueX + valueW - valueRadius, valueY - 10 + valueH);
+        this.ctx.lineTo(valueX + valueRadius, valueY - 10 + valueH);
+        this.ctx.quadraticCurveTo(valueX, valueY - 10 + valueH, valueX, valueY - 10 + valueH - valueRadius);
+        this.ctx.lineTo(valueX, valueY - 10 + valueRadius);
+        this.ctx.quadraticCurveTo(valueX, valueY - 10, valueX + valueRadius, valueY - 10);
+        this.ctx.closePath();
+        this.ctx.fill();
       }
       
-      this.ctx.strokeStyle = colors.borderColor;
-      this.ctx.lineWidth = 1 / this.camera.scale;
-      this.ctx.strokeRect(x + 8, valueY - 10, w - 16, 18);
+      // Border with rounded corners
+      this.ctx.strokeStyle = isValueHovered ? colors.borderHighlight : colors.borderColor;
+      this.ctx.lineWidth = (isValueHovered ? 2 : 1.5) / this.camera.scale;
+      this.ctx.stroke();
       
+      // Inner highlight
+      if (isValueHovered) {
+        this.ctx.strokeStyle = 'rgba(70, 162, 218, 0.3)';
+        this.ctx.lineWidth = 2.5 / this.camera.scale;
+        this.ctx.stroke();
+      } else {
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        this.ctx.lineWidth = 1 / this.camera.scale;
+        this.ctx.stroke();
+      }
+      
+      // Value text
       this.ctx.fillStyle = colors.textPrimary;
       this.ctx.font = (10 * textScale) + 'px ' + style.textFont;
-      this.ctx.textAlign = 'left';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
       let displayValue = String(node.properties.value);
       if (displayValue.length > 20) displayValue = displayValue.substring(0, 20) + '...';
-      this.ctx.fillText(displayValue, x + 12, valueY);
+      this.ctx.fillText(displayValue, valueX + valueW / 2, valueY);
+      
+      // Edit cursor hint
+      if (isValueHovered) {
+        this.canvas.style.cursor = 'text';
+      }
     }
   }
 
@@ -4310,27 +4503,90 @@ class SchemaGraphApp {
     this.ctx.textBaseline = 'middle';
     this.ctx.fillText(inp.name, x + 10, sy);
     
-    // Field type with text scaling
+    // Field type with text scaling and rounded box
     if (!node.isNative || node.nativeInputs[j] === undefined) {
-      this.ctx.fillStyle = colors.textTertiary;
-      this.ctx.font = (8 * textScale) + 'px "Courier New", monospace';
       const compactType = this.graph.compactType(inp.type);
       let typeText = compactType.length > 20 ? compactType.substring(0, 20) + '...' : compactType;
-      this.ctx.fillText(typeText, x + 10, sy + 10);
+      
+      // Measure text to create properly sized box
+      this.ctx.font = (8 * textScale) + 'px "Courier New", monospace';
+      const textWidth = this.ctx.measureText(typeText).width;
+      const typeBoxX = x + 10;
+      const typeBoxY = sy + 10 - 5;
+      const typeBoxW = textWidth + 8;
+      const typeBoxH = 10;
+      const typeBoxRadius = 2;
+      
+      // Background with rounded corners
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      this.ctx.beginPath();
+      this.ctx.moveTo(typeBoxX + typeBoxRadius, typeBoxY);
+      this.ctx.lineTo(typeBoxX + typeBoxW - typeBoxRadius, typeBoxY);
+      this.ctx.quadraticCurveTo(typeBoxX + typeBoxW, typeBoxY, typeBoxX + typeBoxW, typeBoxY + typeBoxRadius);
+      this.ctx.lineTo(typeBoxX + typeBoxW, typeBoxY + typeBoxH - typeBoxRadius);
+      this.ctx.quadraticCurveTo(typeBoxX + typeBoxW, typeBoxY + typeBoxH, typeBoxX + typeBoxW - typeBoxRadius, typeBoxY + typeBoxH);
+      this.ctx.lineTo(typeBoxX + typeBoxRadius, typeBoxY + typeBoxH);
+      this.ctx.quadraticCurveTo(typeBoxX, typeBoxY + typeBoxH, typeBoxX, typeBoxY + typeBoxH - typeBoxRadius);
+      this.ctx.lineTo(typeBoxX, typeBoxY + typeBoxRadius);
+      this.ctx.quadraticCurveTo(typeBoxX, typeBoxY, typeBoxX + typeBoxRadius, typeBoxY);
+      this.ctx.closePath();
+      this.ctx.fill();
+      
+      // Border
+      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      this.ctx.lineWidth = 0.5 / this.camera.scale;
+      this.ctx.stroke();
+      
+      // Type text
+      this.ctx.fillStyle = colors.textTertiary;
+      this.ctx.textAlign = 'left';
+      this.ctx.fillText(typeText, typeBoxX + 4, sy + 10);
     }
     
-    // Native input value box
+    // Native input value box with rounded corners
     if (!isMulti && !inp.link && node.nativeInputs && node.nativeInputs[j] !== undefined) {
       const boxX = x + w - 70;
       const boxY = sy - 8;
+      const boxW = 65;
+      const boxH = 16;
+      const boxRadius = 4;
       const isOptional = node.nativeInputs[j].optional;
       
-      this.ctx.fillStyle = isOptional ? 'rgba(0, 100, 150, 0.2)' : 'rgba(0, 0, 0, 0.4)';
-      this.ctx.fillRect(boxX, boxY, 65, 16);
+      // Check if mouse is hovering over the box
+      const isBoxHovered = !this.connecting && 
+        worldMouse[0] >= boxX && worldMouse[0] <= boxX + boxW &&
+        worldMouse[1] >= boxY && worldMouse[1] <= boxY + boxH;
       
-      this.ctx.strokeStyle = isOptional ? 'rgba(70, 162, 218, 0.5)' : (colors.borderColor || '#1a1a1a');
-      this.ctx.lineWidth = 1 / this.camera.scale;
-      this.ctx.strokeRect(boxX, boxY, 65, 16);
+      // Background with rounded corners
+      this.ctx.fillStyle = isBoxHovered 
+        ? (isOptional ? 'rgba(0, 120, 180, 0.35)' : 'rgba(0, 0, 0, 0.6)')
+        : (isOptional ? 'rgba(0, 100, 150, 0.25)' : 'rgba(0, 0, 0, 0.5)');
+      this.ctx.beginPath();
+      this.ctx.moveTo(boxX + boxRadius, boxY);
+      this.ctx.lineTo(boxX + boxW - boxRadius, boxY);
+      this.ctx.quadraticCurveTo(boxX + boxW, boxY, boxX + boxW, boxY + boxRadius);
+      this.ctx.lineTo(boxX + boxW, boxY + boxH - boxRadius);
+      this.ctx.quadraticCurveTo(boxX + boxW, boxY + boxH, boxX + boxW - boxRadius, boxY + boxH);
+      this.ctx.lineTo(boxX + boxRadius, boxY + boxH);
+      this.ctx.quadraticCurveTo(boxX, boxY + boxH, boxX, boxY + boxH - boxRadius);
+      this.ctx.lineTo(boxX, boxY + boxRadius);
+      this.ctx.quadraticCurveTo(boxX, boxY, boxX + boxRadius, boxY);
+      this.ctx.closePath();
+      this.ctx.fill();
+      
+      // Border with rounded corners
+      this.ctx.strokeStyle = isBoxHovered
+        ? (isOptional ? 'rgba(100, 180, 230, 0.8)' : colors.borderHighlight)
+        : (isOptional ? 'rgba(70, 162, 218, 0.6)' : (colors.borderColor || '#1a1a1a'));
+      this.ctx.lineWidth = (isBoxHovered ? 2 : 1.5) / this.camera.scale;
+      this.ctx.stroke();
+      
+      // Inner glow for optional fields
+      if (isOptional && isBoxHovered) {
+        this.ctx.strokeStyle = 'rgba(70, 162, 218, 0.4)';
+        this.ctx.lineWidth = 3 / this.camera.scale;
+        this.ctx.stroke();
+      }
       
       const displayVal = node.nativeInputs[j].value;
       const isEmpty = displayVal === '' || displayVal === null || displayVal === undefined;
@@ -4339,13 +4595,13 @@ class SchemaGraphApp {
         if (isOptional) {
           this.ctx.fillStyle = colors.textTertiary;
           this.ctx.font = 'italic ' + (8 * textScale) + 'px Arial, sans-serif';
-          this.ctx.textAlign = 'left';
-          this.ctx.fillText('null', boxX + 4, sy);
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('null', boxX + boxW / 2, sy);
         } else {
-          this.ctx.fillStyle = colors.textPrimary;
-          this.ctx.font = (9 * textScale) + 'px "Courier New", monospace';
-          this.ctx.textAlign = 'left';
-          this.ctx.fillText('empty', boxX + 4, sy);
+          this.ctx.fillStyle = colors.textSecondary;
+          this.ctx.font = 'italic ' + (8 * textScale) + 'px Arial, sans-serif';
+          this.ctx.textAlign = 'center';
+          this.ctx.fillText('empty', boxX + boxW / 2, sy);
         }
       } else {
         this.ctx.fillStyle = colors.textPrimary;
@@ -4355,14 +4611,37 @@ class SchemaGraphApp {
         if (displayValue.length > 8) {
           displayValue = displayValue.substring(0, 8) + '...';
         }
-        this.ctx.fillText(displayValue, boxX + 4, sy);
+        this.ctx.fillText(displayValue, boxX + 6, sy);
       }
       
+      // Optional indicator badge
       if (isOptional) {
-        this.ctx.fillStyle = 'rgba(70, 162, 218, 0.8)';
+        const badgeSize = 10;
+        const badgeX = boxX + boxW - badgeSize / 2;
+        const badgeY = boxY - badgeSize / 2;
+        
+        // Badge circle
+        this.ctx.fillStyle = isBoxHovered ? 'rgba(100, 180, 230, 1.0)' : 'rgba(70, 162, 218, 0.9)';
+        this.ctx.beginPath();
+        this.ctx.arc(badgeX, badgeY, badgeSize / 2, 0, Math.PI * 2);
+        this.ctx.fill();
+        
+        // Badge border
+        this.ctx.strokeStyle = colors.textPrimary;
+        this.ctx.lineWidth = 1 / this.camera.scale;
+        this.ctx.stroke();
+        
+        // Question mark
+        this.ctx.fillStyle = '#ffffff';
         this.ctx.font = 'bold ' + (7 * textScale) + 'px Arial, sans-serif';
-        this.ctx.textAlign = 'right';
-        this.ctx.fillText('?', boxX + 65 - 2, boxY + 6);
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText('?', badgeX, badgeY);
+      }
+      
+      // Edit cursor hint
+      if (isBoxHovered) {
+        this.canvas.style.cursor = 'text';
       }
     }
   }
@@ -4410,13 +4689,44 @@ class SchemaGraphApp {
     this.ctx.textBaseline = 'middle';
     this.ctx.fillText(out.name, x + w - 10, sy);
     
-    // Output type with text scaling
+    // Output type with text scaling and rounded box
     if (!node.isNative) {
-      this.ctx.fillStyle = colors.textTertiary;
-      this.ctx.font = (8 * textScale) + 'px "Courier New", monospace';
       const compactType = this.graph.compactType(out.type);
       let typeText = compactType.length > 15 ? compactType.substring(0, 15) + '...' : compactType;
-      this.ctx.fillText(typeText, x + w - 10, sy + 10);
+      
+      // Measure text to create properly sized box
+      this.ctx.font = (8 * textScale) + 'px "Courier New", monospace';
+      const textWidth = this.ctx.measureText(typeText).width;
+      const typeBoxX = x + w - 10 - textWidth - 8;
+      const typeBoxY = sy + 10 - 5;
+      const typeBoxW = textWidth + 8;
+      const typeBoxH = 10;
+      const typeBoxRadius = 2;
+      
+      // Background with rounded corners
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      this.ctx.beginPath();
+      this.ctx.moveTo(typeBoxX + typeBoxRadius, typeBoxY);
+      this.ctx.lineTo(typeBoxX + typeBoxW - typeBoxRadius, typeBoxY);
+      this.ctx.quadraticCurveTo(typeBoxX + typeBoxW, typeBoxY, typeBoxX + typeBoxW, typeBoxY + typeBoxRadius);
+      this.ctx.lineTo(typeBoxX + typeBoxW, typeBoxY + typeBoxH - typeBoxRadius);
+      this.ctx.quadraticCurveTo(typeBoxX + typeBoxW, typeBoxY + typeBoxH, typeBoxX + typeBoxW - typeBoxRadius, typeBoxY + typeBoxH);
+      this.ctx.lineTo(typeBoxX + typeBoxRadius, typeBoxY + typeBoxH);
+      this.ctx.quadraticCurveTo(typeBoxX, typeBoxY + typeBoxH, typeBoxX, typeBoxY + typeBoxH - typeBoxRadius);
+      this.ctx.lineTo(typeBoxX, typeBoxY + typeBoxRadius);
+      this.ctx.quadraticCurveTo(typeBoxX, typeBoxY, typeBoxX + typeBoxRadius, typeBoxY);
+      this.ctx.closePath();
+      this.ctx.fill();
+      
+      // Border
+      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      this.ctx.lineWidth = 0.5 / this.camera.scale;
+      this.ctx.stroke();
+      
+      // Type text
+      this.ctx.fillStyle = colors.textTertiary;
+      this.ctx.textAlign = 'right';
+      this.ctx.fillText(typeText, x + w - 10 - 4, sy + 10);
     }
   }
 
@@ -4471,6 +4781,20 @@ if (document.readyState === 'loading') {
     window.app = gApp;
     window.eventBus = gApp.eventBus;
     window.analytics = gApp.analytics;
+    
+    // Export utility methods for console debugging
+    window.disconnectLink = (linkId) => {
+      const result = gApp.disconnectLink(linkId);
+      gApp.draw();
+      return result;
+    };
+    window.clearMultiInputLinks = (node, slotIdx) => gApp.clearMultiInputLinks(node, slotIdx);
+    window.clearAllMultiInputLinks = (node) => gApp.clearAllMultiInputLinks(node);
+    
+    console.log('💡 Debugging utilities available:');
+    console.log('   - disconnectLink(linkId)');
+    console.log('   - clearMultiInputLinks(node, slotIdx)');
+    console.log('   - clearAllMultiInputLinks(node)');
   });
 } else {
   gApp = new SchemaGraphApp();
@@ -4478,4 +4802,18 @@ if (document.readyState === 'loading') {
   window.app = gApp;
   window.eventBus = gApp.eventBus;
   window.analytics = gApp.analytics;
+  
+  // Export utility methods for console debugging
+  window.disconnectLink = (linkId) => {
+    const result = gApp.disconnectLink(linkId);
+    gApp.draw();
+    return result;
+  };
+  window.clearMultiInputLinks = (node, slotIdx) => gApp.clearMultiInputLinks(node, slotIdx);
+  window.clearAllMultiInputLinks = (node) => gApp.clearAllMultiInputLinks(node);
+  
+  console.log('💡 Debugging utilities available:');
+  console.log('   - disconnectLink(linkId)');
+  console.log('   - clearMultiInputLinks(node, slotIdx)');
+  console.log('   - clearAllMultiInputLinks(node)');
 }
