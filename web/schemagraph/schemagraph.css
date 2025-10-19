@@ -254,6 +254,61 @@ h1 {
 }
 
 /* ========================================================================
+   TEXT SCALING TOGGLE
+   ======================================================================== */
+
+.text-scaling-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s ease;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.text-scaling-toggle:hover {
+  background: var(--bg-quaternary);
+  border-color: var(--border-highlight);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.text-scaling-toggle:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.text-scaling-toggle.scaled {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #ffffff;
+}
+
+.text-scaling-toggle.scaled:hover {
+  background: var(--accent-blue-light);
+  border-color: var(--accent-blue-light);
+}
+
+.text-scaling-icon {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+.text-scaling-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ========================================================================
    ANALYTICS PANEL
    ======================================================================== */
 

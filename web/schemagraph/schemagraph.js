@@ -1359,6 +1359,7 @@ class SchemaGraphApp {
     this.setupEventListeners();
     this.setupVoiceAndAnalyticsUI();
     this.setupDrawingStyleSelector();
+    this.setupTextScalingToggle();
     this.setupVoiceCommands();
     this.registerNativeNodes();
     
@@ -1387,9 +1388,12 @@ class SchemaGraphApp {
     this.themes = ['dark', 'light', 'ocean'];
     this.currentThemeIndex = 0;
     this.loadTheme();
-
+    
     this.drawingStyleManager = new DrawingStyleManager();
     this.drawingStyleManager.loadSavedStyle();
+    
+    this.textScalingMode = 'fixed';  // Default to fixed text size
+    this.loadTextScalingMode();
   }
 
   registerUIElements() {
@@ -1675,6 +1679,68 @@ class SchemaGraphApp {
     });
   }
 
+  setupTextScalingToggle() {
+    const toggleBtn = document.getElementById('textScalingToggle');
+    const label = document.getElementById('textScalingLabel');
+    
+    if (!toggleBtn || !label) return;
+    
+    // Set initial state
+    this.updateTextScalingUI();
+    
+    // Handle toggle
+    toggleBtn.addEventListener('click', () => {
+      this.textScalingMode = this.textScalingMode === 'fixed' ? 'scaled' : 'fixed';
+      this.saveTextScalingMode();
+      this.updateTextScalingUI();
+      this.draw();
+      
+      const mode = this.textScalingMode === 'fixed' ? 'Fixed Size' : 'Scaled with Zoom';
+      this.eventBus.emit('ui:update', { 
+        id: 'status', 
+        content: `Text scaling: ${mode}` 
+      });
+      setTimeout(() => {
+        this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
+      }, 2000);
+    });
+  }
+
+  updateTextScalingUI() {
+    const toggleBtn = document.getElementById('textScalingToggle');
+    const label = document.getElementById('textScalingLabel');
+    
+    if (!toggleBtn || !label) return;
+    
+    if (this.textScalingMode === 'scaled') {
+      toggleBtn.classList.add('scaled');
+      label.textContent = 'Scaled';
+      toggleBtn.title = 'Text scales with zoom (click for fixed size)';
+    } else {
+      toggleBtn.classList.remove('scaled');
+      label.textContent = 'Fixed';
+      toggleBtn.title = 'Text stays readable (click to scale with zoom)';
+    }
+  }
+
+  loadTextScalingMode() {
+    const saved = localStorage.getItem('schemagraph-text-scaling');
+    if (saved === 'scaled' || saved === 'fixed') {
+      this.textScalingMode = saved;
+    }
+  }
+
+  saveTextScalingMode() {
+    localStorage.setItem('schemagraph-text-scaling', this.textScalingMode);
+  }
+
+  getTextScale() {
+    // Returns the scale factor for text
+    // - 'fixed' mode: always 1 (text divided by camera scale to stay same size)
+    // - 'scaled' mode: text scales naturally with zoom
+    return this.textScalingMode === 'fixed' ? (1 / this.camera.scale) : 1;
+  }
+
   updateAnalyticsDisplay() {
     if (!this.analytics) return;
     
@@ -1799,6 +1865,22 @@ class SchemaGraphApp {
       // Help command
       else if (transcript.includes('help') || transcript.includes('commands')) {
         this.showVoiceHelp();
+      }
+      // Layout commands
+      else if (transcript.includes('layout')) {
+        if (transcript.includes('hierarchical') || transcript.includes('hierarchy')) {
+          if (transcript.includes('horizontal')) {
+            this.executeVoiceCommand('layout', 'hierarchical-horizontal');
+          } else {
+            this.executeVoiceCommand('layout', 'hierarchical-vertical');
+          }
+        } else if (transcript.includes('force')) {
+          this.executeVoiceCommand('layout', 'force-directed');
+        } else if (transcript.includes('grid')) {
+          this.executeVoiceCommand('layout', 'grid');
+        } else if (transcript.includes('circular') || transcript.includes('circle')) {
+          this.executeVoiceCommand('layout', 'circular');
+        }
       }
       // Unknown command
       else {
@@ -3567,11 +3649,267 @@ class SchemaGraphApp {
       return;
     }
     
-    // Simplified - implement full layout algorithms as needed
     console.log('Applying layout:', layoutType);
+    
+    switch (layoutType) {
+      case 'hierarchical-vertical':
+        this.applyHierarchicalLayout(true);
+        break;
+      case 'hierarchical-horizontal':
+        this.applyHierarchicalLayout(false);
+        break;
+      case 'force-directed':
+        this.applyForceDirectedLayout();
+        break;
+      case 'grid':
+        this.applyGridLayout();
+        break;
+      case 'circular':
+        this.applyCircularLayout();
+        break;
+      default:
+        this.showError('Unknown layout type: ' + layoutType);
+        return;
+    }
+    
     this.eventBus.emit('layout:applied', { layoutType });
     this.draw();
     this.centerView();
+  }
+
+  applyHierarchicalLayout(vertical = false) {
+    // Find root nodes (nodes with no inputs connected or nodes marked as root)
+    const rootNodes = [];
+    const processedNodes = new Set();
+    
+    for (const node of this.graph.nodes) {
+      let hasInputConnection = false;
+      for (const input of node.inputs) {
+        if (input.link !== null && input.link !== undefined) {
+          hasInputConnection = true;
+          break;
+        }
+      }
+      if (!hasInputConnection || node.isRootType) {
+        rootNodes.push(node);
+      }
+    }
+    
+    // If no root nodes found, use all nodes as roots
+    if (rootNodes.length === 0) {
+      rootNodes.push(...this.graph.nodes);
+    }
+    
+    const layers = [];
+    const nodeToLayer = new Map();
+    
+    // Build layers using BFS
+    const queue = [];
+    for (const root of rootNodes) {
+      queue.push({ node: root, layer: 0 });
+      processedNodes.add(root);
+    }
+    
+    while (queue.length > 0) {
+      const { node, layer } = queue.shift();
+      
+      if (!layers[layer]) {
+        layers[layer] = [];
+      }
+      layers[layer].push(node);
+      nodeToLayer.set(node, layer);
+      
+      // Find connected nodes through outputs
+      for (const output of node.outputs) {
+        for (const linkId of output.links) {
+          const link = this.graph.links[linkId];
+          if (link) {
+            const targetNode = this.graph.getNodeById(link.target_id);
+            if (targetNode && !processedNodes.has(targetNode)) {
+              processedNodes.add(targetNode);
+              queue.push({ node: targetNode, layer: layer + 1 });
+            }
+          }
+        }
+      }
+    }
+    
+    // Add any unconnected nodes to the last layer
+    for (const node of this.graph.nodes) {
+      if (!processedNodes.has(node)) {
+        const lastLayer = layers.length;
+        if (!layers[lastLayer]) {
+          layers[lastLayer] = [];
+        }
+        layers[lastLayer].push(node);
+      }
+    }
+    
+    // Position nodes
+    const layerSpacing = vertical ? 300 : 200;
+    const nodeSpacing = vertical ? 150 : 250;
+    const startX = 100;
+    const startY = 100;
+    
+    for (let i = 0; i < layers.length; i++) {
+      const layer = layers[i];
+      const layerHeight = layer.length * nodeSpacing;
+      
+      for (let j = 0; j < layer.length; j++) {
+        const node = layer[j];
+        if (vertical) {
+          node.pos[0] = startX + i * layerSpacing;
+          node.pos[1] = startY + j * nodeSpacing - layerHeight / 2;
+        } else {
+          node.pos[0] = startX + j * nodeSpacing - layerHeight / 2;
+          node.pos[1] = startY + i * layerSpacing;
+        }
+      }
+    }
+  }
+
+  applyForceDirectedLayout() {
+    // Simple force-directed layout using spring forces
+    const iterations = 100;
+    const repulsionStrength = 50000;
+    const attractionStrength = 0.01;
+    const damping = 0.9;
+    const minDistance = 200;
+    
+    // Initialize velocities
+    const velocities = new Map();
+    for (const node of this.graph.nodes) {
+      velocities.set(node, { x: 0, y: 0 });
+    }
+    
+    // Initial random positions if nodes are clustered
+    const spread = 400;
+    for (const node of this.graph.nodes) {
+      if (node.pos[0] === 0 && node.pos[1] === 0) {
+        node.pos[0] = Math.random() * spread;
+        node.pos[1] = Math.random() * spread;
+      }
+    }
+    
+    // Run simulation
+    for (let iter = 0; iter < iterations; iter++) {
+      // Calculate repulsion forces between all nodes
+      for (let i = 0; i < this.graph.nodes.length; i++) {
+        const nodeA = this.graph.nodes[i];
+        const vel = velocities.get(nodeA);
+        
+        for (let j = i + 1; j < this.graph.nodes.length; j++) {
+          const nodeB = this.graph.nodes[j];
+          const dx = nodeB.pos[0] - nodeA.pos[0];
+          const dy = nodeB.pos[1] - nodeA.pos[1];
+          const distSq = dx * dx + dy * dy;
+          const dist = Math.sqrt(distSq);
+          
+          if (dist < 0.1) continue;
+          
+          const force = repulsionStrength / distSq;
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+          
+          vel.x -= fx;
+          vel.y -= fy;
+          
+          const velB = velocities.get(nodeB);
+          velB.x += fx;
+          velB.y += fy;
+        }
+      }
+      
+      // Calculate attraction forces for connected nodes
+      for (const linkId in this.graph.links) {
+        const link = this.graph.links[linkId];
+        const nodeA = this.graph.getNodeById(link.origin_id);
+        const nodeB = this.graph.getNodeById(link.target_id);
+        
+        if (!nodeA || !nodeB) continue;
+        
+        const dx = nodeB.pos[0] - nodeA.pos[0];
+        const dy = nodeB.pos[1] - nodeA.pos[1];
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 0.1) continue;
+        
+        const force = (dist - minDistance) * attractionStrength;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        
+        const velA = velocities.get(nodeA);
+        const velB = velocities.get(nodeB);
+        
+        velA.x += fx;
+        velA.y += fy;
+        velB.x -= fx;
+        velB.y -= fy;
+      }
+      
+      // Update positions and apply damping
+      for (const node of this.graph.nodes) {
+        const vel = velocities.get(node);
+        node.pos[0] += vel.x;
+        node.pos[1] += vel.y;
+        vel.x *= damping;
+        vel.y *= damping;
+      }
+    }
+  }
+
+  applyGridLayout() {
+    const cols = Math.ceil(Math.sqrt(this.graph.nodes.length));
+    const cellWidth = 250;
+    const cellHeight = 200;
+    const startX = 100;
+    const startY = 100;
+    
+    for (let i = 0; i < this.graph.nodes.length; i++) {
+      const node = this.graph.nodes[i];
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      
+      node.pos[0] = startX + col * cellWidth;
+      node.pos[1] = startY + row * cellHeight;
+    }
+  }
+
+  applyCircularLayout() {
+    const centerX = 0;
+    const centerY = 0;
+    const radius = Math.max(300, this.graph.nodes.length * 30);
+    const angleStep = (2 * Math.PI) / this.graph.nodes.length;
+    
+    // Separate root nodes and regular nodes
+    const rootNodes = [];
+    const regularNodes = [];
+    
+    for (const node of this.graph.nodes) {
+      if (node.isRootType) {
+        rootNodes.push(node);
+      } else {
+        regularNodes.push(node);
+      }
+    }
+    
+    // Place root nodes in the center
+    if (rootNodes.length > 0) {
+      const rootRadius = 100;
+      const rootAngleStep = (2 * Math.PI) / rootNodes.length;
+      for (let i = 0; i < rootNodes.length; i++) {
+        const angle = i * rootAngleStep;
+        rootNodes[i].pos[0] = centerX + Math.cos(angle) * rootRadius;
+        rootNodes[i].pos[1] = centerY + Math.sin(angle) * rootRadius;
+      }
+    }
+    
+    // Place regular nodes in a circle
+    for (let i = 0; i < regularNodes.length; i++) {
+      const angle = i * angleStep;
+      regularNodes[i].pos[0] = centerX + Math.cos(angle) * radius;
+      regularNodes[i].pos[1] = centerY + Math.sin(angle) * radius;
+    }
   }
 
   // Drawing
@@ -3746,6 +4084,7 @@ class SchemaGraphApp {
     const w = node.size[0];
     const h = node.size[1];
     const radius = style.nodeCornerRadius;
+    const textScale = this.getTextScale();
     
     // Shadow
     if (style.nodeShadowBlur > 0) {
@@ -3836,20 +4175,20 @@ class SchemaGraphApp {
       this.ctx.stroke();
     }
     
-    // Title
+    // Title with text scaling
     this.ctx.save();
     this.ctx.beginPath();
     this.ctx.rect(x + 4, y, w - 8, 26);
     this.ctx.clip();
     
     this.ctx.fillStyle = colors.textPrimary;
-    this.ctx.font = (11 / this.camera.scale) + 'px ' + style.textFont;
+    this.ctx.font = (11 * textScale) + 'px ' + style.textFont;
     this.ctx.textBaseline = 'middle';
     this.ctx.textAlign = 'left';
     
     if (style.useGlow && (node.isRootType || node.isNative)) {
       this.ctx.shadowColor = headerColor;
-      this.ctx.shadowBlur = 8 / this.camera.scale;
+      this.ctx.shadowBlur = (8 * textScale);
     }
     
     let titleText = node.title;
@@ -3890,7 +4229,7 @@ class SchemaGraphApp {
       this.drawOutputSlot(node, j, x, y, w, worldMouse, colors);
     }
     
-    // Native value display
+    // Native value display with text scaling
     if (node.isNative && node.properties.value !== undefined) {
       const valueY = y + h - 18;
       
@@ -3904,7 +4243,7 @@ class SchemaGraphApp {
       this.ctx.strokeRect(x + 8, valueY - 10, w - 16, 18);
       
       this.ctx.fillStyle = colors.textPrimary;
-      this.ctx.font = (10 / this.camera.scale) + 'px ' + style.textFont;
+      this.ctx.font = (10 * textScale) + 'px ' + style.textFont;
       this.ctx.textAlign = 'left';
       let displayValue = String(node.properties.value);
       if (displayValue.length > 20) displayValue = displayValue.substring(0, 20) + '...';
@@ -3913,6 +4252,8 @@ class SchemaGraphApp {
   }
 
   drawInputSlot(node, j, x, y, w, worldMouse, colors) {
+    const style = this.drawingStyleManager.getStyle();
+    const textScale = this.getTextScale();
     const inp = node.inputs[j];
     const sy = y + 33 + j * 25;
     const hovered = this.connecting && !this.connecting.isOutput && 
@@ -3928,7 +4269,6 @@ class SchemaGraphApp {
     else if (hasConnections) color = colors.slotConnected;
     else color = colors.slotInput;
     
-    // Draw connection indicator for multi-inputs
     if (this.connecting && compat) {
       this.ctx.fillStyle = color;
       this.ctx.globalAlpha = 0.3;
@@ -3940,12 +4280,9 @@ class SchemaGraphApp {
     
     this.ctx.fillStyle = color;
     this.ctx.beginPath();
-    this.ctx.arc(x - 1, sy, 4, 0, Math.PI * 2);
-    // const style = this.drawingStyleManager.getStyle();
-    // this.ctx.arc(x - 1, sy, style.slotRadius, 0, Math.PI * 2);
+    this.ctx.arc(x - 1, sy, style.slotRadius || 4, 0, Math.PI * 2);
     this.ctx.fill();
     
-    // Highlight for multi-input
     this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
     this.ctx.beginPath();
     this.ctx.arc(x - 2, sy - 1, 1.5, 0, Math.PI * 2);
@@ -3960,23 +4297,23 @@ class SchemaGraphApp {
       
       if (node.multiInputs[j].links.length > 0) {
         this.ctx.fillStyle = colors.accentPurple || '#9370db';
-        this.ctx.font = 'bold ' + (8 / this.camera.scale) + 'px Arial, sans-serif';
+        this.ctx.font = 'bold ' + (8 * textScale) + 'px Arial, sans-serif';
         this.ctx.textAlign = 'left';
         this.ctx.fillText(node.multiInputs[j].links.length, x + 10, sy - 10);
       }
     }
     
-    // Field name
+    // Field name with text scaling
     this.ctx.fillStyle = colors.textSecondary;
-    this.ctx.font = (10 / this.camera.scale) + 'px Arial, sans-serif';
+    this.ctx.font = (10 * textScale) + 'px Arial, sans-serif';
     this.ctx.textAlign = 'left';
     this.ctx.textBaseline = 'middle';
     this.ctx.fillText(inp.name, x + 10, sy);
     
-    // Field type - SHOW THIS FOR SCHEMA NODES
+    // Field type with text scaling
     if (!node.isNative || node.nativeInputs[j] === undefined) {
       this.ctx.fillStyle = colors.textTertiary;
-      this.ctx.font = (8 / this.camera.scale) + 'px "Courier New", monospace';
+      this.ctx.font = (8 * textScale) + 'px "Courier New", monospace';
       const compactType = this.graph.compactType(inp.type);
       let typeText = compactType.length > 20 ? compactType.substring(0, 20) + '...' : compactType;
       this.ctx.fillText(typeText, x + 10, sy + 10);
@@ -4001,18 +4338,18 @@ class SchemaGraphApp {
       if (isEmpty) {
         if (isOptional) {
           this.ctx.fillStyle = colors.textTertiary;
-          this.ctx.font = 'italic ' + (8 / this.camera.scale) + 'px Arial, sans-serif';
+          this.ctx.font = 'italic ' + (8 * textScale) + 'px Arial, sans-serif';
           this.ctx.textAlign = 'left';
           this.ctx.fillText('null', boxX + 4, sy);
         } else {
           this.ctx.fillStyle = colors.textPrimary;
-          this.ctx.font = (9 / this.camera.scale) + 'px "Courier New", monospace';
+          this.ctx.font = (9 * textScale) + 'px "Courier New", monospace';
           this.ctx.textAlign = 'left';
           this.ctx.fillText('empty', boxX + 4, sy);
         }
       } else {
         this.ctx.fillStyle = colors.textPrimary;
-        this.ctx.font = (9 / this.camera.scale) + 'px "Courier New", monospace';
+        this.ctx.font = (9 * textScale) + 'px "Courier New", monospace';
         this.ctx.textAlign = 'left';
         let displayValue = String(displayVal);
         if (displayValue.length > 8) {
@@ -4023,7 +4360,7 @@ class SchemaGraphApp {
       
       if (isOptional) {
         this.ctx.fillStyle = 'rgba(70, 162, 218, 0.8)';
-        this.ctx.font = 'bold ' + (7 / this.camera.scale) + 'px Arial, sans-serif';
+        this.ctx.font = 'bold ' + (7 * textScale) + 'px Arial, sans-serif';
         this.ctx.textAlign = 'right';
         this.ctx.fillText('?', boxX + 65 - 2, boxY + 6);
       }
@@ -4031,6 +4368,8 @@ class SchemaGraphApp {
   }
 
   drawOutputSlot(node, j, x, y, w, worldMouse, colors) {
+    const style = this.drawingStyleManager.getStyle();
+    const textScale = this.getTextScale();
     const out = node.outputs[j];
     const sy = y + 33 + j * 25;
     const hovered = this.connecting && this.connecting.isOutput && 
@@ -4050,15 +4389,13 @@ class SchemaGraphApp {
       this.ctx.globalAlpha = 0.3;
       this.ctx.beginPath();
       this.ctx.arc(x + w + 1, sy, 8, 0, Math.PI * 2);
-      // const style = this.drawingStyleManager.getStyle();
-      // this.ctx.arc(x + w + 1, sy, style.slotHighlightRadius, 0, Math.PI * 2);
       this.ctx.fill();
       this.ctx.globalAlpha = 1.0;
     }
     
     this.ctx.fillStyle = color;
     this.ctx.beginPath();
-    this.ctx.arc(x + w + 1, sy, 4, 0, Math.PI * 2);
+    this.ctx.arc(x + w + 1, sy, style.slotRadius || 4, 0, Math.PI * 2);
     this.ctx.fill();
     
     this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
@@ -4066,17 +4403,17 @@ class SchemaGraphApp {
     this.ctx.arc(x + w, sy - 1, 1.5, 0, Math.PI * 2);
     this.ctx.fill();
     
-    // Output name
+    // Output name with text scaling
     this.ctx.fillStyle = colors.textSecondary;
-    this.ctx.font = (10 / this.camera.scale) + 'px Arial, sans-serif';
+    this.ctx.font = (10 * textScale) + 'px Arial, sans-serif';
     this.ctx.textAlign = 'right';
     this.ctx.textBaseline = 'middle';
     this.ctx.fillText(out.name, x + w - 10, sy);
     
-    // Output type - SHOW THIS FOR SCHEMA NODES
+    // Output type with text scaling
     if (!node.isNative) {
       this.ctx.fillStyle = colors.textTertiary;
-      this.ctx.font = (8 / this.camera.scale) + 'px "Courier New", monospace';
+      this.ctx.font = (8 * textScale) + 'px "Courier New", monospace';
       const compactType = this.graph.compactType(out.type);
       let typeText = compactType.length > 15 ? compactType.substring(0, 15) + '...' : compactType;
       this.ctx.fillText(typeText, x + w - 10, sy + 10);
