@@ -4170,8 +4170,12 @@ class SchemaGraphApp {
         const x2 = targ.pos[0];
         const y2 = targ.pos[1] + 33 + link.target_slot * 25;
         
+        // Better curve calculation - limit control point distance
         const distance = Math.abs(x2 - x1);
-        const cx = x1 + distance * style.linkCurve;
+        const maxControlDistance = 400; // Maximum control point offset
+        const controlOffset = Math.min(distance * style.linkCurve, maxControlDistance);
+        const cx1 = x1 + controlOffset;
+        const cx2 = x2 - controlOffset;
         
         // Shadow layer
         if (style.linkShadowBlur > 0) {
@@ -4187,7 +4191,7 @@ class SchemaGraphApp {
           this.ctx.beginPath();
           if (style.linkCurve > 0) {
             this.ctx.moveTo(x1, y1);
-            this.ctx.bezierCurveTo(cx, y1, cx, y2, x2, y2);
+            this.ctx.bezierCurveTo(cx1, y1, cx2, y2, x2, y2);
           } else {
             this.ctx.moveTo(x1, y1);
             this.ctx.lineTo(x2, y2);
@@ -4208,7 +4212,7 @@ class SchemaGraphApp {
         this.ctx.beginPath();
         if (style.linkCurve > 0) {
           this.ctx.moveTo(x1, y1);
-          this.ctx.bezierCurveTo(cx, y1, cx, y2, x2, y2);
+          this.ctx.bezierCurveTo(cx1, y1, cx2, y2, x2, y2);
         } else {
           this.ctx.moveTo(x1, y1);
           this.ctx.lineTo(x2, y2);
@@ -4448,7 +4452,7 @@ class SchemaGraphApp {
     const style = this.drawingStyleManager.getStyle();
     const textScale = this.getTextScale();
     const inp = node.inputs[j];
-    const sy = y + 33 + j * 25;
+    const sy = y + 38 + j * 25;
     const hovered = this.connecting && !this.connecting.isOutput && 
       Math.abs(worldMouse[0] - x) < 10 && Math.abs(worldMouse[1] - sy) < 10;
     const compat = this.isSlotCompatible(node, j, false);
@@ -4650,7 +4654,7 @@ class SchemaGraphApp {
     const style = this.drawingStyleManager.getStyle();
     const textScale = this.getTextScale();
     const out = node.outputs[j];
-    const sy = y + 33 + j * 25;
+    const sy = y + 38 + j * 25;  // Start slots 5px lower
     const hovered = this.connecting && this.connecting.isOutput && 
       Math.abs(worldMouse[0] - (x + w)) < 10 && Math.abs(worldMouse[1] - sy) < 10;
     const compat = this.isSlotCompatible(node, j, true);
@@ -4743,7 +4747,12 @@ class SchemaGraphApp {
       y1 = node.pos[1] + 33 + this.connecting.slot * 25;
     }
     
-    const cx = x1 + (worldMouse[0] - x1) * 0.5;
+    // Better curve calculation - limit control point distance
+    const distance = Math.abs(worldMouse[0] - x1);
+    const maxControlDistance = 400;
+    const controlOffset = Math.min(distance * 0.5, maxControlDistance);
+    const cx1 = x1 + (this.connecting.isOutput ? controlOffset : -controlOffset);
+    const cx2 = worldMouse[0] + (this.connecting.isOutput ? -controlOffset : controlOffset);
     
     this.ctx.strokeStyle = colors.accentGreen;
     this.ctx.lineWidth = 2.5 / this.camera.scale;
@@ -4751,7 +4760,7 @@ class SchemaGraphApp {
     this.ctx.setLineDash([10 / this.camera.scale, 5 / this.camera.scale]);
     this.ctx.beginPath();
     this.ctx.moveTo(x1, y1);
-    this.ctx.bezierCurveTo(cx, y1, cx, worldMouse[1], worldMouse[0], worldMouse[1]);
+    this.ctx.bezierCurveTo(cx1, y1, cx2, worldMouse[1], worldMouse[0], worldMouse[1]);
     this.ctx.stroke();
     this.ctx.setLineDash([]);
     this.ctx.globalAlpha = 1.0;
