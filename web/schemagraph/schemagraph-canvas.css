@@ -1,0 +1,196 @@
+/* ========================================================================
+   SCHEMAGRAPH CANVAS - Core Canvas & Graph Functionality
+   Can be included standalone for embedding the graph in other pages
+   Requires: schemagraph-themes.css
+   ======================================================================== */
+
+/* Canvas Container */
+.sg-canvas-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--sg-canvas-bg, #212121);
+}
+
+.sg-canvas-container canvas {
+  display: block;
+  cursor: default;
+  width: 100%;
+  height: 100%;
+}
+
+.sg-canvas-container canvas.connecting {
+  cursor: crosshair;
+}
+
+.sg-canvas-container canvas.dragging {
+  cursor: grabbing;
+}
+
+/* Context Menu */
+.sg-context-menu {
+  position: fixed;
+  background: var(--sg-bg-secondary, #2a2a2a);
+  border: 1px solid var(--sg-border-color, #1a1a1a);
+  border-radius: 4px;
+  padding: 4px 0;
+  min-width: 180px;
+  max-height: 400px;
+  overflow-y: auto;
+  z-index: 1000;
+  display: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.sg-context-menu.show {
+  display: block;
+}
+
+.sg-context-menu-category {
+  padding: 6px 12px;
+  font-size: 10px;
+  color: var(--sg-text-tertiary, #707070);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--sg-border-color, #1a1a1a);
+  margin-bottom: 2px;
+  background: var(--sg-bg-tertiary, #353535);
+}
+
+.sg-context-menu-item {
+  padding: 6px 16px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--sg-text-secondary, #aaaaaa);
+  transition: all 0.1s ease;
+  border-left: 3px solid transparent;
+}
+
+.sg-context-menu-item:hover {
+  background: var(--sg-bg-tertiary, #353535);
+  color: var(--sg-text-primary, #ffffff);
+  border-left-color: var(--sg-accent-blue, #46a2da);
+}
+
+.sg-context-menu-delete {
+  color: var(--sg-accent-red, #dc6464);
+}
+
+.sg-context-menu-delete:hover {
+  background: var(--sg-accent-red, #dc6464);
+  color: var(--sg-text-primary, #ffffff);
+  border-left-color: var(--sg-accent-red, #dc6464);
+}
+
+/* Node Input Overlay */
+.sg-node-input-overlay {
+  position: fixed;
+  background: var(--sg-bg-secondary, #2a2a2a);
+  border: 2px solid var(--sg-accent-blue, #46a2da);
+  padding: 8px 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--sg-text-primary, #ffffff);
+  outline: none;
+  z-index: 1000;
+  display: none;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6), 
+              0 0 0 1px rgba(70, 162, 218, 0.3);
+  backdrop-filter: blur(4px);
+  transition: all 0.2s ease;
+}
+
+.sg-node-input-overlay.show {
+  display: block;
+  animation: sg-inputFadeIn 0.2s ease;
+}
+
+.sg-node-input-overlay:focus {
+  border-color: var(--sg-accent-blue-light, #82c4ec);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7), 
+              0 0 0 3px rgba(70, 162, 218, 0.4);
+}
+
+@keyframes sg-inputFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Zoom Indicator */
+.sg-zoom-indicator {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  background: var(--sg-bg-secondary, #2a2a2a);
+  border: 1px solid var(--sg-border-color, #1a1a1a);
+  padding: 6px 10px;
+  border-radius: 3px;
+  font-size: 11px;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sg-text-primary, #ffffff);
+}
+
+.sg-zoom-value {
+  color: var(--sg-accent-blue, #46a2da);
+}
+
+.sg-zoom-reset-btn {
+  background: var(--sg-bg-tertiary, #353535);
+  color: var(--sg-text-primary, #ffffff);
+  border: 1px solid var(--sg-border-color, #1a1a1a);
+  padding: 2px 6px;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.sg-zoom-reset-btn:hover {
+  background: var(--sg-bg-quaternary, #404040);
+  border-color: var(--sg-border-highlight, #46a2da);
+  transform: scale(1.1);
+}
+
+.sg-zoom-reset-btn:active {
+  transform: scale(0.95);
+}
+
+/* Scrollbar Styling */
+.sg-context-menu::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.sg-context-menu::-webkit-scrollbar-track {
+  background: var(--sg-bg-tertiary, #353535);
+}
+
+.sg-context-menu::-webkit-scrollbar-thumb {
+  background: var(--sg-bg-quaternary, #404040);
+  border-radius: 2px;
+}
+
+.sg-context-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--sg-text-tertiary, #707070);
+}

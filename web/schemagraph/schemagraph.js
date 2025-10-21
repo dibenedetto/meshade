@@ -2499,12 +2499,12 @@ class SchemaGraphApp {
       console.log('📋 Opening context menu for node:', node.title);
       const selectionCount = this.selectedNodes.size;
       
-      html += '<div class="context-menu-category">Node Actions</div>';
+      html += '<div class="sg-context-menu-category">Node Actions</div>';
       
       if (selectionCount > 1) {
-        html += '<div class="context-menu-item context-menu-delete" data-action="delete-all">❌ Delete ' + selectionCount + ' Nodes</div>';
+        html += '<div class="sg-context-menu-item sg-context-menu-delete" data-action="delete-all">❌ Delete ' + selectionCount + ' Nodes</div>';
       } else {
-        html += '<div class="context-menu-item context-menu-delete" data-action="delete">❌ Delete Node</div>';
+        html += '<div class="sg-context-menu-item sg-context-menu-delete" data-action="delete">❌ Delete Node</div>';
       }
       
       // Check if node has multi-input slots with connections
@@ -2529,7 +2529,7 @@ class SchemaGraphApp {
       console.log('   hasMultiInputs:', hasMultiInputs, 'total count:', multiInputCount);
       
       if (hasMultiInputs) {
-        html += '<div class="context-menu-item" data-action="clear-multi-inputs">🗑️ Clear ' + multiInputCount + ' Multi-Input Link(s)</div>';
+        html += '<div class="sg-context-menu-item" data-action="clear-multi-inputs">🗑️ Clear ' + multiInputCount + ' Multi-Input Link(s)</div>';
       }
       
       contextMenu.innerHTML = html;
@@ -2537,7 +2537,7 @@ class SchemaGraphApp {
       contextMenu.style.top = coords.clientY + 'px';
       contextMenu.classList.add('show');
       
-      const deleteBtn = contextMenu.querySelector('.context-menu-delete');
+      const deleteBtn = contextMenu.querySelector('.sg-context-menu-delete');
       if (deleteBtn) {
         deleteBtn.addEventListener('click', () => {
           if (this.selectedNodes.size > 1) {
@@ -2561,11 +2561,11 @@ class SchemaGraphApp {
       }
     } else {
       // Canvas context menu (rest remains the same)
-      html += '<div class="context-menu-category">Native Types</div>';
+      html += '<div class="sg-context-menu-category">Native Types</div>';
       const natives = ['Native.String', 'Native.Integer', 'Native.Boolean', 'Native.Float', 'Native.List', 'Native.Dict'];
       for (const nativeType of natives) {
         const name = nativeType.split('.')[1];
-        html += '<div class="context-menu-item" data-type="' + nativeType + '">' + name + '</div>';
+        html += '<div class="sg-context-menu-item" data-type="' + nativeType + '">' + name + '</div>';
       }
       
       const registeredSchemas = Object.keys(this.graph.schemas);
@@ -2584,17 +2584,17 @@ class SchemaGraphApp {
         }
         
         if (schemaTypes.length > 0) {
-          html += '<div class="context-menu-category">' + schemaName + ' Schema</div>';
+          html += '<div class="sg-context-menu-category">' + schemaName + ' Schema</div>';
           
           if (rootNodeType) {
             const name = rootNodeType.split('.')[1];
-            html += '<div class="context-menu-item" data-type="' + rootNodeType + '" style="font-weight: bold; color: var(--accent-orange);">★ ' + name + ' (Root)</div>';
+            html += '<div class="sg-context-menu-item" data-type="' + rootNodeType + '" style="font-weight: bold; color: var(--sg-accent-orange);">★ ' + name + ' (Root)</div>';
           }
           
           for (const schemaType of schemaTypes) {
             if (schemaType !== rootNodeType) {
               const name = schemaType.split('.')[1];
-              html += '<div class="context-menu-item" data-type="' + schemaType + '">' + name + '</div>';
+              html += '<div class="sg-context-menu-item" data-type="' + schemaType + '">' + name + '</div>';
             }
           }
         }
@@ -2607,7 +2607,7 @@ class SchemaGraphApp {
       contextMenu.dataset.worldX = wx;
       contextMenu.dataset.worldY = wy;
       
-      const items = contextMenu.querySelectorAll('.context-menu-item');
+      const items = contextMenu.querySelectorAll('.sg-context-menu-item');
       for (const item of items) {
         item.addEventListener('click', () => {
           const type = item.getAttribute('data-type');
@@ -3871,7 +3871,7 @@ class SchemaGraphApp {
     const listEl = this.uiController.get('schemaList');
     
     if (schemas.length === 0) {
-      listEl.innerHTML = '<div style="color: var(--text-tertiary); font-size: 11px; padding: 8px;">No schemas registered</div>';
+      listEl.innerHTML = '<div style="color: var(--sg-text-tertiary); font-size: 11px; padding: 8px;">No schemas registered</div>';
       return;
     }
     
@@ -3887,10 +3887,10 @@ class SchemaGraphApp {
         if (type.indexOf(schemaName + '.') === 0) typeCount++;
       }
       
-      html += '<div class="schema-item">';
-      html += '<div><span class="schema-item-name">' + schemaName + '</span>';
-      html += '<span class="schema-item-count">(' + typeCount + ' types, ' + nodeCount + ' nodes)</span></div>';
-      html += '<button class="schema-remove-btn" data-schema="' + schemaName + '">Remove</button>';
+      html += '<div class="sg-schema-item">';
+      html += '<div><span class="sg-schema-item-name">' + schemaName + '</span>';
+      html += '<span class="sg-schema-item-count">(' + typeCount + ' types, ' + nodeCount + ' nodes)</span></div>';
+      html += '<button class="sg-schema-remove-btn" data-schema="' + schemaName + '">Remove</button>';
       html += '</div>';
     }
     
@@ -4260,25 +4260,25 @@ class SchemaGraphApp {
   getCanvasColors() {
     const style = getComputedStyle(document.documentElement);
     return {
-      canvasBg: style.getPropertyValue('--canvas-bg').trim(),
-      nodeBg: style.getPropertyValue('--node-bg').trim(),
-      nodeBgSelected: style.getPropertyValue('--node-bg-selected').trim(),
-      nodeHeader: style.getPropertyValue('--node-header').trim(),
-      nodeShadow: style.getPropertyValue('--node-shadow').trim(),
-      borderColor: style.getPropertyValue('--border-color').trim(),
-      borderHighlight: style.getPropertyValue('--border-highlight').trim(),
-      textPrimary: style.getPropertyValue('--text-primary').trim(),
-      textSecondary: style.getPropertyValue('--text-secondary').trim(),
-      textTertiary: style.getPropertyValue('--text-tertiary').trim(),
-      accentPurple: style.getPropertyValue('--accent-purple').trim(),
-      accentOrange: style.getPropertyValue('--accent-orange').trim(),
-      accentGreen: style.getPropertyValue('--accent-green').trim(),
-      accentRed: style.getPropertyValue('--accent-red').trim(),
-      slotInput: style.getPropertyValue('--slot-input').trim(),
-      slotOutput: style.getPropertyValue('--slot-output').trim(),
-      slotConnected: style.getPropertyValue('--slot-connected').trim(),
-      linkColor: style.getPropertyValue('--link-color').trim(),
-      gridColor: style.getPropertyValue('--grid-color').trim()
+      canvasBg: style.getPropertyValue('--sg-canvas-bg').trim(),
+      nodeBg: style.getPropertyValue('--sg-node-bg').trim(),
+      nodeBgSelected: style.getPropertyValue('--sg-node-bg-selected').trim(),
+      nodeHeader: style.getPropertyValue('--sg-node-header').trim(),
+      nodeShadow: style.getPropertyValue('--sg-node-shadow').trim(),
+      borderColor: style.getPropertyValue('--sg-border-color').trim(),
+      borderHighlight: style.getPropertyValue('--sg-border-highlight').trim(),
+      textPrimary: style.getPropertyValue('--sg-text-primary').trim(),
+      textSecondary: style.getPropertyValue('--sg-text-secondary').trim(),
+      textTertiary: style.getPropertyValue('--sg-text-tertiary').trim(),
+      accentPurple: style.getPropertyValue('--sg-accent-purple').trim(),
+      accentOrange: style.getPropertyValue('--sg-accent-orange').trim(),
+      accentGreen: style.getPropertyValue('--sg-accent-green').trim(),
+      accentRed: style.getPropertyValue('--sg-accent-red').trim(),
+      slotInput: style.getPropertyValue('--sg-slot-input').trim(),
+      slotOutput: style.getPropertyValue('--sg-slot-output').trim(),
+      slotConnected: style.getPropertyValue('--sg-slot-connected').trim(),
+      linkColor: style.getPropertyValue('--sg-link-color').trim(),
+      gridColor: style.getPropertyValue('--sg-grid-color').trim()
     };
   }
 
