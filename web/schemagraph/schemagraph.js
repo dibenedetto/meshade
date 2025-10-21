@@ -1380,6 +1380,7 @@ class SchemaGraphApp {
     this.selectionRect = null; // For drag-to-select
     this.selectionStart = null;
     this.isMouseDown = false;
+    this.previewSelection = new Set(); // Nodes currently in selection rect
     this.dragNode = null;
     this.dragOffset = [0, 0];
     this.connecting = null;
@@ -1564,6 +1565,7 @@ class SchemaGraphApp {
         this.selectionRect = null;
         this.selectionStart = null;
         this.isMouseDown = false;
+        this.previewSelection.clear();
         this.draw();
       }
     });
@@ -2230,6 +2232,25 @@ class SchemaGraphApp {
           w: dx,
           h: dy
         };
+        
+        // Update preview selection - find nodes in rectangle
+        this.previewSelection.clear();
+        for (const node of this.graph.nodes) {
+          const nodeRect = {
+            x: node.pos[0],
+            y: node.pos[1],
+            w: node.size[0],
+            h: node.size[1]
+          };
+          
+          // Check if node intersects with selection rectangle
+          if (!(nodeRect.x > this.selectionRect.x + this.selectionRect.w ||
+                nodeRect.x + nodeRect.w < this.selectionRect.x ||
+                nodeRect.y > this.selectionRect.y + this.selectionRect.h ||
+                nodeRect.y + nodeRect.h < this.selectionRect.y)) {
+            this.previewSelection.add(node);
+          }
+        }
       }
       this.draw();
     } else {
@@ -2331,7 +2352,7 @@ class SchemaGraphApp {
       return;
     }
     
-// Handle selection rectangle
+    // Handle selection rectangle
     if (this.selectionStart && this.selectionRect) {
       const rect = this.selectionRect;
       
@@ -2362,6 +2383,7 @@ class SchemaGraphApp {
     // Always clear selection rectangle state on mouse up
     this.selectionStart = null;
     this.selectionRect = null;
+    this.previewSelection.clear();
     
     // Clear drag state
     this.dragNode = null;
@@ -4438,7 +4460,9 @@ class SchemaGraphApp {
     
     // Body with adjustable corner radius
     const isSelected = this.isNodeSelected(node);
-    const bodyColor = isSelected ? colors.nodeBgSelected : colors.nodeBg;
+    const isPreviewSelected = this.previewSelection.has(node);
+    const bodyColor = isSelected ? colors.nodeBgSelected : 
+                      (isPreviewSelected ? this.adjustColorBrightness(colors.nodeBg, 20) : colors.nodeBg);
     
     if (style.useGradient && style.currentStyle !== 'wireframe') {
       const gradient = this.ctx.createLinearGradient(x, y, x, y + h);
@@ -4469,11 +4493,18 @@ class SchemaGraphApp {
       this.ctx.fill();
     }
     
-    this.ctx.strokeStyle = isSelected ? colors.borderHighlight : colors.borderColor;
-    this.ctx.lineWidth = (isSelected ? 2 : 1) / this.camera.scale;
+// Show preview selection with dashed border
+    if (isPreviewSelected && !isSelected) {
+      this.ctx.strokeStyle = colors.accentGreen;
+      this.ctx.lineWidth = 2 / this.camera.scale;
+      this.ctx.setLineDash([5 / this.camera.scale, 5 / this.camera.scale]);
+    } else {
+      this.ctx.strokeStyle = isSelected ? colors.borderHighlight : colors.borderColor;
+      this.ctx.lineWidth = (isSelected ? 2 : 1) / this.camera.scale;
+    }
     
-    if (style.useGlow && isSelected) {
-      this.ctx.shadowColor = colors.borderHighlight;
+    if (style.useGlow && (isSelected || isPreviewSelected)) {
+      this.ctx.shadowColor = isSelected ? colors.borderHighlight : colors.accentGreen;
       this.ctx.shadowBlur = 15 / this.camera.scale;
     } else {
       this.ctx.shadowBlur = 0;
@@ -4482,6 +4513,11 @@ class SchemaGraphApp {
     this.ctx.shadowOffsetX = 0;
     this.ctx.shadowOffsetY = 0;
     this.ctx.stroke();
+    
+    // Reset dash pattern
+    if (isPreviewSelected && !isSelected) {
+      this.ctx.setLineDash([]);
+    }
     
     // Header
     const headerColor = node.isNative ? colors.accentPurple : 
