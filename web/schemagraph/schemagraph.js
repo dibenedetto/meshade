@@ -1357,6 +1357,7 @@ class SchemaGraphApp {
     this.initializeState();
     this.registerUIElements();
     this.setupEventListeners();
+    this.setupCanvasLeaveHandler();
     this.setupVoiceAndAnalyticsUI();
     this.setupDrawingStyleSelector();
     this.setupTextScalingToggle();
@@ -1374,7 +1375,11 @@ class SchemaGraphApp {
     this.graph = new SchemaGraph(this.eventBus);
     this.camera = { x: 0, y: 0, scale: 1.0 };
     
-    this.selectedNode = null;
+    this.selectedNodes = new Set(); // Multi-selection support
+    this.selectedNode = null; // Keep for backward compatibility
+    this.selectionRect = null; // For drag-to-select
+    this.selectionStart = null;
+    this.isMouseDown = false;
     this.dragNode = null;
     this.dragOffset = [0, 0];
     this.connecting = null;
@@ -1550,6 +1555,18 @@ class SchemaGraphApp {
     
     // Set ready status
     this.eventBus.emit('ui:update', { id: 'status', content: 'Ready. Upload a schema to begin.' });
+  }
+
+  setupCanvasLeaveHandler() {
+    this.canvas.addEventListener('mouseleave', () => {
+      // Clean up selection rectangle if mouse leaves canvas
+      if (this.selectionRect) {
+        this.selectionRect = null;
+        this.selectionStart = null;
+        this.isMouseDown = false;
+        this.draw();
+      }
+    });
   }
 
   setupVoiceAndAnalyticsUI() {
@@ -2047,8 +2064,57 @@ class SchemaGraphApp {
     }
   }
 
+  selectNode(node, addToSelection = false) {
+    if (!addToSelection) {
+      this.selectedNodes.clear();
+    }
+    
+    if (node) {
+      this.selectedNodes.add(node);
+      this.selectedNode = node; // Keep last selected for compatibility
+    }
+    
+    this.draw();
+  }
+
+  deselectNode(node) {
+    this.selectedNodes.delete(node);
+    if (this.selectedNode === node) {
+      this.selectedNode = this.selectedNodes.size > 0 ? 
+        Array.from(this.selectedNodes)[this.selectedNodes.size - 1] : null;
+    }
+    this.draw();
+  }
+
+  toggleNodeSelection(node) {
+    if (this.selectedNodes.has(node)) {
+      this.deselectNode(node);
+    } else {
+      this.selectNode(node, true);
+    }
+  }
+
+  clearSelection() {
+    this.selectedNodes.clear();
+    this.selectedNode = null;
+    this.draw();
+  }
+
+  isNodeSelected(node) {
+    return this.selectedNodes.has(node);
+  }
+
+  deleteSelectedNodes() {
+    const nodesToDelete = Array.from(this.selectedNodes);
+    for (const node of nodesToDelete) {
+      this.removeNode(node);
+    }
+    this.clearSelection();
+  }
+
   // Mouse/Touch handlers
   handleMouseDown(data) {
+    this.isMouseDown = true;
     this.uiController.get('contextMenu').classList.remove('show');
     
     const [wx, wy] = this.screenToWorld(data.coords.screenX, data.coords.screenY);
@@ -2094,22 +2160,39 @@ class SchemaGraphApp {
       }
     }
     
-    // Check for node drag
+    // Check for node selection/drag
+    let clickedNode = null;
     for (let i = this.graph.nodes.length - 1; i >= 0; i--) {
       const node = this.graph.nodes[i];
       if (wx >= node.pos[0] && wx <= node.pos[0] + node.size[0] &&
           wy >= node.pos[1] && wy <= node.pos[1] + node.size[1]) {
-        this.selectedNode = node;
-        this.dragNode = node;
-        this.dragOffset = [wx - node.pos[0], wy - node.pos[1]];
-        this.canvas.classList.add('dragging');
-        this.draw();
-        return;
+        clickedNode = node;
+        break;
       }
     }
     
-    this.selectedNode = null;
-    this.draw();
+    if (clickedNode) {
+      // Multi-select with Ctrl/Cmd key
+      if (data.event.ctrlKey || data.event.metaKey) {
+        this.toggleNodeSelection(clickedNode);
+      } else {
+        // If clicking an already selected node, prepare to drag all selected
+        if (!this.selectedNodes.has(clickedNode)) {
+          this.selectNode(clickedNode, false);
+        }
+        this.dragNode = clickedNode;
+        this.dragOffset = [wx - clickedNode.pos[0], wy - clickedNode.pos[1]];
+        this.canvas.classList.add('dragging');
+      }
+      return;
+    }
+    
+    // Clicked on empty space - prepare for selection rectangle or clear selection
+    if (!data.event.ctrlKey && !data.event.metaKey) {
+      this.clearSelection();
+    }
+    // Store potential selection start (will only create rect if mouse moves)
+    this.selectionStart = [wx, wy];
   }
 
   handleMouseMove(data) {
@@ -2121,9 +2204,33 @@ class SchemaGraphApp {
       this.draw();
     } else if (this.dragNode && !this.connecting) {
       const [wx, wy] = this.screenToWorld(data.coords.screenX, data.coords.screenY);
-      this.dragNode.pos = [wx - this.dragOffset[0], wy - this.dragOffset[1]];
+      const dx = wx - this.dragOffset[0] - this.dragNode.pos[0];
+      const dy = wy - this.dragOffset[1] - this.dragNode.pos[1];
+      
+      // Move all selected nodes together
+      for (const node of this.selectedNodes) {
+        node.pos[0] += dx;
+        node.pos[1] += dy;
+      }
+      
       this.draw();
     } else if (this.connecting) {
+      this.draw();
+    } else if (this.selectionStart && this.isMouseDown) {
+      // Draw selection rectangle only if mouse is down and dragging
+      const [wx, wy] = this.screenToWorld(data.coords.screenX, data.coords.screenY);
+      const dx = Math.abs(wx - this.selectionStart[0]);
+      const dy = Math.abs(wy - this.selectionStart[1]);
+      
+      // Only show selection rect if moved at least 5 pixels (prevents accidental rect on click)
+      if (dx > 5 || dy > 5) {
+        this.selectionRect = {
+          x: Math.min(this.selectionStart[0], wx),
+          y: Math.min(this.selectionStart[1], wy),
+          w: dx,
+          h: dy
+        };
+      }
       this.draw();
     } else {
       // Redraw to update hover effects on editable fields
@@ -2132,6 +2239,9 @@ class SchemaGraphApp {
   }
 
   handleMouseUp(data) {
+    this.isMouseDown = false;
+    const [wx, wy] = this.screenToWorld(data.coords.screenX, data.coords.screenY);
+    
     if (this.isPanning) {
       this.isPanning = false;
       this.canvas.style.cursor = this.spacePressed ? 'grab' : 'default';
@@ -2139,10 +2249,10 @@ class SchemaGraphApp {
     }
     
     if (this.connecting) {
-      const [wx, wy] = this.screenToWorld(data.coords.screenX, data.coords.screenY);
-      
+      // Handle connection logic
       for (const node of this.graph.nodes) {
         if (this.connecting.isOutput) {
+          // Connecting from output to input
           for (let j = 0; j < node.inputs.length; j++) {
             const slotY = node.pos[1] + 30 + j * 25;
             const dist = Math.sqrt(Math.pow(wx - node.pos[0], 2) + Math.pow(wy - slotY, 2));
@@ -2177,6 +2287,7 @@ class SchemaGraphApp {
             }
           }
         } else {
+          // Connecting from input to output
           for (let j = 0; j < node.outputs.length; j++) {
             const slotY = node.pos[1] + 30 + j * 25;
             const dist = Math.sqrt(Math.pow(wx - (node.pos[0] + node.size[0]), 2) + Math.pow(wy - slotY, 2));
@@ -2217,10 +2328,46 @@ class SchemaGraphApp {
       this.connecting = null;
       this.canvas.classList.remove('connecting');
       this.draw();
+      return;
     }
     
+// Handle selection rectangle
+    if (this.selectionStart && this.selectionRect) {
+      const rect = this.selectionRect;
+      
+      // Don't clear existing selection if Ctrl/Cmd is held
+      if (!data.event.ctrlKey && !data.event.metaKey) {
+        this.clearSelection();
+      }
+      
+      // Select all nodes within rectangle (always add to selection)
+      for (const node of this.graph.nodes) {
+        const nodeRect = {
+          x: node.pos[0],
+          y: node.pos[1],
+          w: node.size[0],
+          h: node.size[1]
+        };
+        
+        // Check if node intersects with selection rectangle
+        if (!(nodeRect.x > rect.x + rect.w ||
+              nodeRect.x + nodeRect.w < rect.x ||
+              nodeRect.y > rect.y + rect.h ||
+              nodeRect.y + nodeRect.h < rect.y)) {
+          this.selectNode(node, true); // Always ADD to selection when in rect
+        }
+      }
+    }
+    
+    // Always clear selection rectangle state on mouse up
+    this.selectionStart = null;
+    this.selectionRect = null;
+    
+    // Clear drag state
     this.dragNode = null;
     this.canvas.classList.remove('dragging');
+    
+    this.draw();
   }
 
   handleDoubleClick(data) {
@@ -2328,9 +2475,15 @@ class SchemaGraphApp {
     
     if (node) {
       console.log('📋 Opening context menu for node:', node.title);
+      const selectionCount = this.selectedNodes.size;
       
       html += '<div class="context-menu-category">Node Actions</div>';
-      html += '<div class="context-menu-item context-menu-delete" data-action="delete">❌ Delete Node</div>';
+      
+      if (selectionCount > 1) {
+        html += '<div class="context-menu-item context-menu-delete" data-action="delete-all">❌ Delete ' + selectionCount + ' Nodes</div>';
+      } else {
+        html += '<div class="context-menu-item context-menu-delete" data-action="delete">❌ Delete Node</div>';
+      }
       
       // Check if node has multi-input slots with connections
       let hasMultiInputs = false;
@@ -2362,10 +2515,17 @@ class SchemaGraphApp {
       contextMenu.style.top = coords.clientY + 'px';
       contextMenu.classList.add('show');
       
-      contextMenu.querySelector('.context-menu-delete').addEventListener('click', () => {
-        this.removeNode(node);
-        contextMenu.classList.remove('show');
-      });
+      const deleteBtn = contextMenu.querySelector('.context-menu-delete');
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', () => {
+          if (this.selectedNodes.size > 1) {
+            this.deleteSelectedNodes();
+          } else {
+            this.removeNode(node);
+          }
+          contextMenu.classList.remove('show');
+        });
+      }
       
       if (hasMultiInputs) {
         const clearBtn = contextMenu.querySelector('[data-action="clear-multi-inputs"]');
@@ -2448,9 +2608,23 @@ class SchemaGraphApp {
       this.canvas.style.cursor = 'grab';
     }
     
-    if ((data.key === 'Delete' || data.key === 'Backspace') && this.selectedNode && !this.editingNode) {
+    if ((data.key === 'Delete' || data.key === 'Backspace') && this.selectedNodes.size > 0 && !this.editingNode) {
       data.event.preventDefault();
-      this.removeNode(this.selectedNode);
+      this.deleteSelectedNodes();
+    }
+    
+    // Select all with Ctrl+A
+    if ((data.event.ctrlKey || data.event.metaKey) && data.key === 'a' && !this.editingNode) {
+      data.event.preventDefault();
+      this.clearSelection();
+      for (const node of this.graph.nodes) {
+        this.selectNode(node, true);
+      }
+    }
+    
+    // Escape to clear selection
+    if (data.key === 'Escape' && !this.editingNode) {
+      this.clearSelection();
     }
     
     if ((data.event.ctrlKey || data.event.metaKey) && data.key === 's') {
@@ -4110,6 +4284,17 @@ class SchemaGraphApp {
       this.drawConnecting(colors);
     }
     
+    // Draw selection rectangle
+    if (this.selectionRect) {
+      this.ctx.strokeStyle = colors.borderHighlight;
+      this.ctx.fillStyle = 'rgba(70, 162, 218, 0.1)';
+      this.ctx.lineWidth = 1 / this.camera.scale;
+      this.ctx.setLineDash([5 / this.camera.scale, 5 / this.camera.scale]);
+      this.ctx.fillRect(this.selectionRect.x, this.selectionRect.y, this.selectionRect.w, this.selectionRect.h);
+      this.ctx.strokeRect(this.selectionRect.x, this.selectionRect.y, this.selectionRect.w, this.selectionRect.h);
+      this.ctx.setLineDash([]);
+    }
+    
     this.ctx.restore();
   }
 
@@ -4252,7 +4437,8 @@ class SchemaGraphApp {
     }
     
     // Body with adjustable corner radius
-    const bodyColor = node === this.selectedNode ? colors.nodeBgSelected : colors.nodeBg;
+    const isSelected = this.isNodeSelected(node);
+    const bodyColor = isSelected ? colors.nodeBgSelected : colors.nodeBg;
     
     if (style.useGradient && style.currentStyle !== 'wireframe') {
       const gradient = this.ctx.createLinearGradient(x, y, x, y + h);
@@ -4283,10 +4469,10 @@ class SchemaGraphApp {
       this.ctx.fill();
     }
     
-    this.ctx.strokeStyle = node === this.selectedNode ? colors.borderHighlight : colors.borderColor;
-    this.ctx.lineWidth = (node === this.selectedNode ? 2 : 1) / this.camera.scale;
+    this.ctx.strokeStyle = isSelected ? colors.borderHighlight : colors.borderColor;
+    this.ctx.lineWidth = (isSelected ? 2 : 1) / this.camera.scale;
     
-    if (style.useGlow && node === this.selectedNode) {
+    if (style.useGlow && isSelected) {
       this.ctx.shadowColor = colors.borderHighlight;
       this.ctx.shadowBlur = 15 / this.camera.scale;
     } else {
