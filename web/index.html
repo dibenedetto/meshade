@@ -203,8 +203,13 @@
 				color: orange;
 			}
 		</style>
-		<link rel="stylesheet" type="text/css" href="litegraph.css">
-		<script type="text/javascript" src="litegraph.js"></script>
+
+		<!-- Modular CSS: Load in order - Themes, Canvas, UI -->
+		<link rel="stylesheet" href="schemagraph/schemagraph-themes.css">
+		<link rel="stylesheet" href="schemagraph/schemagraph-canvas.css">
+		<link rel="stylesheet" href="schemagraph/schemagraph-ui.css">
+		<!-- SchemaGraph Library -->
+		<script type="text/javascript" src="schemagraph/schemagraph.js"></script>
 	</head>
 	<body>
 		<div class="container">
@@ -258,10 +263,39 @@
 			<div id="loading" class="loading">Loading AG-UI client...</div>
 		</div>
 
-		<div class="canvas-container">
-			<h2 class="centered">Graph Editor</h2>
-			<div class="canvas-wrapper">
-				<canvas id="numelCanvas"></canvas>
+		<div class="sg-canvas-container">
+			<canvas id="canvas"></canvas>
+			<div id="contextMenu" class="sg-context-menu"></div>
+			<input type="text" id="nodeInput" class="sg-node-input-overlay" />
+			<div class="sg-zoom-indicator">
+				<div class="sg-voice-controls">
+					<span style="font-size: 10px; color: var(--sg-text-tertiary); margin-right: 4px;">🎤 Voice:</span>
+					<button id="voiceStartBtn" class="sg-voice-btn">Start</button>
+					<button id="voiceStopBtn" class="sg-voice-btn" style="display: none;">Stop</button>
+					<span id="voiceStatus" class="sg-voice-status"></span>
+				</div>
+				<button id="analyticsToggleBtn" class="sg-action-btn">📊 Analytics</button>
+				<button id="themeBtn" class="sg-theme-btn" title="Switch theme">🎨</button>
+				<select id="layoutSelect" class="sg-layout-select" title="Apply layout algorithm">
+					<option value="">🔧 Layout...</option>
+					<option value="hierarchical-vertical">Hierarchical (Vertical)</option>
+					<option value="hierarchical-horizontal">Hierarchical (Horizontal)</option>
+					<option value="force-directed">Force-Directed</option>
+					<option value="grid">Grid</option>
+					<option value="circular">Circular</option>
+				</select>
+				<select id="drawingStyleSelect" class="sg-drawing-style-select" title="Change drawing style">
+					<option value="default">🎨 Default</option>
+					<option value="minimal">✨ Minimal</option>
+					<option value="blueprint">📐 Blueprint</option>
+					<option value="neon">💫 Neon</option>
+					<option value="organic">🌿 Organic</option>
+					<option value="wireframe">📊 Wireframe</option>
+				</select>
+				<button id="centerViewBtn" class="sg-action-btn" title="Center view on graph">🎯 Center</button>
+				<div class="sg-divider"></div>
+				Zoom: <span class="sg-zoom-value" id="zoomLevel">100%</span>
+				<button id="resetZoomBtn" class="sg-zoom-reset-btn" title="Reset zoom to 100%">⟲</button>
 			</div>
 		</div>
 
@@ -271,7 +305,6 @@
 
 		<script type="text/javascript" src="dist/agui-client.bundle.js"></script>
 		<script type="text/javascript" src="numel.js"></script>
-		<script type="text/javascript" src="updated_graph_js.js"></script>
 
 		<script>
 			const baseConfig = {
@@ -669,185 +702,172 @@
 				return status;
 			}
 
-			function multiplyMatrix4x4(a, b) {
-				// a and b are 4x4 matrices represented as arrays of length 16 (row-major)
-				const result = new Array(16).fill(0);
-				for (let row = 0; row < 4; ++row) {
-					for (let col = 0; col < 4; ++col) {
-						for (let k = 0; k < 4; ++k) {
-							result[row * 4 + col] += a[row * 4 + k] * b[k * 4 + col];
-						}
-					}
-				}
-				return result;
-			}
-
-			function resizeCanvas() {
-				const canvasEl = document.getElementById('numelCanvas');
-				const wrapper = canvasEl.parentElement;
-				const container = wrapper.parentElement;
-				const header = container.querySelector('h2');
+			// function resizeCanvas() {
+			// 	const canvasEl = document.getElementById('numelCanvas');
+			// 	const wrapper = canvasEl.parentElement;
+			// 	const container = wrapper.parentElement;
+			// 	const header = container.querySelector('h2');
 				
-				// Calculate available space
-				const containerStyle = window.getComputedStyle(container);
-				const headerStyle = window.getComputedStyle(header);
-				const wrapperStyle = window.getComputedStyle(wrapper);
+			// 	// Calculate available space
+			// 	const containerStyle = window.getComputedStyle(container);
+			// 	const headerStyle = window.getComputedStyle(header);
+			// 	const wrapperStyle = window.getComputedStyle(wrapper);
 				
-				const containerPadding = parseFloat(containerStyle.paddingTop) + parseFloat(containerStyle.paddingBottom);
-				const headerHeight = header.offsetHeight + parseFloat(headerStyle.marginTop) + parseFloat(headerStyle.marginBottom);
+			// 	const containerPadding = parseFloat(containerStyle.paddingTop) + parseFloat(containerStyle.paddingBottom);
+			// 	const headerHeight = header.offsetHeight + parseFloat(headerStyle.marginTop) + parseFloat(headerStyle.marginBottom);
 				
-				// Get wrapper dimensions (which already accounts for borders)
-				const availableWidth = wrapper.clientWidth;
-				const availableHeight = wrapper.clientHeight;
+			// 	// Get wrapper dimensions (which already accounts for borders)
+			// 	const availableWidth = wrapper.clientWidth;
+			// 	const availableHeight = wrapper.clientHeight;
 				
-				// Get device pixel ratio for high DPI displays
-				const dpr = window.devicePixelRatio || 1;
+			// 	// Get device pixel ratio for high DPI displays
+			// 	const dpr = window.devicePixelRatio || 1;
 				
-				// Set internal canvas dimensions (accounting for DPI)
-				canvasEl.width = availableWidth * dpr;
-				canvasEl.height = availableHeight * dpr;
+			// 	// Set internal canvas dimensions (accounting for DPI)
+			// 	canvasEl.width = availableWidth * dpr;
+			// 	canvasEl.height = availableHeight * dpr;
 				
-				// Set CSS dimensions to match the wrapper
-				canvasEl.style.width = availableWidth + 'px';
-				canvasEl.style.height = availableHeight + 'px';
+			// 	// Set CSS dimensions to match the wrapper
+			// 	canvasEl.style.width = availableWidth + 'px';
+			// 	canvasEl.style.height = availableHeight + 'px';
 				
-				// Notify LiteGraph of canvas size change and DPI
-				if (graph && graph.canvas) {
-					// Scale the context for high DPI displays
-					const ctx = canvasEl.getContext('2d');
-					ctx.scale(dpr, dpr);
+			// 	// Notify LiteGraph of canvas size change and DPI
+			// 	if (graph && graph.canvas) {
+			// 		// Scale the context for high DPI displays
+			// 		const ctx = canvasEl.getContext('2d');
+			// 		ctx.scale(dpr, dpr);
 					
-					// Update LiteGraph's internal dimensions
-					graph.canvas.resize();
+			// 		// Update LiteGraph's internal dimensions
+			// 		graph.canvas.resize();
 					
-					// Force LiteGraph to recalculate mouse coordinates with the correct canvas dimensions
-					graph.canvas.mouse = [0, 0];
-					graph.canvas.graph_mouse = [0, 0];
+			// 		// Force LiteGraph to recalculate mouse coordinates with the correct canvas dimensions
+			// 		graph.canvas.mouse = [0, 0];
+			// 		graph.canvas.graph_mouse = [0, 0];
 					
-					// Trigger a redraw
-					graph.canvas.setDirty(true, true);
-				}
-			}
+			// 		// Trigger a redraw
+			// 		graph.canvas.setDirty(true, true);
+			// 	}
+			// }
 
-			serverUrlInput.addEventListener("change", (e) => {
-				appAgentSelect.disabled  = true;
-				appAgentSelect.innerHTML = "<option value='-1'> - None - </option>";
-			});
+			// serverUrlInput.addEventListener("change", (e) => {
+			// 	appAgentSelect.disabled  = true;
+			// 	appAgentSelect.innerHTML = "<option value='-1'> - None - </option>";
+			// });
 
-			appAgentSelect.addEventListener("change", (e) => {
-				agentCurrIndex = parseInt(e.target.value);
-			});
+			// appAgentSelect.addEventListener("change", (e) => {
+			// 	agentCurrIndex = parseInt(e.target.value);
+			// });
 
-			systemMsgButton.addEventListener("change", changeSystemVisibility);
+			// systemMsgButton.addEventListener("change", changeSystemVisibility);
 
-			messageInput.addEventListener("keypress", (e) => {
-				if (e.key === "Enter" && !e.shiftKey) {
-					e.preventDefault();
-					sendMessage();
-				}
-			});
+			// messageInput.addEventListener("keypress", (e) => {
+			// 	if (e.key === "Enter" && !e.shiftKey) {
+			// 		e.preventDefault();
+			// 		sendMessage();
+			// 	}
+			// });
 
-			window.onload = () => {
-				changeSystemVisibility.call(systemMsgButton);
+			// window.onload = () => {
+			// 	changeSystemVisibility.call(systemMsgButton);
 
-				// Initialize graph
-				graph = new NumelGraph("numelCanvas");
+			// 	// Initialize graph
+			// 	graph = new NumelGraph("numelCanvas");
 				
-				// Override LiteGraph's mouse coordinate calculation
-				if (graph && graph.canvas) {
-					const originalProcessMouseDown = graph.canvas.processMouseDown;
-					const originalProcessMouseMove = graph.canvas.processMouseMove;
-					const originalProcessMouseUp = graph.canvas.processMouseUp;
+			// 	// Override LiteGraph's mouse coordinate calculation
+			// 	if (graph && graph.canvas) {
+			// 		const originalProcessMouseDown = graph.canvas.processMouseDown;
+			// 		const originalProcessMouseMove = graph.canvas.processMouseMove;
+			// 		const originalProcessMouseUp = graph.canvas.processMouseUp;
 					
-					// Helper function to adjust mouse coordinates
-					function adjustMouseEvent(e) {
-						const canvasEl = document.getElementById('numelCanvas');
-						const rect = canvasEl.getBoundingClientRect();
-						const dpr = window.devicePixelRatio || 1;
+			// 		// Helper function to adjust mouse coordinates
+			// 		function adjustMouseEvent(e) {
+			// 			const canvasEl = document.getElementById('numelCanvas');
+			// 			const rect = canvasEl.getBoundingClientRect();
+			// 			const dpr = window.devicePixelRatio || 1;
 						
-						// Calculate the actual mouse position relative to the canvas
-						e.canvasX = (e.clientX - rect.left) * dpr;
-						e.canvasY = (e.clientY - rect.top) * dpr;
-						e.localX = e.canvasX;
-						e.localY = e.canvasY;
+			// 			// Calculate the actual mouse position relative to the canvas
+			// 			e.canvasX = (e.clientX - rect.left) * dpr;
+			// 			e.canvasY = (e.clientY - rect.top) * dpr;
+			// 			e.localX = e.canvasX;
+			// 			e.localY = e.canvasY;
 						
-						// Update the offset values that LiteGraph uses
-						e.offsetX = e.canvasX / dpr;
-						e.offsetY = e.canvasY / dpr;
+			// 			// Update the offset values that LiteGraph uses
+			// 			e.offsetX = e.canvasX / dpr;
+			// 			e.offsetY = e.canvasY / dpr;
 						
-						return e;
-					}
+			// 			return e;
+			// 		}
 					
-					// Override mouse event handlers
-					graph.canvas.processMouseDown = function(e) {
-						e = adjustMouseEvent(e);
-						return originalProcessMouseDown.call(this, e);
-					};
+			// 		// Override mouse event handlers
+			// 		graph.canvas.processMouseDown = function(e) {
+			// 			e = adjustMouseEvent(e);
+			// 			return originalProcessMouseDown.call(this, e);
+			// 		};
 					
-					graph.canvas.processMouseMove = function(e) {
-						e = adjustMouseEvent(e);
-						return originalProcessMouseMove.call(this, e);
-					};
+			// 		graph.canvas.processMouseMove = function(e) {
+			// 			e = adjustMouseEvent(e);
+			// 			return originalProcessMouseMove.call(this, e);
+			// 		};
 					
-					graph.canvas.processMouseUp = function(e) {
-						e = adjustMouseEvent(e);
-						return originalProcessMouseUp.call(this, e);
-					};
-				}
+			// 		graph.canvas.processMouseUp = function(e) {
+			// 			e = adjustMouseEvent(e);
+			// 			return originalProcessMouseUp.call(this, e);
+			// 		};
+			// 	}
 				
-				const nodeMap = graph.buildFromConfig(baseConfig);
+			// 	const nodeMap = graph.buildFromConfig(baseConfig);
 
-				// Initial resize
-				resizeCanvas();
+			// 	// Initial resize
+			// 	resizeCanvas();
 
-				graph.layoutGraph("hierarchical");
-				graph.centerGraph();
-			};
+			// 	graph.layoutGraph("hierarchical");
+			// 	graph.centerGraph();
+			// };
 
-			window.addEventListener('resize', resizeCanvas);
+			// window.addEventListener('resize', resizeCanvas);
 
 			document.addEventListener("DOMContentLoaded", () => {
 				checkAGUILoaded();
 			});
 
-			let currentLayout = 0;
+			// let currentLayout = 0;
 
-			// Add keyboard shortcuts for layout
-			document.addEventListener("keydown", (e) => {
-				if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
-					const layouts = ['hierarchical', 'force', 'circular', 'grid'];
-					switch(e.key) {
-						case "z":
-							currentLayout = (currentLayout + 1) % layouts.length;
-							graph.layoutGraph(layouts[currentLayout]);
-							break;
-						case "a":  // Spacebar - center view
-							e.preventDefault();
-							graph.centerGraph();
-							break;
-					}
+			// // Add keyboard shortcuts for layout
+			// document.addEventListener("keydown", (e) => {
+			// 	if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
+			// 		const layouts = ['hierarchical', 'force', 'circular', 'grid'];
+			// 		switch(e.key) {
+			// 			case "z":
+			// 				currentLayout = (currentLayout + 1) % layouts.length;
+			// 				graph.layoutGraph(layouts[currentLayout]);
+			// 				break;
+			// 			case "a":  // Spacebar - center view
+			// 				e.preventDefault();
+			// 				graph.centerGraph();
+			// 				break;
+			// 		}
 
-					// // examples:
-					// // Apply hierarchical layout (best for config dependencies)
-					// graph.layoutGraph('hierarchical', {
-					// 	direction: 'LR',        // Left-to-right
-					// 	layerSpacing: 450,      // Distance between layers
-					// 	nodeSpacing: 200,       // Distance between nodes in same layer
-					// 	alignLayers: true       // Center each layer
-					// });
+			// 		// // examples:
+			// 		// // Apply hierarchical layout (best for config dependencies)
+			// 		// graph.layoutGraph('hierarchical', {
+			// 		// 	direction: 'LR',        // Left-to-right
+			// 		// 	layerSpacing: 450,      // Distance between layers
+			// 		// 	nodeSpacing: 200,       // Distance between nodes in same layer
+			// 		// 	alignLayers: true       // Center each layer
+			// 		// });
 
-					// // Apply force-directed layout
-					// graph.layoutGraph('force', {
-					// 	iterations: 100,        // Simulation steps
-					// 	nodeRepulsion: 1000,    // Repulsion strength
-					// 	linkDistance: 200,      // Ideal link length
-					// 	damping: 0.9           // Velocity damping
-					// });
+			// 		// // Apply force-directed layout
+			// 		// graph.layoutGraph('force', {
+			// 		// 	iterations: 100,        // Simulation steps
+			// 		// 	nodeRepulsion: 1000,    // Repulsion strength
+			// 		// 	linkDistance: 200,      // Ideal link length
+			// 		// 	damping: 0.9           // Velocity damping
+			// 		// });
 
-					// // Center view on all nodes
-					// graph.centerGraph();
-				}
-			});
+			// 		// // Center view on all nodes
+			// 		// graph.centerGraph();
+			// 	}
+			// });
 		</script>
 	</body>
 </html>

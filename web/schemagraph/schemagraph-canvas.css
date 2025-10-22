@@ -133,8 +133,8 @@
 /* Zoom Indicator */
 .sg-zoom-indicator {
   position: fixed;
-  bottom: 16px;
-  right: 16px;
+  bottom: 70px;
+  right: 30px;
   background: var(--sg-bg-secondary, #2a2a2a);
   border: 1px solid var(--sg-border-color, #1a1a1a);
   padding: 6px 10px;

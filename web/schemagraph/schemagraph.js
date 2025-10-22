@@ -154,7 +154,7 @@ class AnalyticsService {
 // CORE GRAPH CLASSES
 // ========================================================================
 
-class LNode {
+class Node {
   constructor(title) {
     this.id = Math.random().toString(36).substr(2, 9);
     this.title = title || "Node";
@@ -194,7 +194,7 @@ class LNode {
   onExecute() {}
 }
 
-class LLink {
+class Link {
   constructor(id, origin_id, origin_slot, target_id, target_slot, type) {
     this.id = id;
     this.origin_id = origin_id;
@@ -205,7 +205,7 @@ class LLink {
   }
 }
 
-class LGraph {
+class Graph {
   constructor() {
     this.nodes = [];
     this.links = {};
@@ -234,7 +234,7 @@ class LGraph {
     }
     
     const linkId = ++this.last_link_id;
-    const link = new LLink(linkId, originNode.id, originSlot, targetNode.id, targetSlot, outputType);
+    const link = new Link(linkId, originNode.id, originSlot, targetNode.id, targetSlot, outputType);
     
     this.links[linkId] = link;
     originNode.outputs[originSlot].links.push(linkId);
@@ -311,7 +311,7 @@ class LGraph {
 // SCHEMA GRAPH
 // ========================================================================
 
-class SchemaGraph extends LGraph {
+class SchemaGraph extends Graph {
   constructor(eventBus) {
     super();
     this.eventBus = eventBus;
@@ -551,7 +551,7 @@ class SchemaGraph extends LGraph {
       const schemaInfo = this.schemas[schemaName];
       const isRootType = schemaInfo && schemaInfo.rootType === modelName;
       
-      class GeneratedNode extends LNode {
+      class GeneratedNode extends Node {
         constructor() {
           super(schemaName + '.' + modelName);
           this.schemaName = schemaName;
@@ -968,7 +968,7 @@ class SchemaGraph extends LGraph {
         const targetNode = this._nodes_by_id[linkData.target_id];
         
         if (originNode && targetNode) {
-          const link = new LLink(
+          const link = new Link(
             linkData.id,
             linkData.origin_id,
             linkData.origin_slot,
@@ -1583,7 +1583,7 @@ class SchemaGraphApp {
     const resetAnalyticsBtn = document.getElementById('resetAnalyticsBtn');
     
     // Voice control handlers
-    voiceStartBtn.addEventListener('click', () => {
+    voiceStartBtn?.addEventListener('click', () => {
       if (this.voiceController) {
         this.voiceController.startListening();
         voiceStartBtn.style.display = 'none';
@@ -1593,7 +1593,7 @@ class SchemaGraphApp {
       }
     });
     
-    voiceStopBtn.addEventListener('click', () => {
+    voiceStopBtn?.addEventListener('click', () => {
       if (this.voiceController) {
         this.voiceController.stopListening();
         voiceStopBtn.style.display = 'none';
@@ -1626,22 +1626,22 @@ class SchemaGraphApp {
     });
     
     // Analytics panel handlers
-    analyticsToggleBtn.addEventListener('click', () => {
+    analyticsToggleBtn?.addEventListener('click', () => {
       analyticsPanel.classList.toggle('show');
       if (analyticsPanel.classList.contains('show')) {
         this.updateAnalyticsDisplay();
       }
     });
     
-    analyticsCloseBtn.addEventListener('click', () => {
+    analyticsCloseBtn?.addEventListener('click', () => {
       analyticsPanel.classList.remove('show');
     });
     
-    refreshAnalyticsBtn.addEventListener('click', () => {
+    refreshAnalyticsBtn?.addEventListener('click', () => {
       this.updateAnalyticsDisplay();
     });
     
-    exportAnalyticsBtn.addEventListener('click', () => {
+    exportAnalyticsBtn?.addEventListener('click', () => {
       if (this.analytics) {
         const metrics = this.analytics.getSessionMetrics();
         const jsonString = JSON.stringify(metrics, null, 2);
@@ -1657,7 +1657,7 @@ class SchemaGraphApp {
       }
     });
     
-    resetAnalyticsBtn.addEventListener('click', () => {
+    resetAnalyticsBtn?.addEventListener('click', () => {
       if (confirm('Reset analytics for current session? This cannot be undone.')) {
         if (this.analytics) {
           this.analytics.endSession();
@@ -1668,7 +1668,7 @@ class SchemaGraphApp {
     
     // Auto-refresh analytics every 5 seconds if panel is open
     setInterval(() => {
-      if (analyticsPanel.classList.contains('show')) {
+      if (analyticsPanel?.classList.contains('show')) {
         this.updateAnalyticsDisplay();
       }
     }, 5000);
@@ -2048,7 +2048,7 @@ class SchemaGraphApp {
     ];
 
     for (const nodeSpec of nativeNodes) {
-      class NativeNode extends LNode {
+      class NativeNode extends Node {
         constructor() {
           super(nodeSpec.name);
           this.addOutput('value', nodeSpec.type);
@@ -2285,7 +2285,7 @@ class SchemaGraphApp {
               
               if (node.multiInputs && node.multiInputs[j]) {
                 const linkId = ++this.graph.last_link_id;
-                const link = new LLink(
+                const link = new Link(
                   linkId,
                   this.connecting.node.id,
                   this.connecting.slot,
@@ -2320,7 +2320,7 @@ class SchemaGraphApp {
               
               if (this.connecting.node.multiInputs && this.connecting.node.multiInputs[this.connecting.slot]) {
                 const linkId = ++this.graph.last_link_id;
-                const link = new LLink(
+                const link = new Link(
                   linkId,
                   node.id,
                   j,
@@ -3055,7 +3055,7 @@ class SchemaGraphApp {
     this.graph.last_link_id = 0;
 
     const createdNodes = {};
-    const allNodesForField = {}; // Track ALL nodes for each field, including embedded
+    const alNodesForField = {}; // Track ALL nodes for each field, including embedded
     let xOffset = 50;
     const yOffset = 100;
     const xSpacing = 250;
@@ -3085,8 +3085,8 @@ class SchemaGraphApp {
         createdNodes[fieldName] = [];
       }
       
-      if (!allNodesForField[fieldName]) {
-        allNodesForField[fieldName] = [];
+      if (!alNodesForField[fieldName]) {
+        alNodesForField[fieldName] = [];
       }
 
       const isListField = Array.isArray(items);
@@ -3097,7 +3097,7 @@ class SchemaGraphApp {
           const node = this.graph.createNode(nodeType);
           node.pos = [xOffset, yOffset + i * 150];
           createdNodes[fieldName].push(node);
-          allNodesForField[fieldName].push(node);
+          alNodesForField[fieldName].push(node);
           console.log('   ✓ Created', nodeType, 'at index', i, '- node ID:', node.id);
         }
       } else {
@@ -3105,7 +3105,7 @@ class SchemaGraphApp {
         const node = this.graph.createNode(nodeType);
         node.pos = [xOffset, yOffset];
         createdNodes[fieldName].push(node);
-        allNodesForField[fieldName].push(node);
+        alNodesForField[fieldName].push(node);
         console.log('   ✓ Created', nodeType, '- node ID:', node.id);
       }
 
@@ -3114,10 +3114,10 @@ class SchemaGraphApp {
     
     console.log('📦 Top-level node creation complete');
     console.log('   Created nodes for fields:', Object.keys(createdNodes).join(', '));
-    for (const fieldName in allNodesForField) {
-      if (allNodesForField.hasOwnProperty(fieldName)) {
-        const nodeIds = allNodesForField[fieldName].map(n => n.id).join(', ');
-        console.log('   ', fieldName + ':', allNodesForField[fieldName].length, 'nodes - IDs:', nodeIds);
+    for (const fieldName in alNodesForField) {
+      if (alNodesForField.hasOwnProperty(fieldName)) {
+        const nodeIds = alNodesForField[fieldName].map(n => n.id).join(', ');
+        console.log('   ', fieldName + ':', alNodesForField[fieldName].length, 'nodes - IDs:', nodeIds);
       }
     }
 
@@ -3185,14 +3185,14 @@ class SchemaGraphApp {
           console.log('   Value is', isListField ? 'array with ' + items.length + ' items' : typeof items);
           
           // Get all nodes for this field (only the top-level ones we created)
-          const fieldNodes = allNodesForField[fieldName] || [];
+          const fieldNodes = alNodesForField[fieldName] || [];
           
-          console.log('   Looking for nodes in allNodesForField["' + fieldName + '"]');
+          console.log('   Looking for nodes in alNodesForField["' + fieldName + '"]');
           console.log('   Found:', fieldNodes.length, 'nodes');
           
           if (fieldNodes.length === 0) {
-            console.warn('⚠️ No nodes in allNodesForField for:', fieldName);
-            console.warn('   Available field keys:', Object.keys(allNodesForField).join(', '));
+            console.warn('⚠️ No nodes in alNodesForField for:', fieldName);
+            console.warn('   Available field keys:', Object.keys(alNodesForField).join(', '));
             // Check if this field even needs nodes (might be a primitive value)
             if (rootNode.nativeInputs && rootNode.nativeInputs[inputIdx] !== undefined) {
               console.log('   → Field is a native input, setting value directly');
@@ -3215,7 +3215,7 @@ class SchemaGraphApp {
               console.log('   ✓ Field is multi-input (list field)');
               for (const node of fieldNodes) {
                 const linkId = ++this.graph.last_link_id;
-                const link = new LLink(
+                const link = new Link(
                   linkId,
                   node.id,
                   0,
@@ -3359,7 +3359,7 @@ class SchemaGraphApp {
             if (refNode) {
               if (node.multiInputs && node.multiInputs[i]) {
                 const linkId = ++this.graph.last_link_id;
-                const link = new LLink(
+                const link = new Link(
                   linkId,
                   refNode.id,
                   0,
@@ -3379,7 +3379,7 @@ class SchemaGraphApp {
             if (embeddedNode) {
               if (node.multiInputs && node.multiInputs[i]) {
                 const linkId = ++this.graph.last_link_id;
-                const link = new LLink(
+                const link = new Link(
                   linkId,
                   embeddedNode.id,
                   0,
