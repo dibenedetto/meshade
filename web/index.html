@@ -702,53 +702,6 @@
 				return status;
 			}
 
-			// function resizeCanvas() {
-			// 	const canvasEl = document.getElementById('numelCanvas');
-			// 	const wrapper = canvasEl.parentElement;
-			// 	const container = wrapper.parentElement;
-			// 	const header = container.querySelector('h2');
-				
-			// 	// Calculate available space
-			// 	const containerStyle = window.getComputedStyle(container);
-			// 	const headerStyle = window.getComputedStyle(header);
-			// 	const wrapperStyle = window.getComputedStyle(wrapper);
-				
-			// 	const containerPadding = parseFloat(containerStyle.paddingTop) + parseFloat(containerStyle.paddingBottom);
-			// 	const headerHeight = header.offsetHeight + parseFloat(headerStyle.marginTop) + parseFloat(headerStyle.marginBottom);
-				
-			// 	// Get wrapper dimensions (which already accounts for borders)
-			// 	const availableWidth = wrapper.clientWidth;
-			// 	const availableHeight = wrapper.clientHeight;
-				
-			// 	// Get device pixel ratio for high DPI displays
-			// 	const dpr = window.devicePixelRatio || 1;
-				
-			// 	// Set internal canvas dimensions (accounting for DPI)
-			// 	canvasEl.width = availableWidth * dpr;
-			// 	canvasEl.height = availableHeight * dpr;
-				
-			// 	// Set CSS dimensions to match the wrapper
-			// 	canvasEl.style.width = availableWidth + 'px';
-			// 	canvasEl.style.height = availableHeight + 'px';
-				
-			// 	// Notify LiteGraph of canvas size change and DPI
-			// 	if (graph && graph.canvas) {
-			// 		// Scale the context for high DPI displays
-			// 		const ctx = canvasEl.getContext('2d');
-			// 		ctx.scale(dpr, dpr);
-					
-			// 		// Update LiteGraph's internal dimensions
-			// 		graph.canvas.resize();
-					
-			// 		// Force LiteGraph to recalculate mouse coordinates with the correct canvas dimensions
-			// 		graph.canvas.mouse = [0, 0];
-			// 		graph.canvas.graph_mouse = [0, 0];
-					
-			// 		// Trigger a redraw
-			// 		graph.canvas.setDirty(true, true);
-			// 	}
-			// }
-
 			// serverUrlInput.addEventListener("change", (e) => {
 			// 	appAgentSelect.disabled  = true;
 			// 	appAgentSelect.innerHTML = "<option value='-1'> - None - </option>";

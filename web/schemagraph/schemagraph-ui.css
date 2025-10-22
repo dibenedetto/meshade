@@ -75,7 +75,7 @@
   padding: 4px 8px;
   background: var(--sg-bg-tertiary, #353535);
   border: 1px solid var(--sg-border-color, #1a1a1a);
-  border-radius: 3px;
+  border-radius: 6px;
 }
 
 .sg-voice-btn {
@@ -83,7 +83,7 @@
   color: var(--sg-text-primary, #ffffff);
   border: 1px solid var(--sg-border-color, #1a1a1a);
   padding: 4px 8px;
-  border-radius: 2px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 11px;
   transition: all 0.15s ease;
@@ -278,7 +278,7 @@
   color: var(--sg-text-primary, #ffffff);
   border: 1px solid var(--sg-border-color, #1a1a1a);
   padding: 6px 12px;
-  border-radius: 3px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
   transition: all 0.15s ease;
@@ -302,7 +302,7 @@
   color: var(--sg-text-primary, #ffffff);
   border: 1px solid var(--sg-border-color, #1a1a1a);
   padding: 6px 12px;
-  border-radius: 3px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 16px;
   transition: all 0.15s ease;
@@ -321,7 +321,7 @@
   color: var(--sg-text-primary, #ffffff);
   border: 1px solid var(--sg-border-color, #1a1a1a);
   padding: 6px 10px;
-  border-radius: 3px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
   transition: all 0.15s ease;
@@ -344,6 +344,7 @@
 
 .sg-drawing-style-select {
   min-width: 140px;
+  border-radius: 6px;
 }
 
 .sg-status {
