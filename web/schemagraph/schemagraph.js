@@ -1355,6 +1355,9 @@ class SchemaGraphApp {
     this.uiController = new UIController(this.eventBus);
     
     this.initializeState();
+    
+    this.api = this._createAPI();
+    
     this.registerUIElements();
     this.setupEventListeners();
     this.setupCanvasLeaveHandler();
@@ -4997,5 +5000,1145 @@ class SchemaGraphApp {
     const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amount));
     const b = Math.max(0, Math.min(255, (num & 0x0000FF) + amount));
     return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+  }
+
+  // ========================================================================
+  // PUBLIC API - Programmatic Access to All Operations
+  // ========================================================================
+
+  /**
+   * Create the SchemaGraph API object
+   * Called once during initialization
+   * @private
+   */
+  _createAPI() {
+    return {
+      // Schema Management
+      schema: {
+        /**
+         * Register a schema from code string
+         * @param {string} name - Schema name
+         * @param {string} code - Pydantic schema code
+         * @param {string} indexType - Index type (default: 'int')
+         * @param {string} rootType - Root config class name
+         * @returns {boolean} Success status
+         */
+        register: (name, code, indexType = 'int', rootType = null) => {
+          const success = this.graph.registerSchema(name, code, indexType, rootType);
+          if (success) {
+            this.updateSchemaList();
+            this.updateNodeTypesList();
+            this.draw();
+          }
+          return success;
+        },
+
+        /**
+         * Remove a registered schema
+         * @param {string} name - Schema name to remove
+         * @returns {boolean} Success status
+         */
+        remove: (name) => {
+          const success = this.graph.removeSchema(name);
+          if (success) {
+            this.updateSchemaList();
+            this.updateNodeTypesList();
+            this.draw();
+          }
+          return success;
+        },
+
+        /**
+         * Get list of registered schemas
+         * @returns {string[]} Array of schema names
+         */
+        list: () => {
+          return this.graph.getRegisteredSchemas();
+        },
+
+        /**
+         * Get detailed info about a schema
+         * @param {string} name - Schema name
+         * @returns {Object|null} Schema info or null if not found
+         */
+        info: (name) => {
+          return this.graph.getSchemaInfo(name);
+        }
+      },
+
+      // Node Management
+      node: {
+        /**
+         * Create a new node
+         * @param {string} type - Node type (e.g., 'Native.String', 'Schema.ModelName')
+         * @param {number} x - X position in world coordinates
+         * @param {number} y - Y position in world coordinates
+         * @returns {Node|null} Created node or null on failure
+         */
+        create: (type, x = 0, y = 0) => {
+          try {
+            const node = this.graph.createNode(type);
+            node.pos = [x, y];
+            this.draw();
+            return node;
+          } catch (e) {
+            this.showError('Failed to create node: ' + e.message);
+            return null;
+          }
+        },
+
+        /**
+         * Delete a node by reference or ID
+         * @param {Node|string} nodeOrId - Node object or node ID
+         * @returns {boolean} Success status
+         */
+        delete: (nodeOrId) => {
+          const node = typeof nodeOrId === 'string' 
+            ? this.graph.getNodeById(nodeOrId) 
+            : nodeOrId;
+          
+          if (!node) return false;
+          
+          this.removeNode(node);
+          return true;
+        },
+
+        /**
+         * Select a node
+         * @param {Node|string} nodeOrId - Node object or node ID
+         * @param {boolean} addToSelection - Add to existing selection
+         * @returns {boolean} Success status
+         */
+        select: (nodeOrId, addToSelection = false) => {
+          const node = typeof nodeOrId === 'string' 
+            ? this.graph.getNodeById(nodeOrId) 
+            : nodeOrId;
+          
+          if (!node) return false;
+          
+          this.selectNode(node, addToSelection);
+          return true;
+        },
+
+        /**
+         * Get all nodes
+         * @returns {Node[]} Array of all nodes
+         */
+        list: () => {
+          return [...this.graph.nodes];
+        },
+
+        /**
+         * Get node by ID
+         * @param {string} id - Node ID
+         * @returns {Node|null} Node or null if not found
+         */
+        getById: (id) => {
+          return this.graph.getNodeById(id);
+        },
+
+        /**
+         * Get selected nodes
+         * @returns {Node[]} Array of selected nodes
+         */
+        getSelected: () => {
+          return Array.from(this.selectedNodes);
+        },
+
+        /**
+         * Clear selection
+         * @returns {void}
+         */
+        clearSelection: () => {
+          this.clearSelection();
+        },
+
+        /**
+         * Set node property value
+         * @param {Node|string} nodeOrId - Node object or node ID
+         * @param {string} property - Property name
+         * @param {any} value - Property value
+         * @returns {boolean} Success status
+         */
+        setProperty: (nodeOrId, property, value) => {
+          const node = typeof nodeOrId === 'string' 
+            ? this.graph.getNodeById(nodeOrId) 
+            : nodeOrId;
+          
+          if (!node) return false;
+          
+          node.properties[property] = value;
+          this.draw();
+          return true;
+        },
+
+        /**
+         * Set native input value
+         * @param {Node|string} nodeOrId - Node object or node ID
+         * @param {number} slotIndex - Input slot index
+         * @param {any} value - Input value
+         * @returns {boolean} Success status
+         */
+        setInputValue: (nodeOrId, slotIndex, value) => {
+          const node = typeof nodeOrId === 'string' 
+            ? this.graph.getNodeById(nodeOrId) 
+            : nodeOrId;
+          
+          if (!node || !node.nativeInputs || node.nativeInputs[slotIndex] === undefined) {
+            return false;
+          }
+          
+          node.nativeInputs[slotIndex].value = value;
+          this.draw();
+          return true;
+        }
+      },
+
+      // Link Management
+      link: {
+        /**
+         * Create a link between nodes
+         * @param {Node|string} sourceNodeOrId - Source node or ID
+         * @param {number} sourceSlot - Source output slot index
+         * @param {Node|string} targetNodeOrId - Target node or ID
+         * @param {number} targetSlot - Target input slot index
+         * @returns {Link|null} Created link or null on failure
+         */
+        create: (sourceNodeOrId, sourceSlot, targetNodeOrId, targetSlot) => {
+          const sourceNode = typeof sourceNodeOrId === 'string' 
+            ? this.graph.getNodeById(sourceNodeOrId) 
+            : sourceNodeOrId;
+          
+          const targetNode = typeof targetNodeOrId === 'string' 
+            ? this.graph.getNodeById(targetNodeOrId) 
+            : targetNodeOrId;
+          
+          if (!sourceNode || !targetNode) return null;
+          
+          const link = this.graph.connect(sourceNode, sourceSlot, targetNode, targetSlot);
+          if (link) {
+            this.eventBus.emit('link:created', { linkId: link.id });
+            this.draw();
+          }
+          return link;
+        },
+
+        /**
+         * Delete a link by ID
+         * @param {number} linkId - Link ID
+         * @returns {boolean} Success status
+         */
+        delete: (linkId) => {
+          return this.disconnectLink(linkId);
+        },
+
+        /**
+         * Clear all multi-input links from a node's slot
+         * @param {Node|string} nodeOrId - Node object or ID
+         * @param {number} slotIndex - Input slot index
+         * @returns {boolean} Success status
+         */
+        clearMultiInput: (nodeOrId, slotIndex) => {
+          const node = typeof nodeOrId === 'string' 
+            ? this.graph.getNodeById(nodeOrId) 
+            : nodeOrId;
+          
+          if (!node) return false;
+          
+          return this.clearMultiInputLinks(node, slotIndex);
+        },
+
+        /**
+         * Clear all multi-input links from a node
+         * @param {Node|string} nodeOrId - Node object or ID
+         * @returns {boolean} Success status
+         */
+        clearAllMultiInputs: (nodeOrId) => {
+          const node = typeof nodeOrId === 'string' 
+            ? this.graph.getNodeById(nodeOrId) 
+            : nodeOrId;
+          
+          if (!node) return false;
+          
+          return this.clearAllMultiInputLinks(node);
+        },
+
+        /**
+         * Get all links
+         * @returns {Object} Links object keyed by link ID
+         */
+        list: () => {
+          return { ...this.graph.links };
+        }
+      },
+
+      // Graph Operations
+      graph: {
+        /**
+         * Export graph to JSON
+         * @param {boolean} includeCamera - Include camera position/zoom
+         * @returns {Object} Graph data
+         */
+        export: (includeCamera = true) => {
+          return this.graph.serialize(includeCamera, this.camera);
+        },
+
+        /**
+         * Import graph from JSON
+         * @param {Object} data - Graph data
+         * @param {boolean} restoreCamera - Restore camera position/zoom
+         * @returns {boolean} Success status
+         */
+        import: (data, restoreCamera = true) => {
+          try {
+            this.graph.deserialize(data, restoreCamera, this.camera);
+            this.updateSchemaList();
+            this.updateNodeTypesList();
+            if (restoreCamera) {
+              this.eventBus.emit('ui:update', { 
+                id: 'zoomLevel', 
+                content: Math.round(this.camera.scale * 100) + '%' 
+              });
+            }
+            this.draw();
+            this.eventBus.emit('graph:imported', {});
+            return true;
+          } catch (e) {
+            this.showError('Import failed: ' + e.message);
+            return false;
+          }
+        },
+
+        /**
+         * Download graph as JSON file
+         * @param {string} filename - Optional filename
+         * @returns {void}
+         */
+        download: (filename = null) => {
+          const data = this.graph.serialize(true, this.camera);
+          const jsonString = JSON.stringify(data, null, 2);
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename || ('schemagraph-' + new Date().toISOString().slice(0, 10) + '.json');
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          this.eventBus.emit('graph:exported', {});
+        },
+
+        /**
+         * Clear entire graph
+         * @returns {void}
+         */
+        clear: () => {
+          this.graph.nodes = [];
+          this.graph.links = {};
+          this.graph._nodes_by_id = {};
+          this.graph.last_link_id = 0;
+          this.clearSelection();
+          this.draw();
+        }
+      },
+
+      // Config Operations
+      config: {
+        /**
+         * Build config from current graph
+         * @param {string} schemaName - Schema to use for config
+         * @returns {Object} Config data
+         */
+        build: (schemaName = null) => {
+          const schemas = Object.keys(this.graph.schemas);
+          if (schemas.length === 0) {
+            throw new Error('No schemas registered');
+          }
+
+          let targetSchema = schemaName;
+          if (!targetSchema) {
+            for (const name of schemas) {
+              const info = this.graph.schemas[name];
+              if (info && info.rootType) {
+                targetSchema = name;
+                break;
+              }
+            }
+          }
+
+          if (!targetSchema) targetSchema = schemas[0];
+
+          return this.buildConfig(targetSchema);
+        },
+
+        /**
+         * Export config from current graph - alias for build()
+         * @param {string} schemaName - Schema to use for config
+         * @returns {Object} Config data
+         */
+        export: (schemaName = null) => {
+          return this.api.config.build(schemaName);
+        },
+
+        /**
+         * Import config into graph
+         * @param {Object} configData - Config data
+         * @param {string} schemaName - Optional schema name
+         * @returns {boolean} Success status
+         */
+        import: (configData, schemaName = null) => {
+          try {
+            this.importConfigData(configData, schemaName);
+            this.eventBus.emit('config:imported', {});
+            return true;
+          } catch (e) {
+            this.showError('Config import failed: ' + e.message);
+            return false;
+          }
+        },
+
+        /**
+         * Download config as JSON file
+         * @param {string} filename - Optional filename
+         * @returns {void}
+         */
+        download: (filename = null) => {
+          const schemas = Object.keys(this.graph.schemas);
+          if (schemas.length === 0) {
+            this.showError('No schemas registered');
+            return;
+          }
+
+          let targetSchema = null;
+          for (const schemaName of schemas) {
+            const info = this.graph.schemas[schemaName];
+            if (info && info.rootType) {
+              targetSchema = schemaName;
+              break;
+            }
+          }
+
+          if (!targetSchema) targetSchema = schemas[0];
+
+          const config = this.buildConfig(targetSchema);
+          const jsonString = JSON.stringify(config, null, 2);
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename || ('config-' + new Date().toISOString().slice(0, 10) + '.json');
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          this.eventBus.emit('config:exported', {});
+        },
+
+        /**
+         * Visualize config structure (for debugging)
+         * Shows which fields use index references vs. embedded objects
+         * @param {string} schemaName - Optional schema name
+         * @returns {void}
+         */
+        visualize: (schemaName = null) => {
+          const schemas = Object.keys(this.graph.schemas);
+          if (schemas.length === 0) {
+            console.error('No schemas registered');
+            return;
+          }
+
+          let targetSchema = schemaName;
+          if (!targetSchema) {
+            for (const name of schemas) {
+              const info = this.graph.schemas[name];
+              if (info && info.rootType) {
+                targetSchema = name;
+                break;
+              }
+            }
+          }
+
+          if (!targetSchema) targetSchema = schemas[0];
+
+          console.log('%c📋 Config Structure Visualization', 'color: #46a2da; font-weight: bold; font-size: 14px;');
+          console.log(`Schema: ${targetSchema}\n`);
+
+          const config = this.buildConfig(targetSchema);
+          
+          console.log('%cRoot-level collections (shared resources):', 'color: #92d050; font-weight: bold;');
+          for (const key in config) {
+            if (Array.isArray(config[key])) {
+              console.log(`  ${key}: [${config[key].length} items]`);
+            }
+          }
+
+          console.log('\n%cIndex references found:', 'color: #9370db; font-weight: bold;');
+          let referenceCount = 0;
+          
+          const findReferences = (obj, path = '') => {
+            if (typeof obj === 'number' && Number.isInteger(obj) && obj >= 0) {
+              referenceCount++;
+              console.log(`  ${path} = ${obj} (index reference)`);
+              return;
+            }
+            
+            if (Array.isArray(obj)) {
+              obj.forEach((item, idx) => {
+                if (typeof item === 'number' && Number.isInteger(item) && item >= 0) {
+                  referenceCount++;
+                  console.log(`  ${path}[${idx}] = ${item} (index reference)`);
+                } else if (typeof item === 'object' && item !== null) {
+                  findReferences(item, `${path}[${idx}]`);
+                }
+              });
+            } else if (typeof obj === 'object' && obj !== null) {
+              for (const key in obj) {
+                if (obj.hasOwnProperty(key)) {
+                  findReferences(obj[key], path ? `${path}.${key}` : key);
+                }
+              }
+            }
+          };
+
+          findReferences(config);
+          
+          if (referenceCount === 0) {
+            console.log('  (none found - all objects are embedded)');
+          }
+
+          console.log('\n%cFull config structure:', 'color: #46a2da;');
+          console.log(config);
+          
+          console.log('\n💡 How index references work:');
+          console.log('  - Root collections contain the full objects');
+          console.log('  - Child objects reference shared resources by index');
+          console.log('  - Example: agent.backend = 0 refers to backends[0]');
+        }
+      },
+
+      // View Operations
+      view: {
+        /**
+         * Center view on all nodes
+         * @returns {void}
+         */
+        center: () => {
+          this.centerView();
+        },
+
+        /**
+         * Reset zoom to 100%
+         * @returns {void}
+         */
+        resetZoom: () => {
+          this.resetZoom();
+        },
+
+        /**
+         * Set zoom level
+         * @param {number} scale - Zoom scale (0.1 to 5.0)
+         * @returns {void}
+         */
+        setZoom: (scale) => {
+          this.camera.scale = Math.max(0.1, Math.min(5, scale));
+          this.eventBus.emit('ui:update', { 
+            id: 'zoomLevel', 
+            content: Math.round(this.camera.scale * 100) + '%' 
+          });
+          this.draw();
+        },
+
+        /**
+         * Get current zoom level
+         * @returns {number} Current zoom scale
+         */
+        getZoom: () => {
+          return this.camera.scale;
+        },
+
+        /**
+         * Set camera position
+         * @param {number} x - X position
+         * @param {number} y - Y position
+         * @returns {void}
+         */
+        setPosition: (x, y) => {
+          this.camera.x = x;
+          this.camera.y = y;
+          this.draw();
+        },
+
+        /**
+         * Get camera position
+         * @returns {Object} Camera {x, y, scale}
+         */
+        getPosition: () => {
+          return { ...this.camera };
+        },
+
+        /**
+         * Pan camera by offset
+         * @param {number} dx - X offset
+         * @param {number} dy - Y offset
+         * @returns {void}
+         */
+        pan: (dx, dy) => {
+          this.camera.x += dx;
+          this.camera.y += dy;
+          this.draw();
+        },
+
+        /**
+         * Export current view (camera position and zoom)
+         * @returns {Object} View data {x, y, scale}
+         */
+        export: () => {
+          const viewData = {
+            x: this.camera.x,
+            y: this.camera.y,
+            scale: this.camera.scale
+          };
+          this.eventBus.emit('view:exported', viewData);
+          return viewData;
+        },
+
+        /**
+         * Import view (camera position and zoom)
+         * @param {Object} viewData - View data {x, y, scale}
+         * @returns {boolean} Success status
+         */
+        import: (viewData) => {
+          if (!viewData || typeof viewData !== 'object') {
+            return false;
+          }
+          
+          if (typeof viewData.x === 'number') this.camera.x = viewData.x;
+          if (typeof viewData.y === 'number') this.camera.y = viewData.y;
+          if (typeof viewData.scale === 'number') {
+            this.camera.scale = Math.max(0.1, Math.min(5, viewData.scale));
+          }
+          
+          this.eventBus.emit('ui:update', { 
+            id: 'zoomLevel', 
+            content: Math.round(this.camera.scale * 100) + '%' 
+          });
+          this.draw();
+          this.eventBus.emit('view:imported', viewData);
+          return true;
+        },
+
+        /**
+         * Download view as JSON file
+         * @param {string} filename - Optional filename
+         * @returns {void}
+         */
+        download: (filename = null) => {
+          const viewData = this.api.view.export();
+          const jsonString = JSON.stringify(viewData, null, 2);
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename || ('view-' + new Date().toISOString().slice(0, 10) + '.json');
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          this.eventBus.emit('interaction', { type: 'view:downloaded' });
+        },
+
+        /**
+         * Copy view to clipboard
+         * @returns {Promise<boolean>} Success status
+         */
+        copyToClipboard: async () => {
+          try {
+            const viewData = this.api.view.export();
+            await navigator.clipboard.writeText(JSON.stringify(viewData, null, 2));
+            this.eventBus.emit('ui:update', { 
+              id: 'status', 
+              content: 'View copied to clipboard!' 
+            });
+            setTimeout(() => {
+              this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
+            }, 2000);
+            return true;
+          } catch (e) {
+            this.showError('Failed to copy view to clipboard');
+            return false;
+          }
+        }
+      },
+
+      // Layout Operations
+      layout: {
+        /**
+         * Apply a layout algorithm
+         * @param {string} type - Layout type ('hierarchical-vertical', 'hierarchical-horizontal', 'force-directed', 'grid', 'circular')
+         * @returns {boolean} Success status
+         */
+        apply: (type) => {
+          if (this.graph.nodes.length === 0) {
+            return false;
+          }
+          this.applyLayout(type);
+          return true;
+        },
+
+        /**
+         * Available layout types
+         * @returns {string[]} Array of layout type names
+         */
+        types: () => {
+          return [
+            'hierarchical-vertical',
+            'hierarchical-horizontal',
+            'force-directed',
+            'grid',
+            'circular'
+          ];
+        }
+      },
+
+      // Theme Operations
+      theme: {
+        /**
+         * Set theme
+         * @param {string} theme - Theme name ('dark', 'light', 'ocean')
+         * @returns {boolean} Success status
+         */
+        set: (theme) => {
+          if (!this.themes.includes(theme)) return false;
+          this.applyTheme(theme);
+          localStorage.setItem('schemagraph-theme', theme);
+          this.draw();
+          return true;
+        },
+
+        /**
+         * Get current theme
+         * @returns {string} Current theme name
+         */
+        get: () => {
+          return this.themes[this.currentThemeIndex];
+        },
+
+        /**
+         * Cycle to next theme
+         * @returns {string} New theme name
+         */
+        cycle: () => {
+          this.cycleTheme();
+          return this.themes[this.currentThemeIndex];
+        },
+
+        /**
+         * Available themes
+         * @returns {string[]} Array of theme names
+         */
+        list: () => {
+          return [...this.themes];
+        }
+      },
+
+      // Style Operations
+      style: {
+        /**
+         * Set drawing style
+         * @param {string} styleName - Style name
+         * @returns {boolean} Success status
+         */
+        set: (styleName) => {
+          if (this.drawingStyleManager.setStyle(styleName)) {
+            this.draw();
+            return true;
+          }
+          return false;
+        },
+
+        /**
+         * Get current style name
+         * @returns {string} Current style name
+         */
+        get: () => {
+          return this.drawingStyleManager.getCurrentStyleName();
+        },
+
+        /**
+         * Get current style properties
+         * @returns {Object} Style properties
+         */
+        getProperties: () => {
+          return this.drawingStyleManager.getStyle();
+        },
+
+        /**
+         * Available styles
+         * @returns {string[]} Array of style names
+         */
+        list: () => {
+          return Object.keys(this.drawingStyleManager.styles);
+        }
+      },
+
+      // Text Scaling
+      textScaling: {
+        /**
+         * Set text scaling mode
+         * @param {string} mode - Mode ('fixed' or 'scaled')
+         * @returns {boolean} Success status
+         */
+        set: (mode) => {
+          if (mode !== 'fixed' && mode !== 'scaled') return false;
+          this.textScalingMode = mode;
+          this.saveTextScalingMode();
+          this.updateTextScalingUI();
+          this.draw();
+          return true;
+        },
+
+        /**
+         * Get current text scaling mode
+         * @returns {string} Current mode
+         */
+        get: () => {
+          return this.textScalingMode;
+        },
+
+        /**
+         * Toggle text scaling mode
+         * @returns {string} New mode
+         */
+        toggle: () => {
+          this.textScalingMode = this.textScalingMode === 'fixed' ? 'scaled' : 'fixed';
+          this.saveTextScalingMode();
+          this.updateTextScalingUI();
+          this.draw();
+          return this.textScalingMode;
+        }
+      },
+
+      // Voice Control
+      voice: {
+        /**
+         * Start voice recognition
+         * @returns {boolean} Success status
+         */
+        start: () => {
+          if (!this.voiceController.recognition) return false;
+          this.voiceController.startListening();
+          return true;
+        },
+
+        /**
+         * Stop voice recognition
+         * @returns {void}
+         */
+        stop: () => {
+          this.voiceController.stopListening();
+        },
+
+        /**
+         * Check if voice is listening
+         * @returns {boolean} Listening status
+         */
+        isListening: () => {
+          return this.voiceController.isListening;
+        },
+
+        /**
+         * Check if voice is available
+         * @returns {boolean} Availability status
+         */
+        isAvailable: () => {
+          return this.voiceController.recognition !== null;
+        }
+      },
+
+      // Analytics
+      analytics: {
+        /**
+         * Get current metrics
+         * @returns {Object} Metrics object
+         */
+        getMetrics: () => {
+          return this.analytics.getMetrics();
+        },
+
+        /**
+         * Get session metrics
+         * @returns {Object} Session metrics
+         */
+        getSession: () => {
+          return this.analytics.getSessionMetrics();
+        },
+
+        /**
+         * End current session and start new one
+         * @returns {void}
+         */
+        endSession: () => {
+          this.analytics.endSession();
+        },
+
+        /**
+         * Download analytics as JSON file
+         * @param {string} filename - Optional filename
+         * @returns {void}
+         */
+        download: (filename = null) => {
+          const metrics = this.analytics.getSessionMetrics();
+          const jsonString = JSON.stringify(metrics, null, 2);
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename || ('analytics-' + new Date().toISOString().slice(0, 10) + '.json');
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      },
+
+      // Utility Functions
+      util: {
+        /**
+         * Convert screen coordinates to world coordinates
+         * @param {number} sx - Screen X
+         * @param {number} sy - Screen Y
+         * @returns {Array} [worldX, worldY]
+         */
+        screenToWorld: (sx, sy) => {
+          return this.screenToWorld(sx, sy);
+        },
+
+        /**
+         * Convert world coordinates to screen coordinates
+         * @param {number} wx - World X
+         * @param {number} wy - World Y
+         * @returns {Array} [screenX, screenY]
+         */
+        worldToScreen: (wx, wy) => {
+          return this.worldToScreen(wx, wy);
+        },
+
+        /**
+         * Redraw the canvas
+         * @returns {void}
+         */
+        redraw: () => {
+          this.draw();
+        },
+
+        /**
+         * Show error message
+         * @param {string} message - Error message
+         * @returns {void}
+         */
+        showError: (message) => {
+          this.showError(message);
+        },
+
+        /**
+         * Get event bus for custom event handling
+         * @returns {EventBus} Event bus instance
+         */
+        getEventBus: () => {
+          return this.eventBus;
+        }
+      },
+
+      // Help System
+      help: {
+        /**
+         * Print help for all modules or a specific module
+         * @param {string} module - Optional module name
+         * @returns {void}
+         */
+        print: (module = null) => {
+          if (module) {
+            if (!this.api[module]) {
+              console.error(`Module "${module}" not found. Available modules:`, Object.keys(this.api));
+              return;
+            }
+            
+            console.log(`%c📘 ${module.toUpperCase()} API`, 'color: #46a2da; font-weight: bold; font-size: 14px;');
+            console.log(`\nMethods: ${Object.keys(this.api[module]).join(', ')}`);
+            console.log('\nExamples:');
+            
+            // Module-specific examples
+            const examples = {
+              schema: [
+                'gApp.api.schema.register("MySchema", schemaCode, "int", "AppConfig")',
+                'gApp.api.schema.list()',
+                'gApp.api.schema.info("MySchema")',
+                'gApp.api.schema.remove("MySchema")'
+              ],
+              node: [
+                'const node = gApp.api.node.create("Native.String", 100, 100)',
+                'gApp.api.node.setProperty(node, "value", "Hello")',
+                'gApp.api.node.select(node)',
+                'gApp.api.node.list()',
+                'gApp.api.node.delete(node)'
+              ],
+              link: [
+                'const link = gApp.api.link.create(sourceNode, 0, targetNode, 0)',
+                'gApp.api.link.delete(linkId)',
+                'gApp.api.link.clearMultiInput(node, 0)',
+                'gApp.api.link.list()'
+              ],
+              graph: [
+                'const data = gApp.api.graph.export()',
+                'gApp.api.graph.import(data)',
+                'gApp.api.graph.download("my-graph.json")',
+                'gApp.api.graph.clear()'
+              ],
+              config: [
+                'const config = gApp.api.config.build("MySchema")',
+                'gApp.api.config.visualize() // Show structure with index references',
+                'gApp.api.config.import(configData)',
+                'gApp.api.config.download("my-config.json")',
+                '// Config export uses index references:',
+                '// - Root node contains full lists (agents, models, etc.)',
+                '// - Child nodes reference shared resources by index',
+                '// - Example: agent.backend = 0 (refers to backends[0])'
+              ],
+              view: [
+                'gApp.api.view.center()',
+                'gApp.api.view.setZoom(1.5)',
+                'gApp.api.view.resetZoom()',
+                'gApp.api.view.pan(50, 50)',
+                'const viewData = gApp.api.view.export()',
+                'gApp.api.view.import(viewData)',
+                'gApp.api.view.download("my-view.json")',
+                'gApp.api.view.copyToClipboard()'
+              ],
+              layout: [
+                'gApp.api.layout.apply("hierarchical-vertical")',
+                'gApp.api.layout.apply("force-directed")',
+                'gApp.api.layout.types()'
+              ],
+              theme: [
+                'gApp.api.theme.set("ocean")',
+                'gApp.api.theme.cycle()',
+                'gApp.api.theme.list()'
+              ],
+              style: [
+                'gApp.api.style.set("neon")',
+                'gApp.api.style.get()',
+                'gApp.api.style.list()'
+              ],
+              textScaling: [
+                'gApp.api.textScaling.set("fixed")',
+                'gApp.api.textScaling.toggle()'
+              ],
+              voice: [
+                'gApp.api.voice.start()',
+                'gApp.api.voice.stop()',
+                'gApp.api.voice.isListening()'
+              ],
+              analytics: [
+                'gApp.api.analytics.getMetrics()',
+                'gApp.api.analytics.getSession()',
+                'gApp.api.analytics.download()'
+              ],
+              util: [
+                'const [wx, wy] = gApp.api.util.screenToWorld(100, 100)',
+                'gApp.api.util.redraw()',
+                'const eventBus = gApp.api.util.getEventBus()'
+              ]
+            };
+            
+            if (examples[module]) {
+              examples[module].forEach(ex => console.log(`  ${ex}`));
+            }
+          } else {
+            console.log('%c📚 SchemaGraph API Reference', 'color: #46a2da; font-weight: bold; font-size: 16px;');
+            console.log('\nAvailable modules:');
+            Object.keys(this.api).forEach(mod => {
+              if (mod !== 'help') {
+                const methods = Object.keys(this.api[mod]);
+                console.log(`\n  %c${mod}%c - ${methods.length} methods`, 'color: #92d050; font-weight: bold;', 'color: inherit;');
+                console.log(`    ${methods.join(', ')}`);
+              }
+            });
+            console.log('\n💡 Usage:');
+            console.log('  gApp.api.help.print("schema") - Get help for specific module');
+            console.log('  gApp.api.help.example() - Run a complete example');
+            console.log('\n📖 Quick start:');
+            console.log('  1. Upload a schema: gApp.api.schema.register(name, code)');
+            console.log('  2. Create nodes: gApp.api.node.create(type, x, y)');
+            console.log('  3. Connect nodes: gApp.api.link.create(source, 0, target, 0)');
+            console.log('  4. Export: gApp.api.config.download()');
+          }
+        },
+
+        /**
+         * Run a complete example demonstrating the API
+         * @returns {void}
+         */
+        example: () => {
+          console.log('%c🎯 Running API Example...', 'color: #46a2da; font-weight: bold; font-size: 14px;');
+          
+          try {
+            // Create some native nodes
+            console.log('\n1. Creating nodes...');
+            const str1 = this.api.node.create('Native.String', 100, 100);
+            const str2 = this.api.node.create('Native.String', 100, 200);
+            const int1 = this.api.node.create('Native.Integer', 400, 150);
+            console.log('  ✓ Created 3 nodes');
+            
+            // Set some values
+            console.log('\n2. Setting node values...');
+            this.api.node.setProperty(str1, 'value', 'Hello');
+            this.api.node.setProperty(str2, 'value', 'World');
+            this.api.node.setProperty(int1, 'value', 42);
+            console.log('  ✓ Values set');
+            
+            // Select nodes
+            console.log('\n3. Selecting nodes...');
+            this.api.node.select(str1);
+            this.api.node.select(str2, true);
+            console.log('  ✓ Selected 2 nodes');
+            
+            // Apply layout
+            console.log('\n4. Applying layout...');
+            this.api.layout.apply('grid');
+            console.log('  ✓ Grid layout applied');
+            
+            // Center view
+            console.log('\n5. Centering view...');
+            this.api.view.center();
+            console.log('  ✓ View centered');
+            
+            // Get metrics
+            console.log('\n6. Getting analytics...');
+            const metrics = this.api.analytics.getMetrics();
+            console.log('  ✓ Metrics:', metrics);
+            
+            console.log('\n%c✨ Example complete! Check the canvas.', 'color: #92d050; font-weight: bold;');
+            console.log('\n💡 Try: gApp.api.node.list() to see all nodes');
+          } catch (e) {
+            console.error('Example failed:', e);
+          }
+        },
+
+        /**
+         * List all available methods across all modules
+         * @returns {Object} Object with module names as keys and method arrays as values
+         */
+        list: () => {
+          const allMethods = {};
+          Object.keys(this.api).forEach(module => {
+            if (module !== 'help') {
+              allMethods[module] = Object.keys(this.api[module]);
+            }
+          });
+          return allMethods;
+        }
+      }
+    };
   }
 }
