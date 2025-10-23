@@ -350,7 +350,7 @@
 .sg-status {
   font-size: 11px;
   color: var(--sg-text-tertiary, #707070);
-  margin-bottom: 6px;
+  /* margin-bottom: 6px; */
 }
 
 .sg-status-value {

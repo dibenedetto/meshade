@@ -44,6 +44,10 @@ class NumelApp {
 		return NumelApp._post(url + "/ping");
 	}
 
+	static async _getSchema(url) {
+		return NumelApp._post(url + "/schema");
+	}
+
 	static async _getConfig(url) {
 		return NumelApp._post(url + "/export");
 	}
@@ -213,6 +217,10 @@ class NumelApp {
 
 	async getStatus() {
 		return NumelApp._getStatus(this.url);
+	}
+
+	async getSchema() {
+		return NumelApp._getSchema(this.url);
 	}
 
 	async getConfig() {

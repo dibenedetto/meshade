@@ -48,18 +48,6 @@
 				min-height: 0;
 			}
 
-			.canvas-container {
-				background: #262624;
-				border-radius: 6px;
-				padding: 20px;
-				box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-				flex: 1;
-				display: flex;
-				flex-direction: column;
-				min-height: 0;
-				overflow: hidden;
-			}
-
 			.chat-container {
 				flex: 1;
 				border: 1px solid #555;
@@ -119,22 +107,6 @@
 				border: 1px solid #555;
 				border-radius: 6px;
 				font-size: 16px;
-			}
-
-			/* Canvas wrapper to handle border separately */
-			.canvas-wrapper {
-				flex: 1;
-				border: 1px solid #555;
-				border-radius: 6px;
-				overflow: hidden;
-				position: relative;
-				display: flex;
-			}
-
-			#numelCanvas {
-				display: block;
-				width: 100%;
-				height: 100%;
 			}
 
 			button {
@@ -263,39 +235,68 @@
 			<div id="loading" class="loading">Loading AG-UI client...</div>
 		</div>
 
-		<div class="sg-canvas-container">
-			<canvas id="canvas"></canvas>
-			<div id="contextMenu" class="sg-context-menu"></div>
-			<input type="text" id="nodeInput" class="sg-node-input-overlay" />
-			<div class="sg-zoom-indicator">
-				<div class="sg-voice-controls">
-					<span style="font-size: 10px; color: var(--sg-text-tertiary); margin-right: 4px;">🎤 Voice:</span>
-					<button id="voiceStartBtn" class="sg-voice-btn">Start</button>
-					<button id="voiceStopBtn" class="sg-voice-btn" style="display: none;">Stop</button>
-					<span id="voiceStatus" class="sg-voice-status"></span>
+		<div>
+			<div style="display: none;">
+				<div class="sg-error-banner" id="sg-errorBanner"></div>
+				<div class="sg-node-types" id="sg-nodeTypes"><strong>Registered Node Types:</strong> <span id="sg-nodeTypesList">None</span></div>
+				<div class="sg-schema-manager" style="display: none;">
+					<div class="sg-schema-manager-title">📋 Registered Schemas:</div>
+					<div id="sg-schemaList"></div>
+					</div>
 				</div>
-				<button id="analyticsToggleBtn" class="sg-action-btn">📊 Analytics</button>
-				<button id="themeBtn" class="sg-theme-btn" title="Switch theme">🎨</button>
-				<select id="layoutSelect" class="sg-layout-select" title="Apply layout algorithm">
-					<option value="">🔧 Layout...</option>
-					<option value="hierarchical-vertical">Hierarchical (Vertical)</option>
-					<option value="hierarchical-horizontal">Hierarchical (Horizontal)</option>
-					<option value="force-directed">Force-Directed</option>
-					<option value="grid">Grid</option>
-					<option value="circular">Circular</option>
-				</select>
-				<select id="drawingStyleSelect" class="sg-drawing-style-select" title="Change drawing style">
-					<option value="default">🎨 Default</option>
-					<option value="minimal">✨ Minimal</option>
-					<option value="blueprint">📐 Blueprint</option>
-					<option value="neon">💫 Neon</option>
-					<option value="organic">🌿 Organic</option>
-					<option value="wireframe">📊 Wireframe</option>
-				</select>
-				<button id="centerViewBtn" class="sg-action-btn" title="Center view on graph">🎯 Center</button>
-				<div class="sg-divider"></div>
-				Zoom: <span class="sg-zoom-value" id="zoomLevel">100%</span>
-				<button id="resetZoomBtn" class="sg-zoom-reset-btn" title="Reset zoom to 100%">⟲</button>
+				<button style="display: none;" id="sg-uploadSchemaBtn" class="sg-action-btn sg-action-btn-primary" title="Upload Pydantic schema">📤 Upload Schema</button>
+				<button style="display: none;" id="sg-exportBtn" class="sg-action-btn" title="Export graph">Export Graph</button>
+				<button style="display: none;" id="sg-importBtn" class="sg-action-btn" title="Import graph">Import Graph</button>
+				<button style="display: none;" id="sg-exportConfigBtn" class="sg-action-btn" title="Export as config JSON">Export Config</button>
+				<button style="display: none;" id="sg-importConfigBtn" class="sg-action-btn" title="Import config JSON">Import Config</button>
+				<input type="file" id="sg-uploadSchemaFile" accept=".py" style="display: none;" />
+				<input type="file" id="sg-importFile" accept=".json" style="display: none;" />
+				<input type="file" id="sg-importConfigFile" accept=".json" style="display: none;" />
+				<button style="display: none;" id="sg-textScalingToggle" class="sg-text-scaling-toggle" title="Toggle text scaling with zoom">
+					<span class="sg-text-scaling-icon">🔤</span>
+					<span class="sg-text-scaling-label" id="sg-textScalingLabel">Fixed</span>
+				</button>
+			</div>
+
+			<div class="sg-canvas-container">
+				<canvas id="sg-main-canvas"></canvas>
+				<div id="sg-contextMenu" class="sg-context-menu"></div>
+				<input type="text" id="sg-nodeInput" class="sg-node-input-overlay" />
+				<div class="sg-zoom-indicator">
+					<div class="sg-status">Status: <span class="sg-status-value" id="sg-status">None</span></div>
+					<div class="sg-divider"></div>
+					<div class="sg-voice-controls">
+						<span style="font-size: 10px; color: var(--sg-text-tertiary); margin-right: 4px;">🎤 Voice:</span>
+						<button id="sg-voiceStartBtn" class="sg-voice-btn">Start</button>
+						<button id="sg-voiceStopBtn" class="sg-voice-btn" style="display: none;">Stop</button>
+						<span id="sg-voiceStatus" class="sg-voice-status"></span>
+					</div>
+					<div class="sg-divider"></div>
+					<button id="sg-analyticsToggleBtn" class="sg-action-btn">📊 Analytics</button>
+					<div class="sg-divider"></div>
+					<button id="sg-themeBtn" class="sg-theme-btn" title="Switch theme">🎨</button>
+					<select id="sg-drawingStyleSelect" class="sg-drawing-style-select" title="Change drawing style">
+						<option value="default">🎨 Default</option>
+						<option value="minimal">✨ Minimal</option>
+						<option value="blueprint">📐 Blueprint</option>
+						<option value="neon">💫 Neon</option>
+						<option value="organic">🌿 Organic</option>
+						<option value="wireframe">📊 Wireframe</option>
+					</select>
+					<div class="sg-divider"></div>
+					<select id="sg-layoutSelect" class="sg-layout-select" title="Apply layout algorithm">
+						<option value="">🔧 Layout...</option>
+						<option value="hierarchical-vertical">Hierarchical (Vertical)</option>
+						<option value="hierarchical-horizontal">Hierarchical (Horizontal)</option>
+						<option value="force-directed">Force-Directed</option>
+						<option value="grid">Grid</option>
+						<option value="circular">Circular</option>
+					</select>
+					<button id="sg-centerViewBtn" class="sg-action-btn" title="Center view on graph">🎯 Center</button>
+					<div class="sg-divider"></div>
+					Zoom: <span class="sg-zoom-value" id="sg-zoomLevel">100%</span>
+					<button id="sg-resetZoomBtn" class="sg-zoom-reset-btn" title="Reset zoom to 100%">⟲</button>
+				</div>
 			</div>
 		</div>
 
@@ -307,147 +308,11 @@
 		<script type="text/javascript" src="numel.js"></script>
 
 		<script>
-			const baseConfig = {
-				"info" : {
-					"version"      : "1.0.0",
-					"name"         : "Numel Playground",
-					"author"       : "marco@numel.app",
-					"description"  : "Numel AI Playground"
-				},
-
-				"options" : {
-					"seed"   : 7,
-					"port"   : 8000,
-					"reload" : true
-				},
-
-				"backends" : [
-					{
-						"type"    : "agno",
-						"version" : ""
-					}
-				],
-
-				"models" : [
-					{
-						"type" : "openai",
-						"id"   : "gpt-4"
-					}
-				],
-
-				"embeddings" : [
-					{
-						"type" : "openai",
-						"id"   : ""
-					}
-				],
-
-				"prompts" : [
-					{
-						"model"        : 0,
-						"embedding"    : 0,
-						"description"  : "Numel AI Assistant",
-						"instructions" : [
-							"Be helpful and informative",
-							"Provide accurate and relevant information",
-							"Use markdown formatting when appropriate"
-						]
-					}
-				],
-
-				"content_dbs" : [
-					{
-						"engine" : "sqlite",
-						"url"    : "storage/content_db_sqlite_1.db"
-					}
-				],
-
-				"index_dbs" : [
-					{
-						"engine"      : "lancedb",
-						"embedding"   : 0,
-						"url"         : "storage/knowledge/index_db_lancedb_1",
-						"search_type" : "hybrid"
-					}
-				],
-
-				"memory_mgrs" : [
-					{
-						"query"   : false,
-						"update"  : false,
-						"managed" : false,
-						"prompt"  : null
-					}
-				],
-
-				"session_mgrs" : [
-					{
-						"query"        : false,
-						"update"       : false,
-						"summarize"    : false,
-						"history_size" : 10,
-						"prompt"       : null
-					}
-				],
-
-				"knowledge_mgrs" : [
-					{
-						"query"        : false,
-						"description"  : null,
-						"content_db"   : 0,
-						"index_db"     : 0,
-						"max_results"  : 10,
-						"urls"         : []
-					}
-				],
-
-				"tools" : [
-					{
-						"type" : "reasoning",
-						"args" : null,
-						"ref"  : null
-					},
-					{
-						"type" : "web_search",
-						"args" : {
-							"max_results" : 5
-						},
-						"ref"  : null
-					}
-				],
-
-				"agent_options" : [
-					{
-						"markdown" : true
-					}
-				],
-
-				"agents" : [
-					{
-						"info" : {
-							"version" : "1.0.0",
-							"name"    : "Numel Agent",
-							"author"  : "marco@numel.app"
-						},
-
-						"options"       : 0,
-						"backend"       : 0,
-						"prompt"        : 0,
-						"content_db"    : 0,
-						"memory_mgr"    : 0,
-						"session_mgr"   : 0,
-						"knowledge_mgr" : 0,
-						"tools"         : [0, 1]
-					}
-				]
-			};
-
 			const startMessage = "🤖 Hi, I am Numel, an AI playground. Ask me anything you want 🙂";
 			const endMessage   = "🤖 See you soon 👋";
 
 			let aguiApp            = null;
 			let graph              = null;
-			let canvas             = null;
 			let isConnected        = false;
 			let agentPrevIndex     = -1;
 			let agentCurrIndex     = -1;
@@ -531,7 +396,8 @@
 
 					isConnected = true;
 
-					setAppStatus();
+					await setAppSchema();
+					await setAppStatus();
 					clearChat();
 					updateStatus("connected", "AG-UI client ready");
 					enableInput(true);
@@ -682,6 +548,13 @@
 				}
 			}
 
+			async function setAppSchema() {
+				const schema_dict = await aguiApp.getSchema();
+				const schema_code = schema_dict["schema"];
+				graph.importSchemaFromCode(schema_code);
+				return schema_dict;
+			}
+
 			async function setAppStatus() {
 				const status  = await aguiApp.getStatus();
 				const agents  = status["config"]["agents"];
@@ -702,125 +575,35 @@
 				return status;
 			}
 
-			// serverUrlInput.addEventListener("change", (e) => {
-			// 	appAgentSelect.disabled  = true;
-			// 	appAgentSelect.innerHTML = "<option value='-1'> - None - </option>";
-			// });
-
-			// appAgentSelect.addEventListener("change", (e) => {
-			// 	agentCurrIndex = parseInt(e.target.value);
-			// });
-
-			// systemMsgButton.addEventListener("change", changeSystemVisibility);
-
-			// messageInput.addEventListener("keypress", (e) => {
-			// 	if (e.key === "Enter" && !e.shiftKey) {
-			// 		e.preventDefault();
-			// 		sendMessage();
-			// 	}
-			// });
-
-			// window.onload = () => {
-			// 	changeSystemVisibility.call(systemMsgButton);
-
-			// 	// Initialize graph
-			// 	graph = new NumelGraph("numelCanvas");
-				
-			// 	// Override LiteGraph's mouse coordinate calculation
-			// 	if (graph && graph.canvas) {
-			// 		const originalProcessMouseDown = graph.canvas.processMouseDown;
-			// 		const originalProcessMouseMove = graph.canvas.processMouseMove;
-			// 		const originalProcessMouseUp = graph.canvas.processMouseUp;
-					
-			// 		// Helper function to adjust mouse coordinates
-			// 		function adjustMouseEvent(e) {
-			// 			const canvasEl = document.getElementById('numelCanvas');
-			// 			const rect = canvasEl.getBoundingClientRect();
-			// 			const dpr = window.devicePixelRatio || 1;
-						
-			// 			// Calculate the actual mouse position relative to the canvas
-			// 			e.canvasX = (e.clientX - rect.left) * dpr;
-			// 			e.canvasY = (e.clientY - rect.top) * dpr;
-			// 			e.localX = e.canvasX;
-			// 			e.localY = e.canvasY;
-						
-			// 			// Update the offset values that LiteGraph uses
-			// 			e.offsetX = e.canvasX / dpr;
-			// 			e.offsetY = e.canvasY / dpr;
-						
-			// 			return e;
-			// 		}
-					
-			// 		// Override mouse event handlers
-			// 		graph.canvas.processMouseDown = function(e) {
-			// 			e = adjustMouseEvent(e);
-			// 			return originalProcessMouseDown.call(this, e);
-			// 		};
-					
-			// 		graph.canvas.processMouseMove = function(e) {
-			// 			e = adjustMouseEvent(e);
-			// 			return originalProcessMouseMove.call(this, e);
-			// 		};
-					
-			// 		graph.canvas.processMouseUp = function(e) {
-			// 			e = adjustMouseEvent(e);
-			// 			return originalProcessMouseUp.call(this, e);
-			// 		};
-			// 	}
-				
-			// 	const nodeMap = graph.buildFromConfig(baseConfig);
-
-			// 	// Initial resize
-			// 	resizeCanvas();
-
-			// 	graph.layoutGraph("hierarchical");
-			// 	graph.centerGraph();
-			// };
-
-			// window.addEventListener('resize', resizeCanvas);
-
-			document.addEventListener("DOMContentLoaded", () => {
-				checkAGUILoaded();
+			serverUrlInput.addEventListener("change", (e) => {
+				appAgentSelect.disabled  = true;
+				appAgentSelect.innerHTML = "<option value='-1'> - None - </option>";
 			});
 
-			// let currentLayout = 0;
+			appAgentSelect.addEventListener("change", (e) => {
+				agentCurrIndex = parseInt(e.target.value);
+			});
 
-			// // Add keyboard shortcuts for layout
-			// document.addEventListener("keydown", (e) => {
-			// 	if (e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
-			// 		const layouts = ['hierarchical', 'force', 'circular', 'grid'];
-			// 		switch(e.key) {
-			// 			case "z":
-			// 				currentLayout = (currentLayout + 1) % layouts.length;
-			// 				graph.layoutGraph(layouts[currentLayout]);
-			// 				break;
-			// 			case "a":  // Spacebar - center view
-			// 				e.preventDefault();
-			// 				graph.centerGraph();
-			// 				break;
-			// 		}
+			systemMsgButton.addEventListener("change", changeSystemVisibility);
 
-			// 		// // examples:
-			// 		// // Apply hierarchical layout (best for config dependencies)
-			// 		// graph.layoutGraph('hierarchical', {
-			// 		// 	direction: 'LR',        // Left-to-right
-			// 		// 	layerSpacing: 450,      // Distance between layers
-			// 		// 	nodeSpacing: 200,       // Distance between nodes in same layer
-			// 		// 	alignLayers: true       // Center each layer
-			// 		// });
+			messageInput.addEventListener("keypress", (e) => {
+				if (e.key === "Enter" && !e.shiftKey) {
+					e.preventDefault();
+					sendMessage();
+				}
+			});
 
-			// 		// // Apply force-directed layout
-			// 		// graph.layoutGraph('force', {
-			// 		// 	iterations: 100,        // Simulation steps
-			// 		// 	nodeRepulsion: 1000,    // Repulsion strength
-			// 		// 	linkDistance: 200,      // Ideal link length
-			// 		// 	damping: 0.9           // Velocity damping
-			// 		// });
+			const onLoaded = () => {
+				checkAGUILoaded();
+				graph = new SchemaGraphApp("sg-main-canvas");
+			}
 
-			// 		// // Center view on all nodes
-			// 		// graph.centerGraph();
-			// 	}
-			// });
+			if (document.readyState === 'loading') {
+				document.addEventListener('DOMContentLoaded', onLoaded);
+			}
+			else {
+				onLoaded();
+			}
 		</script>
 	</body>
 </html>

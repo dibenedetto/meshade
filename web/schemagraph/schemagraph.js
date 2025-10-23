@@ -1342,11 +1342,11 @@ class DrawingStyleManager {
 // ========================================================================
 
 class SchemaGraphApp {
-  constructor() {
+  constructor(canvasId) {
     this.eventBus = new EventBus();
     this.analytics = new AnalyticsService(this.eventBus);
     
-    this.canvas = document.getElementById('canvas');
+    this.canvas = document.getElementById(canvasId);
     this.ctx = this.canvas.getContext('2d');
     
     this.mouseController = new MouseTouchController(this.canvas, this.eventBus);
@@ -1406,43 +1406,43 @@ class SchemaGraphApp {
     const ui = this.uiController;
     
     // Register all UI elements
-    ui.register('status', document.getElementById('status'));
-    ui.register('errorBanner', document.getElementById('errorBanner'));
-    ui.register('nodeTypesList', document.getElementById('nodeTypesList'));
-    ui.register('zoomLevel', document.getElementById('zoomLevel'));
-    ui.register('contextMenu', document.getElementById('contextMenu'));
-    ui.register('nodeInput', document.getElementById('nodeInput'));
-    ui.register('schemaList', document.getElementById('schemaList'));
-    ui.register('schemaDialog', document.getElementById('schemaDialog'));
-    ui.register('schemaRemovalDialog', document.getElementById('schemaRemovalDialog'));
+    ui.register('status', document.getElementById('sg-status'));
+    ui.register('errorBanner', document.getElementById('sg-errorBanner'));
+    ui.register('nodeTypesList', document.getElementById('sg-nodeTypesList'));
+    ui.register('zoomLevel', document.getElementById('sg-zoomLevel'));
+    ui.register('contextMenu', document.getElementById('sg-contextMenu'));
+    ui.register('nodeInput', document.getElementById('sg-nodeInput'));
+    ui.register('schemaList', document.getElementById('sg-schemaList'));
+    ui.register('schemaDialog', document.getElementById('sg-schemaDialog'));
+    ui.register('schemaRemovalDialog', document.getElementById('sg-schemaRemovalDialog'));
     
     // Setup buttons
-    ui.register('uploadSchemaBtn', document.getElementById('uploadSchemaBtn'));
-    ui.register('exportBtn', document.getElementById('exportBtn'));
-    ui.register('importBtn', document.getElementById('importBtn'));
-    ui.register('exportConfigBtn', document.getElementById('exportConfigBtn'));
-    ui.register('importConfigBtn', document.getElementById('importConfigBtn'));
-    ui.register('centerViewBtn', document.getElementById('centerViewBtn'));
-    ui.register('resetZoomBtn', document.getElementById('resetZoomBtn'));
-    ui.register('themeBtn', document.getElementById('themeBtn'));
+    ui.register('uploadSchemaBtn', document.getElementById('sg-uploadSchemaBtn'));
+    ui.register('exportBtn', document.getElementById('sg-exportBtn'));
+    ui.register('importBtn', document.getElementById('sg-importBtn'));
+    ui.register('exportConfigBtn', document.getElementById('sg-exportConfigBtn'));
+    ui.register('importConfigBtn', document.getElementById('sg-importConfigBtn'));
+    ui.register('centerViewBtn', document.getElementById('sg-centerViewBtn'));
+    ui.register('resetZoomBtn', document.getElementById('sg-resetZoomBtn'));
+    ui.register('themeBtn', document.getElementById('sg-themeBtn'));
     
     // Setup file inputs
-    ui.register('uploadSchemaFile', document.getElementById('uploadSchemaFile'));
-    ui.register('importFile', document.getElementById('importFile'));
-    ui.register('importConfigFile', document.getElementById('importConfigFile'));
+    ui.register('uploadSchemaFile', document.getElementById('sg-uploadSchemaFile'));
+    ui.register('importFile', document.getElementById('sg-importFile'));
+    ui.register('importConfigFile', document.getElementById('sg-importConfigFile'));
     
     // Setup selects
-    ui.register('layoutSelect', document.getElementById('layoutSelect'));
+    ui.register('layoutSelect', document.getElementById('sg-layoutSelect'));
     
     // Setup dialog elements
-    ui.register('schemaNameInput', document.getElementById('schemaNameInput'));
-    ui.register('schemaIndexTypeInput', document.getElementById('schemaIndexTypeInput'));
-    ui.register('schemaRootTypeInput', document.getElementById('schemaRootTypeInput'));
-    ui.register('schemaDialogConfirm', document.getElementById('schemaDialogConfirm'));
-    ui.register('schemaDialogCancel', document.getElementById('schemaDialogCancel'));
-    ui.register('schemaRemovalNameInput', document.getElementById('schemaRemovalNameInput'));
-    ui.register('schemaRemovalConfirm', document.getElementById('schemaRemovalConfirm'));
-    ui.register('schemaRemovalCancel', document.getElementById('schemaRemovalCancel'));
+    ui.register('schemaNameInput', document.getElementById('sg-schemaNameInput'));
+    ui.register('schemaIndexTypeInput', document.getElementById('sg-schemaIndexTypeInput'));
+    ui.register('schemaRootTypeInput', document.getElementById('sg-schemaRootTypeInput'));
+    ui.register('schemaDialogConfirm', document.getElementById('sg-schemaDialogConfirm'));
+    ui.register('schemaDialogCancel', document.getElementById('sg-schemaDialogCancel'));
+    ui.register('schemaRemovalNameInput', document.getElementById('sg-schemaRemovalNameInput'));
+    ui.register('schemaRemovalConfirm', document.getElementById('sg-schemaRemovalConfirm'));
+    ui.register('schemaRemovalCancel', document.getElementById('sg-schemaRemovalCancel'));
   }
 
   setupEventListeners() {
@@ -1572,15 +1572,15 @@ class SchemaGraphApp {
   }
 
   setupVoiceAndAnalyticsUI() {
-    const voiceStartBtn = document.getElementById('voiceStartBtn');
-    const voiceStopBtn = document.getElementById('voiceStopBtn');
-    const voiceStatus = document.getElementById('voiceStatus');
-    const analyticsToggleBtn = document.getElementById('analyticsToggleBtn');
-    const analyticsPanel = document.getElementById('analyticsPanel');
-    const analyticsCloseBtn = document.getElementById('analyticsCloseBtn');
-    const refreshAnalyticsBtn = document.getElementById('refreshAnalyticsBtn');
-    const exportAnalyticsBtn = document.getElementById('exportAnalyticsBtn');
-    const resetAnalyticsBtn = document.getElementById('resetAnalyticsBtn');
+    const voiceStartBtn = document.getElementById('sg-voiceStartBtn');
+    const voiceStopBtn = document.getElementById('sg-voiceStopBtn');
+    const voiceStatus = document.getElementById('sg-voiceStatus');
+    const analyticsToggleBtn = document.getElementById('sg-analyticsToggleBtn');
+    const analyticsPanel = document.getElementById('sg-analyticsPanel');
+    const analyticsCloseBtn = document.getElementById('sg-analyticsCloseBtn');
+    const refreshAnalyticsBtn = document.getElementById('sg-refreshAnalyticsBtn');
+    const exportAnalyticsBtn = document.getElementById('sg-exportAnalyticsBtn');
+    const resetAnalyticsBtn = document.getElementById('sg-resetAnalyticsBtn');
     
     // Voice control handlers
     voiceStartBtn?.addEventListener('click', () => {
@@ -1675,7 +1675,7 @@ class SchemaGraphApp {
   }
 
   setupDrawingStyleSelector() {
-    const drawingStyleSelect = document.getElementById('drawingStyleSelect');
+    const drawingStyleSelect = document.getElementById('sg-drawingStyleSelect');
     
     if (!drawingStyleSelect) return;
     
@@ -1699,8 +1699,8 @@ class SchemaGraphApp {
   }
 
   setupTextScalingToggle() {
-    const toggleBtn = document.getElementById('textScalingToggle');
-    const label = document.getElementById('textScalingLabel');
+    const toggleBtn = document.getElementById('sg-textScalingToggle');
+    const label = document.getElementById('sg-textScalingLabel');
     
     if (!toggleBtn || !label) return;
     
@@ -1726,8 +1726,8 @@ class SchemaGraphApp {
   }
 
   updateTextScalingUI() {
-    const toggleBtn = document.getElementById('textScalingToggle');
-    const label = document.getElementById('textScalingLabel');
+    const toggleBtn = document.getElementById('sg-textScalingToggle');
+    const label = document.getElementById('sg-textScalingLabel');
     
     if (!toggleBtn || !label) return;
     
@@ -1766,26 +1766,26 @@ class SchemaGraphApp {
     const metrics = this.analytics.getMetrics();
     const sessionMetrics = this.analytics.getSessionMetrics();
     
-    document.getElementById('sessionId').textContent = sessionMetrics.sessionId.substring(0, 8);
-    document.getElementById('sessionDuration').textContent = this.formatDuration(sessionMetrics.duration);
-    document.getElementById('totalEvents').textContent = sessionMetrics.events;
+    document.getElementById('sg-sessionId').textContent = sessionMetrics.sessionId.substring(0, 8);
+    document.getElementById('sg-sessionDuration').textContent = this.formatDuration(sessionMetrics.duration);
+    document.getElementById('sg-totalEvents').textContent = sessionMetrics.events;
     
-    document.getElementById('nodesCreated').textContent = metrics.nodeCreated;
-    document.getElementById('nodesDeleted').textContent = metrics.nodeDeleted;
-    document.getElementById('linksCreated').textContent = metrics.linkCreated;
-    document.getElementById('linksDeleted').textContent = metrics.linkDeleted;
+    document.getElementById('sg-nodesCreated').textContent = metrics.nodeCreated;
+    document.getElementById('sg-nodesDeleted').textContent = metrics.nodeDeleted;
+    document.getElementById('sg-linksCreated').textContent = metrics.linkCreated;
+    document.getElementById('sg-linksDeleted').textContent = metrics.linkDeleted;
     
-    document.getElementById('schemasRegistered').textContent = metrics.schemaRegistered;
-    document.getElementById('schemasRemoved').textContent = metrics.schemaRemoved;
+    document.getElementById('sg-schemasRegistered').textContent = metrics.schemaRegistered;
+    document.getElementById('sg-schemasRemoved').textContent = metrics.schemaRemoved;
     
-    document.getElementById('graphsExported').textContent = metrics.graphExported;
-    document.getElementById('graphsImported').textContent = metrics.graphImported;
-    document.getElementById('configsExported').textContent = metrics.configExported;
-    document.getElementById('configsImported').textContent = metrics.configImported;
+    document.getElementById('sg-graphsExported').textContent = metrics.graphExported;
+    document.getElementById('sg-graphsImported').textContent = metrics.graphImported;
+    document.getElementById('sg-configsExported').textContent = metrics.configExported;
+    document.getElementById('sg-configsImported').textContent = metrics.configImported;
     
-    document.getElementById('totalInteractions').textContent = metrics.interactions;
-    document.getElementById('layoutsApplied').textContent = metrics.layoutApplied;
-    document.getElementById('errorCount').textContent = metrics.errors;
+    document.getElementById('sg-totalInteractions').textContent = metrics.interactions;
+    document.getElementById('sg-layoutsApplied').textContent = metrics.layoutApplied;
+    document.getElementById('sg-errorCount').textContent = metrics.errors;
   }
 
   formatDuration(ms) {
@@ -4998,53 +4998,4 @@ class SchemaGraphApp {
     const b = Math.max(0, Math.min(255, (num & 0x0000FF) + amount));
     return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
   }
-}
-
-// ========================================================================
-// INITIALIZATION
-// ========================================================================
-
-let gApp = null;
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    gApp = new SchemaGraphApp();
-    window.graph = gApp.graph;
-    window.app = gApp;
-    window.eventBus = gApp.eventBus;
-    window.analytics = gApp.analytics;
-    
-    // Export utility methods for console debugging
-    window.disconnectLink = (linkId) => {
-      const result = gApp.disconnectLink(linkId);
-      gApp.draw();
-      return result;
-    };
-    window.clearMultiInputLinks = (node, slotIdx) => gApp.clearMultiInputLinks(node, slotIdx);
-    window.clearAllMultiInputLinks = (node) => gApp.clearAllMultiInputLinks(node);
-    
-    console.log('💡 Debugging utilities available:');
-    console.log('   - disconnectLink(linkId)');
-    console.log('   - clearMultiInputLinks(node, slotIdx)');
-    console.log('   - clearAllMultiInputLinks(node)');
-  });
-} else {
-  gApp = new SchemaGraphApp();
-  window.graph = gApp.graph;
-  window.app = gApp;
-  window.eventBus = gApp.eventBus;
-  window.analytics = gApp.analytics;
-  
-  // Export utility methods for console debugging
-  window.disconnectLink = (linkId) => {
-    const result = gApp.disconnectLink(linkId);
-    gApp.draw();
-    return result;
-  };
-  window.clearMultiInputLinks = (node, slotIdx) => gApp.clearMultiInputLinks(node, slotIdx);
-  window.clearAllMultiInputLinks = (node) => gApp.clearAllMultiInputLinks(node);
-  
-  console.log('💡 Debugging utilities available:');
-  console.log('   - disconnectLink(linkId)');
-  console.log('   - clearMultiInputLinks(node, slotIdx)');
-  console.log('   - clearAllMultiInputLinks(node)');
 }

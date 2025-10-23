@@ -26,6 +26,8 @@ from   numel                   import (
 
 load_dotenv()
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
 
 def add_middleware(app: FastAPI) -> None:
 	app.add_middleware(
@@ -45,6 +47,20 @@ if True:
 
 
 if True:
+	schema = None
+	try:
+		schema_path = os.path.join(current_dir, "schema.py")
+		with open(schema_path, "r", encoding="utf-8") as f:
+			schema_text = f.read()
+		schema = {
+			"schema" : schema_text,
+		}
+	except Exception as e:
+		log_print(f"Error reading schema definition: {e}")
+		raise e
+
+
+if True:
 	config = load_config(args.config_path) or AppConfig()
 	config.port = args.port
 	if config.options.seed is not None:
@@ -52,8 +68,7 @@ if True:
 
 
 if True:
-	curr_dir     = os.path.dirname(os.path.abspath(__file__))
-	impl_modules = [os.path.splitext(f)[0] for f in os.listdir(curr_dir) if f.endswith("_impl.py")]
+	impl_modules = [os.path.splitext(f)[0] for f in os.listdir(current_dir) if f.endswith("_impl.py")]
 	for module_name in impl_modules:
 		try:
 			impl_module = __import__(module_name)
@@ -84,6 +99,12 @@ async def ping():
 		"timestamp" : timestamp,
 	}
 	return result
+
+
+@ctrl_app.post("/schema")
+async def export_schema():
+	global schema_text
+	return schema_text
 
 
 @ctrl_app.post("/import")
