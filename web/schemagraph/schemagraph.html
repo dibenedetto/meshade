@@ -230,7 +230,7 @@
 
 		<!-- Main Canvas Container -->
 		<div class="sg-canvas-container">
-			<canvas id="sg-canvas"></canvas>
+			<canvas id="my-sg-canvas"></canvas>
 			<div id="sg-contextMenu" class="sg-context-menu"></div>
 			<input type="text" id="sg-nodeInput" class="sg-node-input-overlay" />
 			<div class="sg-zoom-indicator">
@@ -261,16 +261,20 @@
 
 		<!-- JavaScript -->
 		<script src="schemagraph.js"></script>
+
 		<script>
 			let   gApp = null;
-			const canvasId = 'sg-canvas';
+			const canvasId = 'my-sg-canvas';
+
+			const onLoaded = () => {
+				gApp = new SchemaGraphApp(canvasId);
+			}
+
 			if (document.readyState === 'loading') {
-				document.addEventListener('DOMContentLoaded', () => {
-					gApp = new SchemaGraphApp(canvasId);
-				});
+				document.addEventListener('DOMContentLoaded', onLoaded);
 			}
 			else {
-				gApp = new SchemaGraphApp(canvasId);
+				onLoaded();
 			}
 		</script>
 	</body>
