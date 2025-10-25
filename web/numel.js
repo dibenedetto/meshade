@@ -97,8 +97,7 @@ class NumelApp {
 				return null;
 			}
 
-			const cfg = await NumelApp._getConfig();
-			const schemaDict = await NumelApp._getSchema();
+			const schemaDict = await NumelApp._getSchema(url);
 			const schemaCode = schemaDict["schema"];
 
 			const app = new NumelApp(url, schemaCode, userId, sessionId, subscriber);

@@ -390,9 +390,10 @@
 						throw new Error("NumelApp initialization failed");
 					}
 
-					const schemaDict = await aguiApp.getSchema();
-					const schemaCode = schemaDict["schema"];
-					graph.api.schema.register("numel", schemaCode, "Index", "AppConfig");
+					const schemaName = "numel";
+					const config     = await aguiApp.getConfig();
+					graph.api.schema.register(schemaName, aguiApp.schema, "Index", "AppConfig");
+					graph.api.config.import(config, schemaName);
 
 					agentPrevIndex = -1;
 					agentCurrIndex = 0;

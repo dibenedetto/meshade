@@ -57,7 +57,7 @@ def try_apply_seed(config: AppConfig) -> None:
 if True:
 	parser = argparse.ArgumentParser(description="App configuration")
 	parser .add_argument("--port", type=int, default=DEFAULT_APP_PORT, help="Listening port for control server")
-	parser .add_argument("--config_path", type=str, default="config.json", help="Path to configuration file")
+	parser .add_argument("--config-path", type=str, default="config.json", help="Path to configuration file")
 	args   = parser.parse_args()
 
 
@@ -104,7 +104,7 @@ if True:
 	apps = None
 	running_servers = []
 
-	ctrl_app = FastAPI(title="Status")
+	ctrl_app = FastAPI(title="Control")
 	add_middleware(ctrl_app)
 
 
