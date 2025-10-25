@@ -97,7 +97,8 @@ class NumelApp {
 				return null;
 			}
 
-			const schemaDict = await aguiApp.getSchema();
+			const cfg = await NumelApp._getConfig();
+			const schemaDict = await NumelApp._getSchema();
 			const schemaCode = schemaDict["schema"];
 
 			const app = new NumelApp(url, schemaCode, userId, sessionId, subscriber);

@@ -47,6 +47,13 @@ def adjust_config(config: AppConfig) -> AppConfig:
 	return config
 
 
+def try_apply_seed(config: AppConfig) -> None:
+	if config.options is not None:
+		seed = config.app_options[config.options].seed
+		if seed is not None:
+			seed_everything(seed)
+
+
 if True:
 	parser = argparse.ArgumentParser(description="App configuration")
 	parser .add_argument("--port", type=int, default=DEFAULT_APP_PORT, help="Listening port for control server")
@@ -74,8 +81,7 @@ if True:
 	config = adjust_config(config)
 	if config is None:
 		raise ValueError("Invalid app configuration")
-	if config.options.seed is not None:
-		seed_everything(config.options.seed)
+	try_apply_seed(config)
 
 
 if True:
@@ -146,8 +152,7 @@ async def start_app():
 		host       = "0.0.0.0"
 		agent_port = config.port + 1
 
-		if config.options.seed is not None:
-			seed_everything(config.options.seed)
+		try_apply_seed(config)
 
 		active_agents = [True] * len(config.agents)
 		backends      = get_backends()

@@ -187,11 +187,12 @@ class _AgnoAgentApp(AgentApp):
 				name         = f"Numel Agno Agent {index}"
 				description  = None
 				instructions = None
-				if item_config.info:
-					if item_config.info.name:
-						name = item_config.info.name
-					description  = item_config.info.description
-					instructions = item_config.info.instructions
+				if item_config.info is not None:
+					info = config.infos[item_config.info]
+					if info.name:
+						name = info.name
+					description  = info.description
+					instructions = info.instructions
 
 			if True:
 				prompt = config.prompts[item_config.prompt]
