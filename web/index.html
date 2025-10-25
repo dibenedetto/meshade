@@ -308,6 +308,7 @@
 		<script type="text/javascript" src="numel.js"></script>
 
 		<script>
+			const schemaName   = "numel";
 			const startMessage = "🤖 Hi, I am Numel, an AI playground. Ask me anything you want 🙂";
 			const endMessage   = "🤖 See you soon 👋";
 
@@ -390,10 +391,11 @@
 						throw new Error("NumelApp initialization failed");
 					}
 
-					const schemaName = "numel";
-					const config     = await aguiApp.getConfig();
-					graph.api.schema.register(schemaName, aguiApp.schema, "Index", "AppConfig");
-					graph.api.config.import(config, schemaName);
+					const config = await aguiApp.getConfig();
+					graph.api.schema .register(schemaName, aguiApp.schema, "Index", "AppConfig");
+					graph.api.config .import(config, schemaName);
+					graph.api.layout .apply("circular");
+					graph.api.view   .center();
 
 					agentPrevIndex = -1;
 					agentCurrIndex = 0;
@@ -417,6 +419,8 @@
 			}
 
 			function disconnect() {
+				graph.api.schema.remove(schemaName);
+
 				if (aguiApp) {
 					addMessage("system", "⌛ Disconnecting...");
 					aguiApp.disconnect();

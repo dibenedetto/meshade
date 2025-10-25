@@ -5024,6 +5024,7 @@ class SchemaGraphApp {
          * @returns {boolean} Success status
          */
         register: (name, code, indexType = 'int', rootType = null) => {
+          this.api.schema.remove(name);
           const success = this.graph.registerSchema(name, code, indexType, rootType);
           if (success) {
             this.updateSchemaList();
