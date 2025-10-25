@@ -496,12 +496,13 @@
 
 				if (agentPrevIndex != agentCurrIndex) {
 					agentPrevIndex = agentCurrIndex;
-					agentName      = aguiApp.status["config"]["agents"][agentPrevIndex]["info"]["name"];
+					const agent     = aguiApp.status["config"]["agents"][agentPrevIndex];
+					const agentName = aguiApp.status["config"]["infos" ][agent["info"] ]["name"];
 					addMessage("ui", `🤖 Talking to Agent "${agentName}"`);
 				}
 
 				messageInput    .value       = "";
-				sendButton      .textContent = "Sending...";
+				sendButton      .textContent = "Messaging...";
 				sendButton      .disabled    = true;
 				connectButton   .disabled    = true;
 				clearChatButton .disabled    = true;
@@ -558,7 +559,8 @@
 
 			async function setAppStatus() {
 				const status  = await aguiApp.getStatus();
-				const agents  = status["config"]["agents"];
+				const config  = status["config"];
+				const agents  = config["agents"];
 				let   content = "";
 				if (agents.length == 0) {
 					agentCurrIndex = -1;
@@ -568,7 +570,8 @@
 					agentCurrIndex = 0;
 					for (let i=0; i<agents.length; ++i) {
 						const selected = (i == agentCurrIndex) ? " selected" : "";
-						content += `<option value="${i}"${selected}>${agents[i]["info"]["name"]}</option>`;
+						const info     = config["infos"][agents[i]["info"]];
+						content += `<option value="${i}"${selected}>${info["name"]}</option>`;
 					}
 				}
 				appAgentSelect.innerHTML = content;

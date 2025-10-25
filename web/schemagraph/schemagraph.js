@@ -2965,6 +2965,90 @@ class SchemaGraphApp {
     return config;
   }
 
+  processValueForConfig(value, nodeToIndex) {
+    // Process a value that might contain nested objects or arrays
+    if (value === null || value === undefined) return value;
+    if (typeof value !== 'object') return value;
+    
+    // Handle arrays
+    if (Array.isArray(value)) {
+      return value.map(v => this.processValueForConfig(v, nodeToIndex));
+    }
+    
+    // Check if this object corresponds to a known node
+    for (const [node, info] of nodeToIndex.entries()) {
+      if (node.outputs && node.outputs[0] && node.outputs[0].value === value) {
+        return info.index;
+      }
+    }
+    
+    // Process object properties recursively
+    const processed = {};
+    for (const key in value) {
+      if (value.hasOwnProperty(key)) {
+        processed[key] = this.processValueForConfig(value[key], nodeToIndex);
+      }
+    }
+    
+    return processed;
+  }
+
+  _extractModelTypeFromUnionField(fieldType) {
+    if (!fieldType) return null;
+    
+    let workingType = fieldType;
+    console.log('          Extracting model type from:', workingType);
+    
+    // Strip Optional wrapper
+    if (workingType.kind === 'optional') {
+      workingType = workingType.inner;
+      console.log('          After stripping Optional:', workingType);
+    }
+    
+    // Direct model reference (not a union, not a list)
+    if (workingType.kind === 'basic' && workingType.name) {
+      const primitives = ['str', 'int', 'bool', 'float', 'Any', 'Index', 'string', 'integer'];
+      if (primitives.indexOf(workingType.name) === -1) {
+        console.log('          Direct model reference:', workingType.name);
+        return workingType.name;
+      }
+    }
+    
+    // Strip List/Set/Dict/Tuple wrapper to get the inner type
+    if (workingType.kind === 'list' || workingType.kind === 'set' || workingType.kind === 'tuple') {
+      workingType = workingType.inner;
+      console.log('          After stripping collection:', workingType);
+    }
+    
+    const dictMatch = workingType.kind === 'dict';
+    if (dictMatch) {
+      // For Dict, we don't expect model references in the key-value structure
+      return null;
+    }
+    
+    // Now extract from Union if present
+    if (workingType.kind === 'union') {
+      const types = workingType.types;
+      console.log('          Union contains types:', types.map(t => t.name || t.kind));
+      
+      // Find the non-Index type (the actual model type)
+      for (const t of types) {
+        if (t.kind === 'basic' && t.name) {
+          const trimmed = t.name.trim();
+          if (trimmed !== 'Index' && trimmed !== 'int' && !trimmed.startsWith('int ')) {
+            console.log('           Selected model type from union:', trimmed);
+            return trimmed;
+          }
+        }
+      }
+      console.warn('           No model type found in union, only Index/int');
+      return null;
+    }
+    
+    console.log('           Type is primitive or unsupported:', workingType);
+    return null;
+  }
+
   processNodeDataWithIndices(data, nodeToIndex, fieldMapping) {
     const result = {};
     
@@ -3024,7 +3108,7 @@ class SchemaGraphApp {
       this.showError('No schemas registered. Upload a schema first.');
       return;
     }
-
+  
     let targetSchema = schemaName;
     if (!targetSchema) {
       for (const schema of schemas) {
@@ -3035,11 +3119,11 @@ class SchemaGraphApp {
         }
       }
     }
-
+  
     if (!targetSchema) {
       targetSchema = schemas[0];
     }
-
+  
     console.log('Target schema:', targetSchema);
     const schemaInfo = this.graph.schemas[targetSchema];
     
@@ -3049,24 +3133,77 @@ class SchemaGraphApp {
       fieldMapping = this.graph._createFieldMappingFromSchema(schemaInfo.code, schemaInfo.parsed, schemaInfo.rootType);
       schemaInfo.fieldMapping = fieldMapping;
     }
-
+  
     console.log('Field mapping:', fieldMapping);
-
+  
     this.graph.nodes = [];
     this.graph.links = {};
     this.graph._nodes_by_id = {};
     this.graph.last_link_id = 0;
-
+  
     const createdNodes = {};
     const alNodesForField = {}; // Track ALL nodes for each field, including embedded
     let xOffset = 50;
     const yOffset = 100;
     const xSpacing = 250;
+  
+    // NEW: Analyze root type to determine which fields should be arrays
+    let rootType = schemaInfo.rootType;
+    let rootListFields = new Set();
+    let singleReferenceFields = {}; // Maps single-ref field to its array field
+    
+    if (rootType && schemaInfo.parsed[rootType]) {
+      const rootFields = schemaInfo.parsed[rootType];
+      
+      // Build a map of model type -> list field name
+      // e.g., InfoConfig -> "infos", AppOptionsConfig -> "app_options"
+      const modelTypeToListField = {};
+      
+      for (const field of rootFields) {
+        const fieldType = field.type;
+        if (this.graph._isListFieldType(fieldType)) {
+          const modelType = this.graph._extractModelTypeFromField(fieldType);
+          if (modelType) {
+            rootListFields.add(field.name);
+            modelTypeToListField[modelType] = field.name;
+            console.log(`List field: ${field.name} contains model type ${modelType}`);
+          }
+        }
+      }
+      
+      // Now find single-reference fields and map them to their corresponding list fields
+      for (const field of rootFields) {
+        const fieldType = field.type;
+        if (!this.graph._isListFieldType(fieldType)) {
+          // Extract the model type from this single-reference field
+          const modelType = this._extractModelTypeFromUnionField(fieldType);
+          if (modelType) {
+            // Look up which list field contains this model type
+            const listFieldName = modelTypeToListField[modelType];
+            if (listFieldName) {
+              singleReferenceFields[field.name] = listFieldName;
+              console.log(`Single reference: ${field.name} (${modelType}) → ${listFieldName}`);
+            } else {
+              console.log(`âš ï¸ No list field found for model type ${modelType} from field ${field.name}`);
+            }
+          }
+        }
+      }
+    }
+    
+    console.log('Root list fields:', Array.from(rootListFields));
+    console.log('Single reference mappings:', singleReferenceFields);
 
-    // First pass: create top-level nodes
+    // First pass: create top-level nodes (only for array fields)
     for (const fieldName in configData) {
       if (!configData.hasOwnProperty(fieldName)) continue;
       const items = configData[fieldName];
+      
+      // NEW: Skip single reference fields - we'll handle them by moving to arrays
+      if (singleReferenceFields[fieldName]) {
+        console.log(`Skipping single reference field: ${fieldName} (will be added to ${singleReferenceFields[fieldName]})`);
+        continue;
+      }
       
       const modelName = fieldMapping.fieldToModel[fieldName];
       console.log('📦 Field:', fieldName, '→ Model:', modelName);
@@ -3078,12 +3215,12 @@ class SchemaGraphApp {
       
       const nodeType = targetSchema + '.' + modelName;
       console.log('   Node type:', nodeType);
-
+  
       if (!this.graph.nodeTypes[nodeType]) {
         console.warn('⚠️ Node type not found:', nodeType);
         continue;
       }
-
+  
       if (!createdNodes[fieldName]) {
         createdNodes[fieldName] = [];
       }
@@ -3091,7 +3228,7 @@ class SchemaGraphApp {
       if (!alNodesForField[fieldName]) {
         alNodesForField[fieldName] = [];
       }
-
+  
       const isListField = Array.isArray(items);
       
       if (isListField) {
@@ -3101,7 +3238,7 @@ class SchemaGraphApp {
           node.pos = [xOffset, yOffset + i * 150];
           createdNodes[fieldName].push(node);
           alNodesForField[fieldName].push(node);
-          console.log('   ✓ Created', nodeType, 'at index', i, '- node ID:', node.id);
+          console.log('   ✔ Created', nodeType, 'at index', i, '- node ID:', node.id);
         }
       } else {
         console.log('   Creating 1 node for single field');
@@ -3109,9 +3246,46 @@ class SchemaGraphApp {
         node.pos = [xOffset, yOffset];
         createdNodes[fieldName].push(node);
         alNodesForField[fieldName].push(node);
-        console.log('   ✓ Created', nodeType, '- node ID:', node.id);
+        console.log('   ✔ Created', nodeType, '- node ID:', node.id);
       }
-
+  
+      xOffset += xSpacing;
+    }
+    
+    // NEW: Handle single reference fields - add them to their corresponding arrays
+    for (const singleField in singleReferenceFields) {
+      if (!configData[singleField]) continue;
+      
+      const arrayField = singleReferenceFields[singleField];
+      const item = configData[singleField];
+      
+      console.log(`Moving ${singleField} to ${arrayField} array`);
+      
+      const modelName = fieldMapping.fieldToModel[arrayField];
+      const nodeType = targetSchema + '.' + modelName;
+      
+      if (!this.graph.nodeTypes[nodeType]) {
+        console.warn('⚠️ Node type not found:', nodeType);
+        continue;
+      }
+      
+      // Create node and add to the array field
+      const node = this.graph.createNode(nodeType);
+      node.pos = [xOffset, yOffset];
+      
+      if (!createdNodes[arrayField]) {
+        createdNodes[arrayField] = [];
+      }
+      if (!alNodesForField[arrayField]) {
+        alNodesForField[arrayField] = [];
+      }
+      
+      // Insert at beginning so it gets index 0
+      createdNodes[arrayField].unshift(node);
+      alNodesForField[arrayField].unshift(node);
+      
+      console.log(`   ✔ Added ${singleField} to ${arrayField} at index 0`);
+      
       xOffset += xSpacing;
     }
     
@@ -3123,12 +3297,24 @@ class SchemaGraphApp {
         console.log('   ', fieldName + ':', alNodesForField[fieldName].length, 'nodes - IDs:', nodeIds);
       }
     }
-
-    // Second pass: populate nodes with data (this may create embedded nodes)
+  
+    // Second pass: populate nodes with data
     const nodesBefore = this.graph.nodes.length;
     
     for (const fieldName in configData) {
       if (!configData.hasOwnProperty(fieldName)) continue;
+      
+      // NEW: Skip single reference fields - they've been moved to arrays
+      if (singleReferenceFields[fieldName]) {
+        const arrayField = singleReferenceFields[fieldName];
+        const item = configData[fieldName];
+        // Populate the first node in the array field with this data
+        if (createdNodes[arrayField] && createdNodes[arrayField][0]) {
+          this.populateNodeFromConfig(createdNodes[arrayField][0], item, createdNodes, fieldMapping);
+        }
+        continue;
+      }
+      
       const items = configData[fieldName];
       const isListField = Array.isArray(items);
       
@@ -3152,7 +3338,7 @@ class SchemaGraphApp {
     
     const nodesAfter = this.graph.nodes.length;
     console.log('Nodes created during population:', nodesAfter - nodesBefore, '(embedded nodes)');
-
+  
     // Third pass: create root type node if applicable
     if (schemaInfo && schemaInfo.rootType) {
       const rootNodeType = targetSchema + '.' + schemaInfo.rootType;
@@ -3180,23 +3366,33 @@ class SchemaGraphApp {
             continue;
           }
           
-          console.log('   ✓ Found input slot:', inputIdx, '(type:', rootNode.inputs[inputIdx].type + ')');
+          console.log('   ✔ Found input slot:', inputIdx, '(type:', rootNode.inputs[inputIdx].type + ')');
+          
+          // NEW: Check if this is a single reference field that was moved to an array
+          let targetFieldName = fieldName;
+          let useIndex = null;
+          
+          if (singleReferenceFields[fieldName]) {
+            targetFieldName = singleReferenceFields[fieldName];
+            useIndex = 0; // Always reference the first item (which we inserted)
+            console.log(`   Single reference field - using ${targetFieldName}[0]`);
+          }
           
           const items = configData[fieldName];
           const isListField = Array.isArray(items);
           
           console.log('   Value is', isListField ? 'array with ' + items.length + ' items' : typeof items);
           
-          // Get all nodes for this field (only the top-level ones we created)
-          const fieldNodes = alNodesForField[fieldName] || [];
+          // Get all nodes for this field
+          const fieldNodes = alNodesForField[targetFieldName] || [];
           
-          console.log('   Looking for nodes in alNodesForField["' + fieldName + '"]');
+          console.log('   Looking for nodes in alNodesForField["' + targetFieldName + '"]');
           console.log('   Found:', fieldNodes.length, 'nodes');
           
           if (fieldNodes.length === 0) {
-            console.warn('⚠️ No nodes in alNodesForField for:', fieldName);
+            console.warn('⚠️ No nodes in alNodesForField for:', targetFieldName);
             console.warn('   Available field keys:', Object.keys(alNodesForField).join(', '));
-            // Check if this field even needs nodes (might be a primitive value)
+            // Check if this field even needs nodes
             if (rootNode.nativeInputs && rootNode.nativeInputs[inputIdx] !== undefined) {
               console.log('   → Field is a native input, setting value directly');
               if (typeof items === 'object') {
@@ -3212,10 +3408,20 @@ class SchemaGraphApp {
           const nodeInfo = fieldNodes.map(n => n.id + ':' + n.title).join(', ');
           console.log('   Node details:', nodeInfo);
           
-          if (isListField) {
+          // NEW: Single reference field - connect to index 0
+          if (useIndex !== null) {
+            console.log('   ✔ Connecting single reference to index', useIndex);
+            const refNode = fieldNodes[useIndex];
+            if (refNode) {
+              this.graph.connect(refNode, 0, rootNode, inputIdx);
+              console.log('   ✅ Connected', refNode.title, 'to root at slot', inputIdx);
+            }
+          }
+          // Multi-input list field
+          else if (isListField) {
             // Connect all nodes to multi-input
             if (rootNode.multiInputs && rootNode.multiInputs[inputIdx]) {
-              console.log('   ✓ Field is multi-input (list field)');
+              console.log('   ✔ Field is multi-input (list field)');
               for (const node of fieldNodes) {
                 const linkId = ++this.graph.last_link_id;
                 const link = new Link(
@@ -3233,15 +3439,12 @@ class SchemaGraphApp {
               }
             } else {
               console.warn('   ⚠️ Expected multi-input but not found for field:', fieldName);
-              console.warn('   Input type:', rootNode.inputs[inputIdx].type);
-              console.warn('   Has multiInputs?', !!rootNode.multiInputs);
-              if (rootNode.multiInputs) {
-                console.warn('   multiInputs[' + inputIdx + ']?', !!rootNode.multiInputs[inputIdx]);
-              }
             }
-          } else {
+          }
+          // Single value field
+          else {
             // Connect single node or set native value
-            console.log('   ✓ Field is single-input');
+            console.log('   ✔ Field is single-input');
             if (typeof items === 'number') {
               // This is an index reference to another node
               console.log('   → Value is an index reference:', items);
@@ -3271,8 +3474,6 @@ class SchemaGraphApp {
         
         console.log('🎯 Root node connection summary:');
         console.log('   Total inputs:', rootNode.inputs.length);
-        console.log('   Config fields:', Object.keys(configData).join(', '));
-        console.log('   Root node input names:', rootNode.inputs.map(inp => inp.name).join(', '));
         
         let connectedCount = 0;
         for (let i = 0; i < rootNode.inputs.length; i++) {
@@ -3283,25 +3484,24 @@ class SchemaGraphApp {
           if (rootNode.multiInputs && rootNode.multiInputs[i]) {
             const links = rootNode.multiInputs[i].links.length;
             if (links > 0) {
-              console.log('   ✓', fieldName, '(multi):', links, 'connections', isInConfig ? '' : '⚠️ NOT IN CONFIG');
+              console.log('   ✔', fieldName, '(multi):', links, 'connections', isInConfig ? '' : '⚠️ NOT IN CONFIG');
               connectedCount++;
             } else {
               console.log('   ✗', fieldName, '(multi): no connections', isInConfig ? '❌ WAS IN CONFIG!' : '(not in config)');
             }
           } else if (input.link) {
-            console.log('   ✓', fieldName, ': connected', isInConfig ? '' : '⚠️ NOT IN CONFIG');
+            console.log('   ✔', fieldName, ': connected', isInConfig ? '' : '⚠️ NOT IN CONFIG');
             connectedCount++;
           } else if (rootNode.nativeInputs && rootNode.nativeInputs[i]) {
             const val = rootNode.nativeInputs[i].value;
-            // Check if value is truly empty (not false, not 0)
             const isEmpty = val === null || val === undefined || val === '';
             const hasValue = !isEmpty || typeof val === 'boolean' || typeof val === 'number';
             
             if (hasValue) {
-              console.log('   ✓', fieldName, '(native):', JSON.stringify(val), '(type: ' + typeof val + ')', isInConfig ? '' : '⚠️ NOT IN CONFIG');
+              console.log('   ✔', fieldName, '(native):', JSON.stringify(val), '(type: ' + typeof val + ')', isInConfig ? '' : '⚠️ NOT IN CONFIG');
               connectedCount++;
             } else {
-              console.log('   ○', fieldName, '(native): empty', rootNode.nativeInputs[i].optional ? '(optional)' : '❌ REQUIRED!', isInConfig ? '❌ WAS IN CONFIG!' : '');
+              console.log('   ◯', fieldName, '(native): empty', rootNode.nativeInputs[i].optional ? '(optional)' : '❌ REQUIRED!', isInConfig ? '❌ WAS IN CONFIG!' : '');
             }
           } else {
             console.log('   ✗', fieldName, ': not connected', isInConfig ? '❌ WAS IN CONFIG!' : '(not in config)');
@@ -3310,16 +3510,16 @@ class SchemaGraphApp {
         console.log('   Connected:', connectedCount, '/', rootNode.inputs.length);
       }
     }
-
+  
     // Execute all nodes
     for (const node of this.graph.nodes) {
       node.onExecute();
     }
-
+  
     this.updateSchemaList();
     this.updateNodeTypesList();
     this.draw();
-
+  
     console.log('=== IMPORT CONFIG COMPLETE ===');
     const statusEl = this.uiController.get('status');
     statusEl.textContent = 'Config imported successfully!';
