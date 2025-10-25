@@ -39,6 +39,14 @@ def add_middleware(app: FastAPI) -> None:
 	)
 
 
+def adjust_config(config: AppConfig) -> AppConfig:
+	config = unroll_config(config)
+	if not validate_config(config):
+		return None
+	config = compact_config(config)
+	return config
+
+
 if True:
 	parser = argparse.ArgumentParser(description="App configuration")
 	parser .add_argument("--port", type=int, default=DEFAULT_APP_PORT, help="Listening port for control server")
@@ -63,6 +71,9 @@ if True:
 if True:
 	config = load_config(args.config_path) or AppConfig()
 	config.port = args.port
+	config = adjust_config(config)
+	if config is None:
+		raise ValueError("Invalid app configuration")
 	if config.options.seed is not None:
 		seed_everything(config.options.seed)
 
@@ -103,8 +114,8 @@ async def ping():
 
 @ctrl_app.post("/schema")
 async def export_schema():
-	global schema_text
-	return schema_text
+	global schema
+	return schema
 
 
 @ctrl_app.post("/import")
@@ -113,10 +124,9 @@ async def import_config(cfg: dict):
 	if apps is not None:
 		return {"error": "App is running"}
 	new_config = AppConfig(**cfg)
-	new_config = unroll_config(new_config)
-	if not validate_config(new_config):
+	new_config = adjust_config(new_config)
+	if new_config is None:
 		return {"error": "Invalid app configuration"}
-	config = compact_config(new_config)
 	ctrl_status["status"] = "ready"
 	return config
 

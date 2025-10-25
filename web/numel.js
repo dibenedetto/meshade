@@ -84,32 +84,33 @@ class NumelApp {
 		if (!options) {
 			options = {};
 		}
+
 		const userId     = options["userId"    ];
 		const sessionId  = options["sessionId" ];
-		const config     = options["config"    ];
 		const subscriber = options["subscriber"];
+
 		try {
-			let status = null;
 			await NumelApp._stop(url);
-			if (config) {
-				status = await NumelApp._putConfig(url, config);
-				if (!status || status.error) {
-					return null;
-				}
-			}
-			status = await NumelApp._start(url);
+
+			let status = await NumelApp._start(url);
 			if (!status || status.error) {
 				return null;
 			}
-			const app = new NumelApp(url, userId, sessionId, subscriber);
+
+			const schemaDict = await aguiApp.getSchema();
+			const schemaCode = schemaDict["schema"];
+
+			const app = new NumelApp(url, schemaCode, userId, sessionId, subscriber);
 			status = await app._update();
 			if (!status || status.error) {
 				return null;
 			}
+
 			if (!app.isValid()) {
 				await NumelApp._stop(url);
 				return null;
 			}
+
 			return app;
 		}
 		catch (error) {
@@ -118,8 +119,9 @@ class NumelApp {
 		}
 	}
 
-	constructor(url, userId, sessionId, subscriber) {
+	constructor(url, schema, userId, sessionId, subscriber) {
 		this.url        = url;
+		this.schema     = schema;
 		this.userId     = userId;
 		this.sessionId  = sessionId;
 		this.subscriber = subscriber;

@@ -384,26 +384,29 @@
 					aguiApp = await NumelApp.connect(serverUrl, {
 						userId     : userId,
 						sessionId  : sessionId,
-						config     : baseConfig,
 						subscriber : { onEvent(params) { handleAGUIEvent(params.event); }, },
 					});
 					if (!aguiApp) {
 						throw new Error("NumelApp initialization failed");
 					}
 
+					const schemaDict = await aguiApp.getSchema();
+					const schemaCode = schemaDict["schema"];
+					graph.api.schema.register("numel", schemaCode, "Index", "AppConfig");
+
 					agentPrevIndex = -1;
 					agentCurrIndex = 0;
+					isConnected    = true;
 
-					isConnected = true;
-
-					await setAppSchema();
 					await setAppStatus();
+
 					clearChat();
 					updateStatus("connected", "AG-UI client ready");
 					enableInput(true);
 					connectButton.textContent = "Disconnect";
 					addMessage("system", `✅ AG-UI client initialized for ${serverUrl}`);
 					addMessage("ui", startMessage);
+
 				} catch (error) {
 					console.error("Failed to initialize AG-UI client:", error);
 					addMessage("system-error", `❌ Connection failed: ${error.message}<br/>`);
@@ -546,13 +549,6 @@
 				} else {
 					connect();
 				}
-			}
-
-			async function setAppSchema() {
-				const schema_dict = await aguiApp.getSchema();
-				const schema_code = schema_dict["schema"];
-				graph.importSchemaFromCode(schema_code);
-				return schema_dict;
 			}
 
 			async function setAppStatus() {
