@@ -1141,74 +1141,6 @@ class VoiceController {
   }
 }
 
-class UIController {
-  constructor(eventBus) {
-    this.eventBus = eventBus;
-    this.elements = new Map();
-    this.setupDefaultListeners();
-  }
-
-  register(id, element) {
-    this.elements.set(id, element);
-  }
-
-  get(id) {
-    return this.elements.get(id);
-  }
-
-  setupDefaultListeners() {
-    this.eventBus.on('ui:show', (data) => {
-      const element = this.elements.get(data.id);
-      if (element) element.classList.add('show');
-    });
-
-    this.eventBus.on('ui:hide', (data) => {
-      const element = this.elements.get(data.id);
-      if (element) element.classList.remove('show');
-    });
-
-    this.eventBus.on('ui:update', (data) => {
-      const element = this.elements.get(data.id);
-      if (element && data.content !== undefined) {
-        element.textContent = data.content;
-      }
-    });
-  }
-
-  setupButton(id, eventName) {
-    const element = this.elements.get(id);
-    if (element) {
-      element.addEventListener('click', () => {
-        this.eventBus.emit(eventName, { id });
-        this.eventBus.emit('interaction', { type: eventName });
-      });
-    }
-  }
-
-  setupFileInput(id, eventName) {
-    const element = this.elements.get(id);
-    if (element) {
-      element.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-          this.eventBus.emit(eventName, { file, element: e.target });
-          this.eventBus.emit('interaction', { type: eventName });
-        }
-      });
-    }
-  }
-
-  setupSelect(id, eventName) {
-    const element = this.elements.get(id);
-    if (element) {
-      element.addEventListener('change', (e) => {
-        this.eventBus.emit(eventName, { value: e.target.value, element: e.target });
-        this.eventBus.emit('interaction', { type: eventName });
-      });
-    }
-  }
-}
-
 class DrawingStyleManager {
   constructor() {
     this.currentStyle = 'default';
@@ -1352,22 +1284,21 @@ class SchemaGraphApp {
     this.mouseController = new MouseTouchController(this.canvas, this.eventBus);
     this.keyboardController = new KeyboardController(this.eventBus);
     this.voiceController = new VoiceController(this.eventBus);
-    this.uiController = new UIController(this.eventBus);
     
     this.initializeState();
     
     this.api = this._createAPI();
+    this.ui = this._createUI();
     
-    this.registerUIElements();
-    this.setupEventListeners();
+    // Setup core events and UI
+    this.setupEventListeners();  // Mouse, keyboard, graph events
     this.setupCanvasLeaveHandler();
-    this.setupVoiceAndAnalyticsUI();
-    this.setupDrawingStyleSelector();
-    this.setupTextScalingToggle();
     this.setupVoiceCommands();
     this.registerNativeNodes();
     
-    this.resizeCanvas();
+    this.ui.init();  // All UI button/dialog setup
+    
+    this.ui.util.resizeCanvas();
     this.draw();
     
     this.eventBus.emit('app:ready', {});
@@ -1405,49 +1336,6 @@ class SchemaGraphApp {
     this.loadTextScalingMode();
   }
 
-  registerUIElements() {
-    const ui = this.uiController;
-    
-    // Register all UI elements
-    ui.register('status', document.getElementById('sg-status'));
-    ui.register('errorBanner', document.getElementById('sg-errorBanner'));
-    ui.register('nodeTypesList', document.getElementById('sg-nodeTypesList'));
-    ui.register('zoomLevel', document.getElementById('sg-zoomLevel'));
-    ui.register('contextMenu', document.getElementById('sg-contextMenu'));
-    ui.register('nodeInput', document.getElementById('sg-nodeInput'));
-    ui.register('schemaList', document.getElementById('sg-schemaList'));
-    ui.register('schemaDialog', document.getElementById('sg-schemaDialog'));
-    ui.register('schemaRemovalDialog', document.getElementById('sg-schemaRemovalDialog'));
-    
-    // Setup buttons
-    ui.register('uploadSchemaBtn', document.getElementById('sg-uploadSchemaBtn'));
-    ui.register('exportBtn', document.getElementById('sg-exportBtn'));
-    ui.register('importBtn', document.getElementById('sg-importBtn'));
-    ui.register('exportConfigBtn', document.getElementById('sg-exportConfigBtn'));
-    ui.register('importConfigBtn', document.getElementById('sg-importConfigBtn'));
-    ui.register('centerViewBtn', document.getElementById('sg-centerViewBtn'));
-    ui.register('resetZoomBtn', document.getElementById('sg-resetZoomBtn'));
-    ui.register('themeBtn', document.getElementById('sg-themeBtn'));
-    
-    // Setup file inputs
-    ui.register('uploadSchemaFile', document.getElementById('sg-uploadSchemaFile'));
-    ui.register('importFile', document.getElementById('sg-importFile'));
-    ui.register('importConfigFile', document.getElementById('sg-importConfigFile'));
-    
-    // Setup selects
-    ui.register('layoutSelect', document.getElementById('sg-layoutSelect'));
-    
-    // Setup dialog elements
-    ui.register('schemaNameInput', document.getElementById('sg-schemaNameInput'));
-    ui.register('schemaIndexTypeInput', document.getElementById('sg-schemaIndexTypeInput'));
-    ui.register('schemaRootTypeInput', document.getElementById('sg-schemaRootTypeInput'));
-    ui.register('schemaDialogConfirm', document.getElementById('sg-schemaDialogConfirm'));
-    ui.register('schemaDialogCancel', document.getElementById('sg-schemaDialogCancel'));
-    ui.register('schemaRemovalNameInput', document.getElementById('sg-schemaRemovalNameInput'));
-    ui.register('schemaRemovalConfirm', document.getElementById('sg-schemaRemovalConfirm'));
-    ui.register('schemaRemovalCancel', document.getElementById('sg-schemaRemovalCancel'));
-  }
-
   setupEventListeners() {
     // Mouse events
     this.eventBus.on('mouse:down', (data) => this.handleMouseDown(data));
@@ -1461,69 +1349,15 @@ class SchemaGraphApp {
     this.eventBus.on('keyboard:down', (data) => this.handleKeyDown(data));
     this.eventBus.on('keyboard:up', (data) => this.handleKeyUp(data));
     
-    // UI events
-    this.uiController.setupButton('uploadSchemaBtn', 'ui:upload-schema');
-    this.uiController.setupButton('exportBtn', 'ui:export-graph');
-    this.uiController.setupButton('importBtn', 'ui:import-graph');
-    this.uiController.setupButton('exportConfigBtn', 'ui:export-config');
-    this.uiController.setupButton('importConfigBtn', 'ui:import-config');
-    this.uiController.setupButton('centerViewBtn', 'ui:center-view');
-    this.uiController.setupButton('resetZoomBtn', 'ui:reset-zoom');
-    this.uiController.setupButton('themeBtn', 'ui:cycle-theme');
-    this.uiController.setupButton('schemaDialogConfirm', 'ui:confirm-schema');
-    this.uiController.setupButton('schemaDialogCancel', 'ui:cancel-schema');
-    this.uiController.setupButton('schemaRemovalConfirm', 'ui:confirm-removal');
-    this.uiController.setupButton('schemaRemovalCancel', 'ui:cancel-removal');
-    
-    this.uiController.setupFileInput('uploadSchemaFile', 'file:schema-uploaded');
-    this.uiController.setupFileInput('importFile', 'file:graph-uploaded');
-    this.uiController.setupFileInput('importConfigFile', 'file:config-uploaded');
-    
-    this.uiController.setupSelect('layoutSelect', 'ui:layout-selected');
-    
-    this.eventBus.on('ui:upload-schema', () => {
-      this.uiController.get('uploadSchemaFile').click();
-    });
-    
-    this.eventBus.on('ui:import-graph', () => {
-      this.uiController.get('importFile').click();
-    });
-    
-    this.eventBus.on('ui:import-config', () => {
-      this.uiController.get('importConfigFile').click();
-    });
-    
-    this.eventBus.on('ui:export-graph', () => this.exportGraph());
-    this.eventBus.on('ui:export-config', () => this.exportConfig());
-    this.eventBus.on('ui:center-view', () => this.centerView());
-    this.eventBus.on('ui:reset-zoom', () => this.resetZoom());
-    this.eventBus.on('ui:cycle-theme', () => this.cycleTheme());
-    
-    this.eventBus.on('ui:layout-selected', (data) => {
-      if (data.value) {
-        this.applyLayout(data.value);
-        data.element.value = '';
-      }
-    });
-    
-    this.eventBus.on('file:schema-uploaded', (data) => this.handleSchemaFileUpload(data));
-    this.eventBus.on('file:graph-uploaded', (data) => this.handleImportGraph(data));
-    this.eventBus.on('file:config-uploaded', (data) => this.handleImportConfig(data));
-    
-    this.eventBus.on('ui:confirm-schema', () => this.confirmSchemaRegistration());
-    this.eventBus.on('ui:cancel-schema', () => this.cancelSchemaRegistration());
-    this.eventBus.on('ui:confirm-removal', () => this.confirmSchemaRemoval());
-    this.eventBus.on('ui:cancel-removal', () => this.cancelSchemaRemoval());
-    
-    // Graph events
+    // Graph events (for auto-updating displays)
     this.eventBus.on('node:created', () => {
-      this.updateSchemaList();
-      this.updateNodeTypesList();
+      this.ui.update.schemaList();
+      this.ui.update.nodeTypesList();
       this.draw();
     });
     
     this.eventBus.on('node:deleted', () => {
-      this.updateSchemaList();
+      this.ui.update.schemaList();
       this.draw();
     });
     
@@ -1531,34 +1365,21 @@ class SchemaGraphApp {
     this.eventBus.on('link:deleted', () => this.draw());
     
     this.eventBus.on('schema:registered', () => {
-      this.updateSchemaList();
-      this.updateNodeTypesList();
+      this.ui.update.schemaList();
+      this.ui.update.nodeTypesList();
       this.draw();
     });
     
     this.eventBus.on('schema:removed', () => {
-      this.updateSchemaList();
-      this.updateNodeTypesList();
+      this.ui.update.schemaList();
+      this.ui.update.nodeTypesList();
       this.draw();
     });
     
     // Input events
-    const nodeInput = this.uiController.get('nodeInput');
+    const nodeInput = document.getElementById('sg-nodeInput');
     nodeInput.addEventListener('blur', () => this.handleInputBlur());
     nodeInput.addEventListener('keydown', (e) => this.handleInputKeyDown(e));
-    
-    // Document events
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#contextMenu')) {
-        this.uiController.get('contextMenu').classList.remove('show');
-      }
-    });
-    
-    // Window events
-    window.addEventListener('resize', () => this.resizeCanvas());
-    
-    // Set ready status
-    this.eventBus.emit('ui:update', { id: 'status', content: 'Ready. Upload a schema to begin.' });
   }
 
   setupCanvasLeaveHandler() {
@@ -1571,160 +1392,6 @@ class SchemaGraphApp {
         this.previewSelection.clear();
         this.draw();
       }
-    });
-  }
-
-  setupVoiceAndAnalyticsUI() {
-    const voiceStartBtn = document.getElementById('sg-voiceStartBtn');
-    const voiceStopBtn = document.getElementById('sg-voiceStopBtn');
-    const voiceStatus = document.getElementById('sg-voiceStatus');
-    const analyticsToggleBtn = document.getElementById('sg-analyticsToggleBtn');
-    const analyticsPanel = document.getElementById('sg-analyticsPanel');
-    const analyticsCloseBtn = document.getElementById('sg-analyticsCloseBtn');
-    const refreshAnalyticsBtn = document.getElementById('sg-refreshAnalyticsBtn');
-    const exportAnalyticsBtn = document.getElementById('sg-exportAnalyticsBtn');
-    const resetAnalyticsBtn = document.getElementById('sg-resetAnalyticsBtn');
-    
-    // Voice control handlers
-    voiceStartBtn?.addEventListener('click', () => {
-      if (this.voiceController) {
-        this.voiceController.startListening();
-        voiceStartBtn.style.display = 'none';
-        voiceStopBtn.style.display = 'inline-block';
-        voiceStopBtn.classList.add('active');
-        voiceStatus.textContent = 'Listening...';
-      }
-    });
-    
-    voiceStopBtn?.addEventListener('click', () => {
-      if (this.voiceController) {
-        this.voiceController.stopListening();
-        voiceStopBtn.style.display = 'none';
-        voiceStartBtn.style.display = 'inline-block';
-        voiceStopBtn.classList.remove('active');
-        voiceStatus.textContent = '';
-      }
-    });
-    
-    // Voice event listeners
-    this.eventBus.on('voice:result', (data) => {
-      voiceStatus.textContent = `Heard: "${data.transcript}"`;
-      setTimeout(() => {
-        voiceStatus.textContent = 'Listening...';
-      }, 3000);
-    });
-    
-    this.eventBus.on('voice:stopped', () => {
-      voiceStopBtn.style.display = 'none';
-      voiceStartBtn.style.display = 'inline-block';
-      voiceStopBtn.classList.remove('active');
-      voiceStatus.textContent = '';
-    });
-    
-    this.eventBus.on('voice:error', (data) => {
-      voiceStatus.textContent = `Error: ${data.error}`;
-      voiceStopBtn.style.display = 'none';
-      voiceStartBtn.style.display = 'inline-block';
-      voiceStopBtn.classList.remove('active');
-    });
-    
-    // Analytics panel handlers
-    analyticsToggleBtn?.addEventListener('click', () => {
-      analyticsPanel.classList.toggle('show');
-      if (analyticsPanel.classList.contains('show')) {
-        this.updateAnalyticsDisplay();
-      }
-    });
-    
-    analyticsCloseBtn?.addEventListener('click', () => {
-      analyticsPanel.classList.remove('show');
-    });
-    
-    refreshAnalyticsBtn?.addEventListener('click', () => {
-      this.updateAnalyticsDisplay();
-    });
-    
-    exportAnalyticsBtn?.addEventListener('click', () => {
-      if (this.analytics) {
-        const metrics = this.analytics.getSessionMetrics();
-        const jsonString = JSON.stringify(metrics, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'analytics-' + new Date().toISOString().slice(0, 10) + '.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
-    });
-    
-    resetAnalyticsBtn?.addEventListener('click', () => {
-      if (confirm('Reset analytics for current session? This cannot be undone.')) {
-        if (this.analytics) {
-          this.analytics.endSession();
-          this.updateAnalyticsDisplay();
-        }
-      }
-    });
-    
-    // Auto-refresh analytics every 5 seconds if panel is open
-    setInterval(() => {
-      if (analyticsPanel?.classList.contains('show')) {
-        this.updateAnalyticsDisplay();
-      }
-    }, 5000);
-  }
-
-  setupDrawingStyleSelector() {
-    const drawingStyleSelect = document.getElementById('sg-drawingStyleSelect');
-    
-    if (!drawingStyleSelect) return;
-    
-    // Set initial value
-    drawingStyleSelect.value = this.drawingStyleManager.getCurrentStyleName();
-    
-    // Handle style change
-    drawingStyleSelect.addEventListener('change', (e) => {
-      const styleName = e.target.value;
-      if (this.drawingStyleManager.setStyle(styleName)) {
-        this.draw();
-        this.eventBus.emit('ui:update', { 
-          id: 'status', 
-          content: `Drawing style changed to ${this.drawingStyleManager.getStyle().name}` 
-        });
-        setTimeout(() => {
-          this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
-        }, 2000);
-      }
-    });
-  }
-
-  setupTextScalingToggle() {
-    const toggleBtn = document.getElementById('sg-textScalingToggle');
-    const label = document.getElementById('sg-textScalingLabel');
-    
-    if (!toggleBtn || !label) return;
-    
-    // Set initial state
-    this.updateTextScalingUI();
-    
-    // Handle toggle
-    toggleBtn.addEventListener('click', () => {
-      this.textScalingMode = this.textScalingMode === 'fixed' ? 'scaled' : 'fixed';
-      this.saveTextScalingMode();
-      this.updateTextScalingUI();
-      this.draw();
-      
-      const mode = this.textScalingMode === 'fixed' ? 'Fixed Size' : 'Scaled with Zoom';
-      this.eventBus.emit('ui:update', { 
-        id: 'status', 
-        content: `Text scaling: ${mode}` 
-      });
-      setTimeout(() => {
-        this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
-      }, 2000);
     });
   }
 
@@ -1943,11 +1610,11 @@ class SchemaGraphApp {
         break;
         
       case 'import-graph':
-        this.uiController.get('importFile').click();
+        document.getElementById('sg-importFile').click();
         break;
         
       case 'import-config':
-        this.uiController.get('importConfigFile').click();
+        document.getElementById('sg-importConfigFile').click();
         break;
         
       case 'center-view':
@@ -2120,7 +1787,7 @@ class SchemaGraphApp {
   // Mouse/Touch handlers
   handleMouseDown(data) {
     this.isMouseDown = true;
-    this.uiController.get('contextMenu').classList.remove('show');
+    document.getElementById('sg-contextMenu').classList.remove('show');
     
     const [wx, wy] = this.screenToWorld(data.coords.screenX, data.coords.screenY);
     
@@ -2448,7 +2115,7 @@ class SchemaGraphApp {
     this.editingNode = node;
     this.editingNode.editingSlot = slot;
     
-    const nodeInput = this.uiController.get('nodeInput');
+    const nodeInput = document.getElementById('sg-nodeInput');
     if (slot !== null) {
       nodeInput.value = String(node.nativeInputs[slot].value);
     } else {
@@ -2495,7 +2162,7 @@ class SchemaGraphApp {
   }
 
   showContextMenu(node, wx, wy, coords) {
-    const contextMenu = this.uiController.get('contextMenu');
+    const contextMenu = document.getElementById('sg-contextMenu');
     let html = '';
     
     if (node) {
@@ -2672,7 +2339,7 @@ class SchemaGraphApp {
 
   handleInputBlur() {
     if (this.editingNode) {
-      const nodeInput = this.uiController.get('nodeInput');
+      const nodeInput = document.getElementById('sg-nodeInput');
       const val = nodeInput.value;
       
       if (this.editingNode.editingSlot !== null && this.editingNode.editingSlot !== undefined) {
@@ -2704,15 +2371,15 @@ class SchemaGraphApp {
       
       this.draw();
     }
-    this.uiController.get('nodeInput').classList.remove('show');
+    document.getElementById('sg-nodeInput').classList.remove('show');
     this.editingNode = null;
   }
 
   handleInputKeyDown(e) {
     if (e.key === 'Enter') {
-      this.uiController.get('nodeInput').blur();
+      document.getElementById('sg-nodeInput').blur();
     } else if (e.key === 'Escape') {
-      this.uiController.get('nodeInput').classList.remove('show');
+      document.getElementById('sg-nodeInput').classList.remove('show');
       this.editingNode = null;
     }
   }
@@ -2735,13 +2402,13 @@ class SchemaGraphApp {
 
       const suggestedRootType = rootTypeMatch ? rootTypeMatch[1] : '';
 
-      this.uiController.get('schemaNameInput').value = suggestedName;
-      this.uiController.get('schemaIndexTypeInput').value = 'Index';
-      this.uiController.get('schemaRootTypeInput').value = suggestedRootType;
+      document.getElementById('sg-schemaNameInput').value = suggestedName;
+      document.getElementById('sg-schemaIndexTypeInput').value = 'Index';
+      document.getElementById('sg-schemaRootTypeInput').value = suggestedRootType;
 
       this.eventBus.emit('ui:show', { id: 'schemaDialog' });
-      this.uiController.get('schemaNameInput').focus();
-      this.uiController.get('schemaNameInput').select();
+      document.getElementById('sg-schemaNameInput').focus();
+      document.getElementById('sg-schemaNameInput').select();
     };
     reader.readAsText(data.file);
     data.element.value = '';
@@ -2791,9 +2458,9 @@ class SchemaGraphApp {
   confirmSchemaRegistration() {
     if (!this.pendingSchemaCode) return;
     
-    const schemaName = this.uiController.get('schemaNameInput').value.trim();
-    const indexType = this.uiController.get('schemaIndexTypeInput').value.trim() || 'int';
-    const rootType = this.uiController.get('schemaRootTypeInput').value.trim() || null;
+    const schemaName = document.getElementById('sg-schemaNameInput').value.trim();
+    const indexType = document.getElementById('sg-schemaIndexTypeInput').value.trim() || 'int';
+    const rootType = document.getElementById('sg-schemaRootTypeInput').value.trim() || null;
     
     if (!schemaName) {
       this.showError('Schema name is required');
@@ -2839,7 +2506,7 @@ class SchemaGraphApp {
   }
 
   confirmSchemaRemoval() {
-    const schemaName = this.uiController.get('schemaRemovalNameInput').value;
+    const schemaName = document.getElementById('sg-schemaRemovalNameInput').value;
     if (!schemaName) {
       this.showError('Please select a schema');
       return;
@@ -3521,7 +3188,7 @@ class SchemaGraphApp {
     this.draw();
   
     console.log('=== IMPORT CONFIG COMPLETE ===');
-    const statusEl = this.uiController.get('status');
+    const statusEl = document.getElementById('sg-status');
     statusEl.textContent = 'Config imported successfully!';
     setTimeout(() => {
       statusEl.textContent = 'Right-click to add nodes.';
@@ -4056,7 +3723,7 @@ class SchemaGraphApp {
   }
 
   showError(text) {
-    const errorEl = this.uiController.get('errorBanner');
+    const errorEl = document.getElementById('sg-errorBanner');
     errorEl.textContent = '⚠️ ' + text;
     errorEl.style.display = 'block';
     setTimeout(() => { errorEl.style.display = 'none'; }, 3000);
@@ -4065,13 +3732,13 @@ class SchemaGraphApp {
 
   updateNodeTypesList() {
     const types = Object.keys(this.graph.nodeTypes);
-    const listEl = this.uiController.get('nodeTypesList');
+    const listEl = document.getElementById('sg-nodeTypesList');
     listEl.textContent = types.length > 0 ? types.join(', ') : 'None';
   }
 
   updateSchemaList() {
     const schemas = Object.keys(this.graph.schemas);
-    const listEl = this.uiController.get('schemaList');
+    const listEl = document.getElementById('sg-schemaList');
     
     if (schemas.length === 0) {
       listEl.innerHTML = '<div style="color: var(--sg-text-tertiary); font-size: 11px; padding: 8px;">No schemas registered</div>';
@@ -4118,10 +3785,10 @@ class SchemaGraphApp {
     for (const schemaName of schemas) {
       options += '<option value="' + schemaName + '">' + schemaName + '</option>';
     }
-    this.uiController.get('schemaRemovalNameInput').innerHTML = options;
+    document.getElementById('sg-schemaRemovalNameInput').innerHTML = options;
     
     this.eventBus.emit('ui:show', { id: 'schemaRemovalDialog' });
-    this.uiController.get('schemaRemovalNameInput').focus();
+    document.getElementById('sg-schemaRemovalNameInput').focus();
   }
 
   screenToWorld(sx, sy) {
@@ -6339,6 +6006,830 @@ class SchemaGraphApp {
           });
           return allMethods;
         }
+      }
+    };
+  }
+
+  /**
+   * Create the UI management object
+   * Connects HTML elements to API methods
+   * Called once during initialization
+   * @private
+   */
+  _createUI() {
+    return {
+      // Button Handlers
+      buttons: {
+        /**
+         * Setup upload schema button
+         * @returns {void}
+         */
+        setupUploadSchema: () => {
+          const btn = document.getElementById('sg-uploadSchemaBtn');
+          const fileInput = document.getElementById('sg-uploadSchemaFile');
+          
+          btn?.addEventListener('click', () => {
+            fileInput?.click();
+          });
+          
+          fileInput?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              this.pendingSchemaCode = event.target.result;
+              
+              // Auto-fill dialog fields
+              const fileName = file.name.replace(/\.py$/, '');
+              const suggestedName = fileName.charAt(0).toUpperCase() + fileName.slice(1);
+              
+              // Try to detect root type
+              const rootTypeRegex = /class\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
+              let lastMatch = null;
+              let match;
+              while ((match = rootTypeRegex.exec(this.pendingSchemaCode)) !== null) {
+                lastMatch = match;
+              }
+              const suggestedRootType = lastMatch ? lastMatch[1] : '';
+              
+              document.getElementById('sg-schemaNameInput').value = suggestedName;
+              document.getElementById('sg-schemaIndexTypeInput').value = 'Index';
+              document.getElementById('sg-schemaRootTypeInput').value = suggestedRootType;
+              
+              this.ui.dialogs.showSchemaDialog();
+            };
+            reader.readAsText(file);
+            e.target.value = ''; // Reset file input
+          });
+        },
+  
+        /**
+         * Setup export graph button
+         * @returns {void}
+         */
+        setupExportGraph: () => {
+          const btn = document.getElementById('sg-exportBtn');
+          btn?.addEventListener('click', () => {
+            this.api.graph.download();
+          });
+        },
+  
+        /**
+         * Setup import graph button
+         * @returns {void}
+         */
+        setupImportGraph: () => {
+          const btn = document.getElementById('sg-importBtn');
+          const fileInput = document.getElementById('sg-importFile');
+          
+          btn?.addEventListener('click', () => {
+            fileInput?.click();
+          });
+          
+          fileInput?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const data = JSON.parse(event.target.result);
+                this.api.graph.import(data, true);
+                this.ui.messages.showSuccess('Graph imported successfully!');
+              } catch (err) {
+                this.ui.messages.showError('Import failed: ' + err.message);
+              }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+          });
+        },
+  
+        /**
+         * Setup export config button
+         * @returns {void}
+         */
+        setupExportConfig: () => {
+          const btn = document.getElementById('sg-exportConfigBtn');
+          btn?.addEventListener('click', () => {
+            this.api.config.download();
+          });
+        },
+  
+        /**
+         * Setup import config button
+         * @returns {void}
+         */
+        setupImportConfig: () => {
+          const btn = document.getElementById('sg-importConfigBtn');
+          const fileInput = document.getElementById('sg-importConfigFile');
+          
+          btn?.addEventListener('click', () => {
+            fileInput?.click();
+          });
+          
+          fileInput?.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              try {
+                const data = JSON.parse(event.target.result);
+                this.api.config.import(data);
+                this.ui.messages.showSuccess('Config imported successfully!');
+              } catch (err) {
+                this.ui.messages.showError('Config import failed: ' + err.message);
+              }
+            };
+            reader.readAsText(file);
+            e.target.value = '';
+          });
+        },
+  
+        /**
+         * Setup center view button
+         * @returns {void}
+         */
+        setupCenterView: () => {
+          const btn = document.getElementById('sg-centerViewBtn');
+          btn?.addEventListener('click', () => {
+            this.api.view.center();
+            this.ui.messages.showSuccess('View centered', 1500);
+          });
+        },
+  
+        /**
+         * Setup reset zoom button
+         * @returns {void}
+         */
+        setupResetZoom: () => {
+          const btn = document.getElementById('sg-resetZoomBtn');
+          btn?.addEventListener('click', () => {
+            this.api.view.resetZoom();
+            this.ui.messages.showSuccess('Zoom reset to 100%', 1500);
+          });
+        },
+  
+        /**
+         * Setup theme button
+         * @returns {void}
+         */
+        setupTheme: () => {
+          const btn = document.getElementById('sg-themeBtn');
+          btn?.addEventListener('click', () => {
+            const newTheme = this.api.theme.cycle();
+            this.ui.messages.showSuccess(`Theme: ${newTheme}`, 1500);
+          });
+        },
+  
+        /**
+         * Setup layout selector
+         * @returns {void}
+         */
+        setupLayout: () => {
+          const select = document.getElementById('sg-layoutSelect');
+          select?.addEventListener('change', (e) => {
+            const value = e.target.value;
+            if (value) {
+              this.api.layout.apply(value);
+              this.ui.messages.showSuccess(`Applied ${value} layout`, 1500);
+              e.target.value = ''; // Reset selector
+            }
+          });
+        },
+  
+        /**
+         * Setup drawing style selector
+         * @returns {void}
+         */
+        setupDrawingStyle: () => {
+          const select = document.getElementById('sg-drawingStyleSelect');
+          if (!select) return;
+          
+          // Set initial value
+          select.value = this.api.style.get();
+          
+          select.addEventListener('change', (e) => {
+            const styleName = e.target.value;
+            if (this.api.style.set(styleName)) {
+              this.ui.messages.showSuccess(`Style: ${styleName}`, 1500);
+            }
+          });
+        },
+  
+        /**
+         * Setup text scaling toggle
+         * @returns {void}
+         */
+        setupTextScaling: () => {
+          const btn = document.getElementById('sg-textScalingToggle');
+          btn?.addEventListener('click', () => {
+            const newMode = this.api.textScaling.toggle();
+            this.ui.update.textScaling();
+            const modeText = newMode === 'fixed' ? 'Fixed Size' : 'Scaled with Zoom';
+            this.ui.messages.showSuccess(`Text: ${modeText}`, 1500);
+          });
+        },
+  
+        /**
+         * Setup all buttons
+         * @returns {void}
+         */
+        setupAll: () => {
+          this.ui.buttons.setupUploadSchema();
+          this.ui.buttons.setupExportGraph();
+          this.ui.buttons.setupImportGraph();
+          this.ui.buttons.setupExportConfig();
+          this.ui.buttons.setupImportConfig();
+          this.ui.buttons.setupCenterView();
+          this.ui.buttons.setupResetZoom();
+          this.ui.buttons.setupTheme();
+          this.ui.buttons.setupLayout();
+          this.ui.buttons.setupDrawingStyle();
+          this.ui.buttons.setupTextScaling();
+        }
+      },
+  
+      // Dialog Management
+      dialogs: {
+        /**
+         * Show schema registration dialog
+         * @returns {void}
+         */
+        showSchemaDialog: () => {
+          const dialog = document.getElementById('sg-schemaDialog');
+          dialog?.classList.add('show');
+          document.getElementById('sg-schemaNameInput')?.focus();
+        },
+  
+        /**
+         * Hide schema registration dialog
+         * @returns {void}
+         */
+        hideSchemaDialog: () => {
+          const dialog = document.getElementById('sg-schemaDialog');
+          dialog?.classList.remove('show');
+          this.pendingSchemaCode = null;
+        },
+  
+        /**
+         * Setup schema registration dialog handlers
+         * @returns {void}
+         */
+        setupSchemaDialog: () => {
+          const confirmBtn = document.getElementById('sg-schemaDialogConfirm');
+          const cancelBtn = document.getElementById('sg-schemaDialogCancel');
+          
+          confirmBtn?.addEventListener('click', () => {
+            if (!this.pendingSchemaCode) return;
+            
+            const name = document.getElementById('sg-schemaNameInput').value.trim();
+            const indexType = document.getElementById('sg-schemaIndexTypeInput').value.trim() || 'int';
+            const rootType = document.getElementById('sg-schemaRootTypeInput').value.trim() || null;
+            
+            if (!name) {
+              this.ui.messages.showError('Schema name is required');
+              return;
+            }
+            
+            if (this.api.schema.register(name, this.pendingSchemaCode, indexType, rootType)) {
+              this.ui.dialogs.hideSchemaDialog();
+              this.ui.messages.showSuccess(`Schema "${name}" registered!`, 3000);
+            } else {
+              this.ui.messages.showError('Failed to register schema. Check console.');
+            }
+          });
+          
+          cancelBtn?.addEventListener('click', () => {
+            this.ui.dialogs.hideSchemaDialog();
+          });
+        },
+  
+        /**
+         * Show schema removal dialog
+         * @returns {void}
+         */
+        showSchemaRemovalDialog: () => {
+          const schemas = this.api.schema.list();
+          if (schemas.length === 0) {
+            this.ui.messages.showError('No schemas to remove');
+            return;
+          }
+          
+          const select = document.getElementById('sg-schemaRemovalNameInput');
+          if (!select) return;
+          
+          select.innerHTML = schemas.map(name => 
+            `<option value="${name}">${name}</option>`
+          ).join('');
+          
+          const dialog = document.getElementById('sg-schemaRemovalDialog');
+          dialog?.classList.add('show');
+          select.focus();
+        },
+  
+        /**
+         * Hide schema removal dialog
+         * @returns {void}
+         */
+        hideSchemaRemovalDialog: () => {
+          const dialog = document.getElementById('sg-schemaRemovalDialog');
+          dialog?.classList.remove('show');
+        },
+  
+        /**
+         * Setup schema removal dialog handlers
+         * @returns {void}
+         */
+        setupSchemaRemovalDialog: () => {
+          const confirmBtn = document.getElementById('sg-schemaRemovalConfirm');
+          const cancelBtn = document.getElementById('sg-schemaRemovalCancel');
+          
+          confirmBtn?.addEventListener('click', () => {
+            const select = document.getElementById('sg-schemaRemovalNameInput');
+            const schemaName = select?.value;
+            
+            if (!schemaName) {
+              this.ui.messages.showError('Please select a schema');
+              return;
+            }
+            
+            if (this.api.schema.remove(schemaName)) {
+              this.ui.dialogs.hideSchemaRemovalDialog();
+              this.ui.messages.showSuccess(`Schema "${schemaName}" removed`, 2000);
+            } else {
+              this.ui.messages.showError('Failed to remove schema');
+            }
+          });
+          
+          cancelBtn?.addEventListener('click', () => {
+            this.ui.dialogs.hideSchemaRemovalDialog();
+          });
+        },
+  
+        /**
+         * Show context menu
+         * @param {MouseEvent} e - Mouse event
+         * @param {Node|null} node - Node clicked (null for canvas)
+         * @returns {void}
+         */
+        showContextMenu: (e, node = null) => {
+          const [wx, wy] = this.api.util.screenToWorld(e.clientX, e.clientY);
+          
+          const menu = document.getElementById('sg-contextMenu');
+          if (!menu) return;
+          
+          let html = '';
+          
+          if (node) {
+            // Node context menu
+            const selectionCount = this.api.node.getSelected().length;
+            
+            html += '<div class="sg-context-menu-category">Node Actions</div>';
+            
+            if (selectionCount > 1) {
+              html += `<div class="sg-context-menu-item sg-context-menu-delete" data-action="delete-all">✖ Delete ${selectionCount} Nodes</div>`;
+            } else {
+              html += '<div class="sg-context-menu-item sg-context-menu-delete" data-action="delete">✖ Delete Node</div>';
+            }
+            
+            // Check for multi-input links
+            if (node.multiInputs) {
+              let totalLinks = 0;
+              for (const slotIdx in node.multiInputs) {
+                if (node.multiInputs.hasOwnProperty(slotIdx)) {
+                  const links = node.multiInputs[slotIdx].links;
+                  if (links && links.length > 0) {
+                    totalLinks += links.length;
+                  }
+                }
+              }
+              
+              if (totalLinks > 0) {
+                html += `<div class="sg-context-menu-item" data-action="clear-multi">🗑️ Clear ${totalLinks} Multi-Input Link(s)</div>`;
+              }
+            }
+          } else {
+            // Canvas context menu - show node types
+            html += '<div class="sg-context-menu-category">Native Types</div>';
+            const natives = ['Native.String', 'Native.Integer', 'Native.Boolean', 'Native.Float', 'Native.List', 'Native.Dict'];
+            for (const type of natives) {
+              const name = type.split('.')[1];
+              html += `<div class="sg-context-menu-item" data-type="${type}">${name}</div>`;
+            }
+            
+            // Add schema types
+            const schemas = this.api.schema.list();
+            for (const schemaName of schemas) {
+              const info = this.api.schema.info(schemaName);
+              if (!info) continue;
+              
+              html += `<div class="sg-context-menu-category">${schemaName} Schema</div>`;
+              
+              // Show root type first
+              if (info.rootType) {
+                const rootType = `${schemaName}.${info.rootType}`;
+                html += `<div class="sg-context-menu-item" data-type="${rootType}" style="font-weight: bold; color: var(--sg-accent-orange);">★ ${info.rootType} (Root)</div>`;
+              }
+              
+              // Show other models
+              for (const model of info.models) {
+                if (model !== info.rootType) {
+                  const type = `${schemaName}.${model}`;
+                  html += `<div class="sg-context-menu-item" data-type="${type}">${model}</div>`;
+                }
+              }
+            }
+          }
+          
+          menu.innerHTML = html;
+          menu.style.left = e.clientX + 'px';
+          menu.style.top = e.clientY + 'px';
+          menu.classList.add('show');
+          menu.dataset.worldX = wx;
+          menu.dataset.worldY = wy;
+          
+          // Setup click handlers
+          if (node) {
+            menu.querySelector('[data-action="delete"]')?.addEventListener('click', () => {
+              this.api.node.delete(node);
+              menu.classList.remove('show');
+            });
+            
+            menu.querySelector('[data-action="delete-all"]')?.addEventListener('click', () => {
+              const selected = this.api.node.getSelected();
+              selected.forEach(n => this.api.node.delete(n));
+              menu.classList.remove('show');
+            });
+            
+            menu.querySelector('[data-action="clear-multi"]')?.addEventListener('click', () => {
+              this.api.link.clearAllMultiInputs(node);
+              menu.classList.remove('show');
+            });
+          } else {
+            menu.querySelectorAll('[data-type]').forEach(item => {
+              item.addEventListener('click', () => {
+                const type = item.getAttribute('data-type');
+                const wx = parseFloat(menu.dataset.worldX);
+                const wy = parseFloat(menu.dataset.worldY);
+                this.api.node.create(type, wx - 90, wy - 40);
+                menu.classList.remove('show');
+              });
+            });
+          }
+        },
+  
+        /**
+         * Hide context menu
+         * @returns {void}
+         */
+        hideContextMenu: () => {
+          const menu = document.getElementById('sg-contextMenu');
+          menu?.classList.remove('show');
+        },
+  
+        /**
+         * Setup all dialogs
+         * @returns {void}
+         */
+        setupAll: () => {
+          this.ui.dialogs.setupSchemaDialog();
+          this.ui.dialogs.setupSchemaRemovalDialog();
+          
+          // Close context menu when clicking outside
+          document.addEventListener('click', (e) => {
+            if (!e.target.closest('#sg-contextMenu')) {
+              this.ui.dialogs.hideContextMenu();
+            }
+          });
+        }
+      },
+  
+      // Display Updates
+      update: {
+        /**
+         * Update node types list in header
+         * @returns {void}
+         */
+        nodeTypesList: () => {
+          const types = Object.keys(this.graph.nodeTypes);
+          const listEl = document.getElementById('sg-nodeTypesList');
+          if (listEl) {
+            listEl.textContent = types.length > 0 ? types.join(', ') : 'None';
+          }
+        },
+  
+        /**
+         * Update schema list in manager
+         * @returns {void}
+         */
+        schemaList: () => {
+          const schemas = this.api.schema.list();
+          const listEl = document.getElementById('sg-schemaList');
+          if (!listEl) return;
+          
+          if (schemas.length === 0) {
+            listEl.innerHTML = '<div style="color: var(--sg-text-tertiary); font-size: 11px; padding: 8px;">No schemas registered</div>';
+            return;
+          }
+          
+          let html = '';
+          for (const schemaName of schemas) {
+            const info = this.api.schema.info(schemaName);
+            if (!info) continue;
+            
+            let nodeCount = 0;
+            for (const node of this.api.node.list()) {
+              if (node.schemaName === schemaName) nodeCount++;
+            }
+            
+            html += '<div class="sg-schema-item">';
+            html += `<div><span class="sg-schema-item-name">${schemaName}</span>`;
+            html += `<span class="sg-schema-item-count">(${info.models.length} types, ${nodeCount} nodes)</span></div>`;
+            html += `<button class="sg-schema-remove-btn" data-schema="${schemaName}">Remove</button>`;
+            html += '</div>';
+          }
+          
+          listEl.innerHTML = html;
+          
+          // Setup remove buttons
+          listEl.querySelectorAll('.sg-schema-remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              this.ui.dialogs.showSchemaRemovalDialog();
+            });
+          });
+        },
+  
+        /**
+         * Update text scaling UI
+         * @returns {void}
+         */
+        textScaling: () => {
+          const btn = document.getElementById('sg-textScalingToggle');
+          const label = document.getElementById('sg-textScalingLabel');
+          if (!btn || !label) return;
+          
+          const mode = this.api.textScaling.get();
+          
+          if (mode === 'scaled') {
+            btn.classList.add('scaled');
+            label.textContent = 'Scaled';
+            btn.title = 'Text scales with zoom (click for fixed size)';
+          } else {
+            btn.classList.remove('scaled');
+            label.textContent = 'Fixed';
+            btn.title = 'Text stays readable (click to scale with zoom)';
+          }
+        },
+  
+        /**
+         * Update analytics display
+         * @returns {void}
+         */
+        analytics: () => {
+          const metrics = this.api.analytics.getMetrics();
+          const session = this.api.analytics.getSession();
+          
+          const updateEl = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+          };
+          
+          updateEl('sg-sessionId', session.sessionId.substring(0, 8));
+          updateEl('sg-sessionDuration', this.ui.util.formatDuration(session.duration));
+          updateEl('sg-totalEvents', session.events);
+          
+          updateEl('sg-nodesCreated', metrics.nodeCreated);
+          updateEl('sg-nodesDeleted', metrics.nodeDeleted);
+          updateEl('sg-linksCreated', metrics.linkCreated);
+          updateEl('sg-linksDeleted', metrics.linkDeleted);
+          
+          updateEl('sg-schemasRegistered', metrics.schemaRegistered);
+          updateEl('sg-schemasRemoved', metrics.schemaRemoved);
+          
+          updateEl('sg-graphsExported', metrics.graphExported);
+          updateEl('sg-graphsImported', metrics.graphImported);
+          updateEl('sg-configsExported', metrics.configExported);
+          updateEl('sg-configsImported', metrics.configImported);
+          
+          updateEl('sg-totalInteractions', metrics.interactions);
+          updateEl('sg-layoutsApplied', metrics.layoutApplied);
+          updateEl('sg-errorCount', metrics.errors);
+        },
+  
+        /**
+         * Update status message
+         * @param {string} message - Status message
+         * @returns {void}
+         */
+        status: (message) => {
+          const statusEl = document.getElementById('sg-status');
+          if (statusEl) statusEl.textContent = message;
+        },
+  
+        /**
+         * Update zoom display
+         * @returns {void}
+         */
+        zoom: () => {
+          const zoomEl = document.getElementById('sg-zoomLevel');
+          if (zoomEl) {
+            zoomEl.textContent = Math.round(this.api.view.getZoom() * 100) + '%';
+          }
+        }
+      },
+  
+      // Voice & Analytics
+      voice: {
+        /**
+         * Setup voice controls
+         * @returns {void}
+         */
+        setup: () => {
+          const startBtn = document.getElementById('sg-voiceStartBtn');
+          const stopBtn = document.getElementById('sg-voiceStopBtn');
+          const status = document.getElementById('sg-voiceStatus');
+          
+          startBtn?.addEventListener('click', () => {
+            if (this.api.voice.start()) {
+              startBtn.style.display = 'none';
+              stopBtn.style.display = 'inline-block';
+              stopBtn.classList.add('active');
+              if (status) status.textContent = 'Listening...';
+            }
+          });
+          
+          stopBtn?.addEventListener('click', () => {
+            this.api.voice.stop();
+            stopBtn.style.display = 'none';
+            startBtn.style.display = 'inline-block';
+            stopBtn.classList.remove('active');
+            if (status) status.textContent = '';
+          });
+          
+          // Voice event listeners
+          this.eventBus.on('voice:result', (data) => {
+            if (status) {
+              status.textContent = `Heard: "${data.transcript}"`;
+              setTimeout(() => {
+                if (this.api.voice.isListening()) {
+                  status.textContent = 'Listening...';
+                }
+              }, 3000);
+            }
+          });
+          
+          this.eventBus.on('voice:stopped', () => {
+            stopBtn.style.display = 'none';
+            startBtn.style.display = 'inline-block';
+            stopBtn.classList.remove('active');
+            if (status) status.textContent = '';
+          });
+          
+          this.eventBus.on('voice:error', (data) => {
+            if (status) status.textContent = `Error: ${data.error}`;
+            stopBtn.style.display = 'none';
+            startBtn.style.display = 'inline-block';
+            stopBtn.classList.remove('active');
+          });
+        }
+      },
+  
+      analytics: {
+        /**
+         * Setup analytics panel
+         * @returns {void}
+         */
+        setup: () => {
+          const toggleBtn = document.getElementById('sg-analyticsToggleBtn');
+          const panel = document.getElementById('sg-analyticsPanel');
+          const closeBtn = document.getElementById('sg-analyticsCloseBtn');
+          const refreshBtn = document.getElementById('sg-refreshAnalyticsBtn');
+          const exportBtn = document.getElementById('sg-exportAnalyticsBtn');
+          const resetBtn = document.getElementById('sg-resetAnalyticsBtn');
+          
+          toggleBtn?.addEventListener('click', () => {
+            panel?.classList.toggle('show');
+            if (panel?.classList.contains('show')) {
+              this.ui.update.analytics();
+            }
+          });
+          
+          closeBtn?.addEventListener('click', () => {
+            panel?.classList.remove('show');
+          });
+          
+          refreshBtn?.addEventListener('click', () => {
+            this.ui.update.analytics();
+          });
+          
+          exportBtn?.addEventListener('click', () => {
+            this.api.analytics.download();
+          });
+          
+          resetBtn?.addEventListener('click', () => {
+            if (confirm('Reset analytics for current session? This cannot be undone.')) {
+              this.api.analytics.endSession();
+              this.ui.update.analytics();
+            }
+          });
+          
+          // Auto-refresh every 5 seconds if open
+          setInterval(() => {
+            if (panel?.classList.contains('show')) {
+              this.ui.update.analytics();
+            }
+          }, 5000);
+        }
+      },
+  
+      // Messages & Notifications
+      messages: {
+        /**
+         * Show error message
+         * @param {string} text - Error message
+         * @param {number} duration - Duration in ms
+         * @returns {void}
+         */
+        showError: (text, duration = 3000) => {
+          const errorEl = document.getElementById('sg-errorBanner');
+          if (errorEl) {
+            errorEl.textContent = '⚠️ ' + text;
+            errorEl.style.display = 'block';
+            setTimeout(() => { errorEl.style.display = 'none'; }, duration);
+          }
+          this.eventBus.emit('error', { message: text });
+        },
+  
+        /**
+         * Show success message
+         * @param {string} text - Success message
+         * @param {number} duration - Duration in ms
+         * @returns {void}
+         */
+        showSuccess: (text, duration = 2000) => {
+          this.ui.update.status(text);
+          setTimeout(() => {
+            this.ui.update.status('Right-click to add nodes.');
+          }, duration);
+        }
+      },
+  
+      // Utilities
+      util: {
+        /**
+         * Format duration
+         * @param {number} ms - Duration in milliseconds
+         * @returns {string} Formatted duration
+         */
+        formatDuration: (ms) => {
+          const seconds = Math.floor(ms / 1000);
+          const minutes = Math.floor(seconds / 60);
+          const hours = Math.floor(minutes / 60);
+          
+          if (hours > 0) {
+            return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+          } else if (minutes > 0) {
+            return `${minutes}m ${seconds % 60}s`;
+          } else {
+            return `${seconds}s`;
+          }
+        },
+  
+        /**
+         * Resize canvas to fit container
+         * @returns {void}
+         */
+        resizeCanvas: () => {
+          const container = this.canvas.parentElement;
+          const rect = container.getBoundingClientRect();
+          this.canvas.width = rect.width;
+          this.canvas.height = rect.height;
+          this.api.util.redraw();
+        }
+      },
+  
+      /**
+       * Initialize all UI components
+       * @returns {void}
+       */
+      init: () => {
+        this.ui.buttons.setupAll();
+        this.ui.dialogs.setupAll();
+        this.ui.voice.setup();
+        this.ui.analytics.setup();
+        
+        // Window resize
+        window.addEventListener('resize', () => this.ui.util.resizeCanvas());
+        
+        // Initial updates
+        this.ui.update.textScaling();
+        this.ui.update.nodeTypesList();
+        this.ui.update.schemaList();
+        this.ui.update.status('Ready. Upload a schema to begin.');
+        this.ui.update.zoom();
       }
     };
   }
