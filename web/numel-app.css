@@ -1,0 +1,411 @@
+/* ========================================================================
+   NUMEL APP - Inherits SchemaGraph Theme Variables
+   Uses SchemaGraph CSS variables (--sg-*) for theming
+   ======================================================================== */
+
+/* Base Layout */
+body {
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+	margin: 0;
+	padding: 20px 20px 60px 20px;
+	background: var(--sg-bg-primary);
+	color: var(--sg-text-primary);
+	display: flex;
+	gap: 20px;
+	height: 100vh;
+	box-sizing: border-box;
+	transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+/* Chat Panel */
+.numel-panel {
+	background: var(--sg-bg-secondary);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 6px;
+	padding: 20px;
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+	flex: 0 0 400px;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.numel-title {
+	margin: 0 0 20px 0;
+	font-size: 24px;
+	font-weight: 600;
+	text-align: center;
+	color: var(--sg-text-primary);
+}
+
+.numel-brand {
+	color: var(--sg-accent-orange);
+	font-weight: 700;
+}
+
+/* Config Sections */
+.numel-config-section {
+	margin-bottom: 15px;
+	padding: 12px;
+	background: var(--sg-bg-tertiary);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 6px;
+	transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.numel-config-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 8px 0;
+}
+
+.numel-config-row label {
+	flex: 0 0 80px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--sg-text-secondary);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.numel-config-row input[type="text"],
+.numel-config-row input[type="url"] {
+	flex: 1;
+	padding: 6px 10px;
+	background: var(--sg-bg-quaternary);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 4px;
+	color: var(--sg-text-primary);
+	font-size: 12px;
+	font-family: 'Courier New', monospace;
+	transition: all 0.15s ease;
+}
+
+.numel-config-row input:focus {
+	outline: none;
+	border-color: var(--sg-accent-blue);
+	box-shadow: 0 0 0 2px rgba(70, 162, 218, 0.2);
+}
+
+.numel-config-row input:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.numel-config-row select {
+	flex: 1;
+	padding: 6px 10px;
+	background: var(--sg-bg-quaternary);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 4px;
+	color: var(--sg-text-primary);
+	font-size: 12px;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.numel-config-row select:focus {
+	outline: none;
+	border-color: var(--sg-accent-blue);
+	box-shadow: 0 0 0 2px rgba(70, 162, 218, 0.2);
+}
+
+.numel-config-row select:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.numel-config-row input[type="checkbox"] {
+	width: 18px;
+	height: 18px;
+	cursor: pointer;
+}
+
+/* Status */
+.numel-status {
+	flex: 1;
+	font-size: 12px;
+	font-weight: 600;
+	padding: 4px 8px;
+	border-radius: 3px;
+	text-align: center;
+}
+
+.numel-status-idle {
+	color: var(--sg-accent-purple);
+	background: rgba(147, 112, 219, 0.1);
+}
+
+.numel-status-connecting {
+	color: var(--sg-accent-yellow);
+	background: rgba(255, 215, 0, 0.1);
+}
+
+.numel-status-connected {
+	color: var(--sg-accent-green);
+	background: rgba(146, 208, 80, 0.1);
+}
+
+.numel-status-disconnected {
+	color: var(--sg-accent-red);
+	background: rgba(220, 100, 100, 0.1);
+}
+
+/* Chat Container */
+.numel-chat-container {
+	flex: 1;
+	border: 1px solid var(--sg-border-color);
+	border-radius: 6px;
+	overflow-y: auto;
+	padding: 15px;
+	background: var(--sg-bg-quaternary);
+	margin-bottom: 15px;
+	min-height: 200px;
+	transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.numel-chat-container::-webkit-scrollbar {
+	width: 10px;
+}
+
+.numel-chat-container::-webkit-scrollbar-track {
+	background: var(--sg-bg-tertiary);
+}
+
+.numel-chat-container::-webkit-scrollbar-thumb {
+	background: var(--sg-bg-quaternary);
+	border-radius: 5px;
+}
+
+.numel-chat-container::-webkit-scrollbar-thumb:hover {
+	background: var(--sg-text-tertiary);
+}
+
+/* Messages */
+.message {
+	margin: 10px 0;
+	padding: 10px 14px;
+	border-radius: 8px;
+	max-width: 80%;
+	line-height: 1.5;
+	animation: messageSlideIn 0.2s ease;
+}
+
+@keyframes messageSlideIn {
+	from {
+		opacity: 0;
+		transform: translateY(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.message.user {
+	background: var(--sg-accent-blue);
+	color: #ffffff;
+	margin-left: auto;
+	border-bottom-right-radius: 3px;
+}
+
+.message.agent {
+	background: var(--sg-accent-green);
+	color: #ffffff;
+	border-bottom-left-radius: 3px;
+}
+
+.message.system {
+	background: var(--sg-bg-tertiary);
+	color: var(--sg-text-tertiary);
+	font-size: 0.85em;
+	font-style: italic;
+	border-left: 3px solid var(--sg-text-quaternary);
+}
+
+.message.system-error {
+	background: rgba(220, 100, 100, 0.2);
+	color: var(--sg-accent-red);
+	font-size: 0.85em;
+	border-left: 3px solid var(--sg-accent-red);
+}
+
+.message.ui {
+	background: rgba(146, 208, 80, 0.15);
+	color: var(--sg-accent-green);
+	font-size: 0.9em;
+	border-left: 3px solid var(--sg-accent-green);
+}
+
+/* Input Group */
+.numel-input-group {
+	display: flex;
+	gap: 8px;
+}
+
+.numel-input-group input[type="text"] {
+	flex: 1;
+	padding: 10px 12px;
+	border: 1px solid var(--sg-border-color);
+	border-radius: 6px;
+	background: var(--sg-bg-quaternary);
+	color: var(--sg-text-primary);
+	font-size: 14px;
+	transition: all 0.15s ease;
+}
+
+.numel-input-group input[type="text"]:focus {
+	outline: none;
+	border-color: var(--sg-accent-blue);
+	box-shadow: 0 0 0 2px rgba(70, 162, 218, 0.2);
+}
+
+.numel-input-group input[type="text"]:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Buttons */
+.numel-btn {
+	padding: 10px 16px;
+	border: none;
+	border-radius: 6px;
+	cursor: pointer;
+	font-size: 14px;
+	font-weight: 600;
+	transition: all 0.15s ease;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.numel-btn:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.numel-btn:active {
+	transform: translateY(0);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.numel-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+	transform: none !important;
+}
+
+.numel-btn-primary {
+	background: var(--sg-accent-blue);
+	color: #ffffff;
+}
+
+.numel-btn-primary:hover:not(:disabled) {
+	background: var(--sg-accent-blue-light);
+}
+
+.numel-btn-secondary {
+	background: var(--sg-bg-tertiary);
+	color: var(--sg-text-primary);
+	border: 1px solid var(--sg-border-color);
+}
+
+.numel-btn-secondary:hover:not(:disabled) {
+	background: var(--sg-bg-quaternary);
+	border-color: var(--sg-border-highlight);
+}
+
+.numel-btn-accent {
+	background: var(--sg-accent-green);
+	color: #ffffff;
+}
+
+.numel-btn-accent:hover:not(:disabled) {
+	background: #7ab854;
+}
+
+/* Loading */
+.numel-loading {
+	display: none;
+	color: var(--sg-text-tertiary);
+	font-style: italic;
+	font-size: 12px;
+	text-align: center;
+	padding: 8px;
+}
+
+/* Graph Panel */
+.numel-graph-panel {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+/* Canvas Container - Match panel shadow */
+.numel-graph-panel .sg-canvas-container {
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+	border: 1px solid var(--sg-border-color);
+	background: var(--sg-canvas-bg);
+	transition: box-shadow 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
+}
+
+.numel-hidden-elements {
+	display: none;
+}
+
+/* Toolbar Adjustments */
+.numel-toolbar {
+	flex-wrap: wrap;
+	padding: 8px 12px;
+	gap: 8px;
+}
+
+/* Footer */
+.numel-footer {
+	position: fixed;
+	bottom: 10px;
+	left: 50%;
+	transform: translateX(-50%);
+	text-align: center;
+	font-size: 11px;
+	color: var(--sg-text-tertiary);
+	padding: 8px 16px;
+	background: var(--sg-bg-secondary);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 4px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.numel-footer a {
+	color: var(--sg-accent-blue);
+	text-decoration: none;
+	transition: color 0.15s ease;
+}
+
+.numel-footer a:hover {
+	color: var(--sg-accent-blue-light);
+	text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+	body {
+		flex-direction: column;
+		padding: 15px 15px 50px 15px;
+	}
+
+	.numel-panel {
+		flex: 0 0 auto;
+		max-height: 50vh;
+	}
+
+	.numel-graph-panel {
+		flex: 1;
+		min-height: 400px;
+	}
+}

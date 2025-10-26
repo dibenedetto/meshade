@@ -1,613 +1,169 @@
 <!DOCTYPE html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>Numel AI Playground</title>
-		<style>
-			body {
-				font-family: system-ui, -apple-system, sans-serif;
-				margin: 0;
-				padding: 20px 20px 60px 20px;
-				line-height: 1.6;
-				background: #f8f9fa;
-				background: #1F1E1D;
-				gap: 20px;
-				height: 100vh;
-				box-sizing: border-box;
-				display: flex;
-			}
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Numel AI Playground</title>
+	
+	<!-- SchemaGraph Theme & Styles (load first for CSS variables) -->
+	<link rel="stylesheet" href="schemagraph/schemagraph-themes.css">
+	<link rel="stylesheet" href="schemagraph/schemagraph-canvas.css">
+	<link rel="stylesheet" href="schemagraph/schemagraph-ui.css">
+	
+	<!-- Numel App Styles (inherits SchemaGraph theme) -->
+	<link rel="stylesheet" href="numel-app.css">
+</head>
+<body>
+	<!-- Chat Panel -->
+	<div class="numel-panel">
+		<h1 class="numel-title">
+			<span class="numel-brand">Numel AI</span> Playground
+		</h1>
 
-			.main-content {
-				display: flex;
-				gap: 20px;
-				flex: 1;
-				min-height: 0;
-			}
-
-			* {
-				color: #b6b6b6;
-			}
-
-			select {
-				background: #262624;
-				border: 1px solid #555;
-				border-radius: 6px;
-				padding: 5px;
-			}
-
-			.container {
-				background: white;
-				background: #262624;
-				border-radius: 6px;
-				padding: 20px;
-				box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-				flex: 0 0 400px;
-				display: flex;
-				flex-direction: column;
-				min-height: 0;
-			}
-
-			.chat-container {
-				flex: 1;
-				border: 1px solid #555;
-				border-radius: 6px;
-				overflow-y: auto;
-				padding: 15px;
-				background: #fafafa;
-				background: #30302E;
-				margin-bottom: 15px;
-				min-height: 200px;
-			}
-
-			.message {
-				margin: 10px 0;
-				padding: 8px 12px;
-				border-radius: 8px;
-				max-width: 80%;
-			}
-
-			.message.user {
-				background: #007bff;
-				color: white;
-				margin-left: auto;
-			}
-
-			.message.agent {
-				background: #28a745;
-				color: white;
-			}
-
-			.message.system {
-				background: #6c757d;
-				color: white;
-				font-size: 0.9em;
-			}
-
-			.message.system-error {
-				background: #6c757d;
-				color: white;
-				font-size: 0.9em;
-			}
-
-			.message.ui {
-				background: #365138;
-				color: white;
-				font-size: 0.9em;
-			}
-
-			.input-group {
-				display: flex;
-				gap: 10px;
-			}
-
-			#messageInput {
-				flex: 1;
-				padding: 10px;
-				border: 1px solid #555;
-				border-radius: 6px;
-				font-size: 16px;
-			}
-
-			button {
-				padding: 10px 20px;
-				background: #007bff;
-				color: white;
-				border: none;
-				border-radius: 6px;
-				cursor: pointer;
-				font-size: 16px;
-			}
-
-			button:hover {
-				background: #0056b3;
-			}
-
-			button:disabled {
-				background: #6c757d;
-				cursor: not-allowed;
-			}
-
-			.status.idle { color: #bea7ff; }
-			.status.connecting { color: #b18606; }
-			.status.connected { color: #198b33; }
-			.status.disconnected { color: #bb0f20; }
-
-			.config {
-				margin-bottom: 15px;
-				padding: 10px;
-				background: #e9ecef;
-				background: #30302E;
-				border-radius: 6px;
-				border: 1px solid #555;
-			}
-
-			.config input {
-				width: 100%;
-				padding: 5px;
-				border: 1px solid #555;
-				border-radius: 4px;
-				margin: 5px 0;
-				background: #262624;
-			}
-
-			.loading {
-				display: none;
-				color: #6c757d;
-				font-style: italic;
-			}
-
-			.footer {
-				padding: 10px 0 20px 0;
-				text-align: center;
-				font-size: 0.8em;
-				position: absolute;
-				bottom: 0;
-				left: 50%;
-				transform: translateX(-50%);
-			}
-
-			.centered {
-				text-align: center;
-			}
-
-			.app-name {
-				color: orange;
-			}
-		</style>
-
-		<!-- Modular CSS: Load in order - Themes, Canvas, UI -->
-		<link rel="stylesheet" href="schemagraph/schemagraph-themes.css">
-		<link rel="stylesheet" href="schemagraph/schemagraph-canvas.css">
-		<link rel="stylesheet" href="schemagraph/schemagraph-ui.css">
-		<!-- SchemaGraph Library -->
-		<script type="text/javascript" src="schemagraph/schemagraph.js"></script>
-	</head>
-	<body>
-		<div class="container">
-			<h1 class="centered"><span class="app-name">Numel AI</span> Playground</h1>
-
-			<div class="config">
-				<table>
-					<tr>
-						<td><label for="serverUrl">URL:</label></td>
-						<td><input type="url" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000" /></td>
-					</tr>
-					<tr>
-						<td><label for="userId">User ID:</label></td>
-						<td><input type="text" id="userId" value="" placeholder="Optional User ID" /></td>
-					</tr>
-					<tr>
-						<td><label for="sessionId">Session ID:</label></td>
-						<td><input type="text" id="sessionId" value="" placeholder="Optional Session ID" /></td>
-					</tr>
-					<tr>
-						<td><label for="status">Status:</label></td>
-						<td><div id="status" class="status idle">Not connected</div></td>
-					</tr>
-				</table>
+		<!-- Connection Config -->
+		<div class="numel-config-section">
+			<div class="numel-config-row">
+				<label for="serverUrl">URL:</label>
+				<input type="url" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000" />
 			</div>
-
-			<div class="config">
-				<table>
-					<tr>
-						<td><label for="agents">Agent:</label></td>
-						<td><select id="appAgentSelect" disabled><option value="-1"> - None - </option></select></td>
-					</tr>
-					<tr>
-						<td><label for="debugMessage">Debug:</label></td>
-						<td>
-							<input type="checkbox" id="debugMessage" value="true" />
-						</td>
-					</tr>
-				</table>
+			<div class="numel-config-row">
+				<label for="userId">User ID:</label>
+				<input type="text" id="userId" placeholder="Optional User ID" />
 			</div>
-
-			<div id="chatContainer" class="chat-container"></div>
-
-			<div class="input-group">
-				<input type="text" id="messageInput" placeholder="Type your message..." disabled>
-				<button id="sendButton" onclick="sendMessage()" disabled>Send</button>
-				<button id="clearChatButton" onclick="clearChat()">🗑️</button>
-				<button id="connectButton" onclick="toggleConnection()">Connect</button>
+			<div class="numel-config-row">
+				<label for="sessionId">Session ID:</label>
+				<input type="text" id="sessionId" placeholder="Optional Session ID" />
 			</div>
-
-			<div id="loading" class="loading">Loading AG-UI client...</div>
+			<div class="numel-config-row">
+				<label for="status">Status:</label>
+				<div id="status" class="numel-status numel-status-idle">Not connected</div>
+			</div>
 		</div>
 
-		<div>
-			<div style="display: none;">
-				<div class="sg-error-banner" id="sg-errorBanner"></div>
-				<div class="sg-node-types" id="sg-nodeTypes"><strong>Registered Node Types:</strong> <span id="sg-nodeTypesList">None</span></div>
-				<div class="sg-schema-manager" style="display: none;">
-					<div class="sg-schema-manager-title">📋 Registered Schemas:</div>
-					<div id="sg-schemaList"></div>
-					</div>
+		<!-- Agent Config -->
+		<div class="numel-config-section">
+			<div class="numel-config-row">
+				<label for="appAgentSelect">Agent:</label>
+				<select id="appAgentSelect" disabled>
+					<option value="-1"> - None - </option>
+				</select>
+			</div>
+			<div class="numel-config-row">
+				<label for="debugMessage">Debug:</label>
+				<input type="checkbox" id="debugMessage" />
+			</div>
+		</div>
+
+		<!-- Chat Container -->
+		<div id="chatContainer" class="numel-chat-container"></div>
+
+		<!-- Input Group -->
+		<div class="numel-input-group">
+			<input type="text" id="messageInput" placeholder="Type your message..." disabled>
+			<button id="sendButton" class="numel-btn numel-btn-primary" disabled>Send</button>
+			<button id="clearChatButton" class="numel-btn numel-btn-secondary">🗑️</button>
+			<button id="connectButton" class="numel-btn numel-btn-accent">Connect</button>
+		</div>
+
+		<div id="loading" class="numel-loading">Loading NumelApp...</div>
+	</div>
+
+	<!-- SchemaGraph Canvas Panel -->
+	<div class="numel-graph-panel">
+		<!-- Hidden UI Elements (SchemaGraph requires these IDs) -->
+		<div class="numel-hidden-elements">
+			<div class="sg-error-banner" id="sg-errorBanner"></div>
+			<div class="sg-node-types" id="sg-nodeTypes">
+				<strong>Registered Node Types:</strong> 
+				<span id="sg-nodeTypesList">None</span>
+			</div>
+			<div class="sg-schema-manager" style="display: none;">
+				<div class="sg-schema-manager-title">📋 Registered Schemas:</div>
+				<div id="sg-schemaList"></div>
+			</div>
+			
+			<button id="sg-uploadSchemaBtn" class="sg-action-btn">📤 Upload Schema</button>
+			<button id="sg-exportBtn" class="sg-action-btn">Export Graph</button>
+			<button id="sg-importBtn" class="sg-action-btn">Import Graph</button>
+			<button id="sg-exportConfigBtn" class="sg-action-btn">Export Config</button>
+			<button id="sg-importConfigBtn" class="sg-action-btn">Import Config</button>
+			
+			<input type="file" id="sg-uploadSchemaFile" accept=".py" />
+			<input type="file" id="sg-importFile" accept=".json" />
+			<input type="file" id="sg-importConfigFile" accept=".json" />
+			
+			<button id="sg-textScalingToggle" class="sg-text-scaling-toggle">
+				<span class="sg-text-scaling-icon">🔤</span>
+				<span class="sg-text-scaling-label" id="sg-textScalingLabel">Fixed</span>
+			</button>
+		</div>
+
+		<!-- Canvas Container -->
+		<div class="sg-canvas-container">
+			<canvas id="sg-main-canvas"></canvas>
+			<div id="sg-contextMenu" class="sg-context-menu"></div>
+			<input type="text" id="sg-nodeInput" class="sg-node-input-overlay" />
+			
+			<!-- Toolbar -->
+			<div class="sg-zoom-indicator numel-toolbar">
+				<div class="sg-status">
+					Status: <span class="sg-status-value" id="sg-status">None</span>
 				</div>
-				<button style="display: none;" id="sg-uploadSchemaBtn" class="sg-action-btn sg-action-btn-primary" title="Upload Pydantic schema">📤 Upload Schema</button>
-				<button style="display: none;" id="sg-exportBtn" class="sg-action-btn" title="Export graph">Export Graph</button>
-				<button style="display: none;" id="sg-importBtn" class="sg-action-btn" title="Import graph">Import Graph</button>
-				<button style="display: none;" id="sg-exportConfigBtn" class="sg-action-btn" title="Export as config JSON">Export Config</button>
-				<button style="display: none;" id="sg-importConfigBtn" class="sg-action-btn" title="Import config JSON">Import Config</button>
-				<input type="file" id="sg-uploadSchemaFile" accept=".py" style="display: none;" />
-				<input type="file" id="sg-importFile" accept=".json" style="display: none;" />
-				<input type="file" id="sg-importConfigFile" accept=".json" style="display: none;" />
-				<button style="display: none;" id="sg-textScalingToggle" class="sg-text-scaling-toggle" title="Toggle text scaling with zoom">
-					<span class="sg-text-scaling-icon">🔤</span>
-					<span class="sg-text-scaling-label" id="sg-textScalingLabel">Fixed</span>
-				</button>
-			</div>
-
-			<div class="sg-canvas-container">
-				<canvas id="sg-main-canvas"></canvas>
-				<div id="sg-contextMenu" class="sg-context-menu"></div>
-				<input type="text" id="sg-nodeInput" class="sg-node-input-overlay" />
-				<div class="sg-zoom-indicator">
-					<div class="sg-status">Status: <span class="sg-status-value" id="sg-status">None</span></div>
-					<div class="sg-divider"></div>
-					<div class="sg-voice-controls">
-						<span style="font-size: 10px; color: var(--sg-text-tertiary); margin-right: 4px;">🎤 Voice:</span>
-						<button id="sg-voiceStartBtn" class="sg-voice-btn">Start</button>
-						<button id="sg-voiceStopBtn" class="sg-voice-btn" style="display: none;">Stop</button>
-						<span id="sg-voiceStatus" class="sg-voice-status"></span>
-					</div>
-					<div class="sg-divider"></div>
-					<button id="sg-analyticsToggleBtn" class="sg-action-btn">📊 Analytics</button>
-					<div class="sg-divider"></div>
-					<button id="sg-themeBtn" class="sg-theme-btn" title="Switch theme">🎨</button>
-					<select id="sg-drawingStyleSelect" class="sg-drawing-style-select" title="Change drawing style">
-						<option value="default">🎨 Default</option>
-						<option value="minimal">✨ Minimal</option>
-						<option value="blueprint">📐 Blueprint</option>
-						<option value="neon">💫 Neon</option>
-						<option value="organic">🌿 Organic</option>
-						<option value="wireframe">📊 Wireframe</option>
-					</select>
-					<div class="sg-divider"></div>
-					<select id="sg-layoutSelect" class="sg-layout-select" title="Apply layout algorithm">
-						<option value="">🔧 Layout...</option>
-						<option value="hierarchical-vertical">Hierarchical (Vertical)</option>
-						<option value="hierarchical-horizontal">Hierarchical (Horizontal)</option>
-						<option value="force-directed">Force-Directed</option>
-						<option value="grid">Grid</option>
-						<option value="circular">Circular</option>
-					</select>
-					<button id="sg-centerViewBtn" class="sg-action-btn" title="Center view on graph">🎯 Center</button>
-					<div class="sg-divider"></div>
-					Zoom: <span class="sg-zoom-value" id="sg-zoomLevel">100%</span>
-					<button id="sg-resetZoomBtn" class="sg-zoom-reset-btn" title="Reset zoom to 100%">⟲</button>
+				<div class="sg-divider"></div>
+				
+				<!-- Voice Controls -->
+				<div class="sg-voice-controls">
+					<span style="font-size: 10px; color: var(--sg-text-tertiary); margin-right: 4px;">🎤 Voice:</span>
+					<button id="sg-voiceStartBtn" class="sg-voice-btn">Start</button>
+					<button id="sg-voiceStopBtn" class="sg-voice-btn" style="display: none;">Stop</button>
+					<span id="sg-voiceStatus" class="sg-voice-status"></span>
 				</div>
+				<div class="sg-divider"></div>
+				
+				<!-- Analytics -->
+				<button id="sg-analyticsToggleBtn" class="sg-action-btn">📊 Analytics</button>
+				<div class="sg-divider"></div>
+				
+				<!-- Theme & Style -->
+				<button id="sg-themeBtn" class="sg-theme-btn" title="Switch theme">🎨</button>
+				<select id="sg-drawingStyleSelect" class="sg-drawing-style-select" title="Change drawing style">
+					<option value="default">🎨 Default</option>
+					<option value="minimal">✨ Minimal</option>
+					<option value="blueprint">📐 Blueprint</option>
+					<option value="neon">💫 Neon</option>
+					<option value="organic">🌿 Organic</option>
+					<option value="wireframe">📊 Wireframe</option>
+				</select>
+				<div class="sg-divider"></div>
+				
+				<!-- Layout -->
+				<select id="sg-layoutSelect" class="sg-layout-select" title="Apply layout algorithm">
+					<option value="">🔧 Layout...</option>
+					<option value="hierarchical-vertical">Hierarchical (Vertical)</option>
+					<option value="hierarchical-horizontal">Hierarchical (Horizontal)</option>
+					<option value="force-directed">Force-Directed</option>
+					<option value="grid">Grid</option>
+					<option value="circular">Circular</option>
+				</select>
+				<button id="sg-centerViewBtn" class="sg-action-btn" title="Center view on graph">🎯 Center</button>
+				<div class="sg-divider"></div>
+				
+				<!-- Zoom -->
+				Zoom: <span class="sg-zoom-value" id="sg-zoomLevel">100%</span>
+				<button id="sg-resetZoomBtn" class="sg-zoom-reset-btn" title="Reset zoom to 100%">⟲</button>
 			</div>
 		</div>
+	</div>
 
-		<div class="footer">
-			&copy; 2025 - <a href="mailto:marco.dibenedetto@isti.cnr.it">Marco Di Benedetto</a>
-		</div>
+	<!-- Footer -->
+	<div class="numel-footer">
+		&copy; 2025 - <a href="mailto:marco.dibenedetto@isti.cnr.it">Marco Di Benedetto</a>
+	</div>
 
-		<script type="text/javascript" src="dist/agui-client.bundle.js"></script>
-		<script type="text/javascript" src="numel.js"></script>
-
-		<script>
-			const schemaName   = "numel";
-			const startMessage = "🤖 Hi, I am Numel, an AI playground. Ask me anything you want 🙂";
-			const endMessage   = "🤖 See you soon 👋";
-
-			let aguiApp            = null;
-			let graph              = null;
-			let isConnected        = false;
-			let agentPrevIndex     = -1;
-			let agentCurrIndex     = -1;
-			let messagePrevRole    = null;
-			let messagePrevElement = null;
-
-			const chatContainer   = document.getElementById("chatContainer");
-			const messageInput    = document.getElementById("messageInput");
-			const sendButton      = document.getElementById("sendButton");
-			const connectButton   = document.getElementById("connectButton");
-			const statusDiv       = document.getElementById("status");
-			const serverUrlInput  = document.getElementById("serverUrl");
-			const sessionIdInput  = document.getElementById("sessionId");
-			const userIdInput     = document.getElementById("userId");
-			const loadingDiv      = document.getElementById("loading");
-			const systemMsgButton = document.getElementById("debugMessage");
-			const appAgentSelect  = document.getElementById("appAgentSelect");
-			const clearChatButton = document.getElementById("clearChatButton");
-
-			function clearChat() {
-				messagePrevRole         = null;
-				messagePrevElement      = null;
-				chatContainer.innerHTML = "";
-			}
-
-			function changeSystemVisibility() {
-				const divs    = document.getElementsByClassName("message system");
-				const display = this.checked ? "block" : "none";
-				for (let dv of divs) {
-					dv.style.display = display;
-				}
-			}
-
-			function checkAGUILoaded() {
-				if (typeof NumelApp !== "undefined") {
-					loadingDiv.style.display = "none";
-					addMessage("system", "✅ NumelApp loaded successfully");
-				} else {
-					loadingDiv.style.display = "block";
-					loadingDiv.textContent = "❌ Failed to load NumelApp.";
-					addMessage("system-error", "❌ Error: NumelApp not found.");
-				}
-			}
-
-			function enableAppInput(enable) {
-				serverUrlInput  .disabled = !enable;
-				sessionIdInput  .disabled = !enable;
-				userIdInput     .disabled = !enable;
-				appAgentSelect  .disabled = enable;
-			}
-
-			async function connect() {
-				const serverUrl = serverUrlInput.value.trim();
-				if (!serverUrl) {
-					addMessage("system", "⚠️ Please enter a valid server URL");
-					return;
-				}
-
-				addMessage("system", "⌛ Connecting...");
-
-				const userId    = userIdInput    .value.trim();
-				const sessionId = sessionIdInput .value.trim();
-
-				enableAppInput(false);
-
-				updateStatus("connecting", "Connecting...");
-
-				try {
-					aguiApp = await NumelApp.connect(serverUrl, {
-						userId     : userId,
-						sessionId  : sessionId,
-						subscriber : { onEvent(params) { handleAGUIEvent(params.event); }, },
-					});
-					if (!aguiApp) {
-						throw new Error("NumelApp initialization failed");
-					}
-
-					const config = await aguiApp.getConfig();
-					graph.api.schema .register(schemaName, aguiApp.schema, "Index", "AppConfig");
-					graph.api.config .import(config, schemaName);
-					graph.api.layout .apply("circular");
-					graph.api.view   .center();
-
-					agentPrevIndex = -1;
-					agentCurrIndex = 0;
-					isConnected    = true;
-
-					await setAppStatus();
-
-					clearChat();
-					updateStatus("connected", "AG-UI client ready");
-					enableInput(true);
-					connectButton.textContent = "Disconnect";
-					addMessage("system", `✅ AG-UI client initialized for ${serverUrl}`);
-					addMessage("ui", startMessage);
-
-				} catch (error) {
-					console.error("Failed to initialize AG-UI client:", error);
-					addMessage("system-error", `❌ Connection failed: ${error.message}<br/>`);
-					updateStatus("disconnected", "Connection failed");
-					enableAppInput(true);
-				}
-			}
-
-			function disconnect() {
-				graph.api.schema.remove(schemaName);
-
-				if (aguiApp) {
-					addMessage("system", "⌛ Disconnecting...");
-					aguiApp.disconnect();
-					aguiApp = null;
-				}
-
-				isConnected = false;
-
-				agentCurrIndex = -1;
-				appAgentSelect.innerHTML = "<option value='-1'> - None - </option>";
-
-				messageInput.value = "";
-
-				updateStatus("disconnected", "Disconnected");
-				enableInput(false);
-				connectButton.textContent = "Connect";
-				addMessage("system", "ℹ️ Disconnected from agent");
-				addMessage("ui", endMessage);
-				enableAppInput(true);
-			}
-
-			function handleAGUIEvent(event) {
-				console.log("AG-UI Event:", event);
-
-				if (!event) return;
-
-				switch (event.type) {
-					case NumelApp.EventType.TEXT_MESSAGE_CONTENT:
-					case NumelApp.EventType.TEXT_MESSAGE_CHUNK:
-						const content = event.delta || "No content";
-						addMessage("agent", content);
-						break;
-
-					case NumelApp.EventType.TEXT_MESSAGE_START:
-						addMessage("system", "🤖 Agent is responding...");
-						break;
-
-					case NumelApp.EventType.TEXT_MESSAGE_END:
-						addMessage("system", "✅ Response complete");
-						break;
-
-					case NumelApp.EventType.RUN_STARTED:
-						addMessage("system", "🚀 Agent run started");
-						break;
-
-					case NumelApp.EventType.RUN_FINISHED:
-						addMessage("system", "🏁 Agent run finished");
-						break;
-
-					case NumelApp.EventType.RUN_ERROR:
-						addMessage("system-error", `❌ Error: ${event.error || "Unknown error"}`);
-						break;
-
-					case NumelApp.EventType.TOOL_CALL_START:
-						addMessage("system", `🔧 Tool call: ${event.tool_name || "unknown"}`);
-						break;
-
-					case NumelApp.EventType.TOOL_CALL_RESULT:
-						addMessage("system", `✅ Tool result received`);
-						break;
-
-					default:
-						addMessage("system", `ℹ️ Event: ${event.type}`);
-						console.log("Unhandled event:", event);
-				}
-			}
-
-			async function sendMessage() {
-				const message = messageInput.value.trim();
-				if (!message || !isConnected || !aguiApp) return;
-
-				addMessage("user", message);
-
-				if (agentPrevIndex != agentCurrIndex) {
-					agentPrevIndex = agentCurrIndex;
-					const agent     = aguiApp.status["config"]["agents"][agentPrevIndex];
-					const agentName = aguiApp.status["config"]["infos" ][agent["info"] ]["name"];
-					addMessage("ui", `🤖 Talking to Agent "${agentName}"`);
-				}
-
-				messageInput    .value       = "";
-				sendButton      .textContent = "Messaging...";
-				sendButton      .disabled    = true;
-				connectButton   .disabled    = true;
-				clearChatButton .disabled    = true;
-
-				try {
-					await aguiApp.send(message, agentPrevIndex);
-				} catch (error) {
-					console.error("Failed to send message:", error);
-					addMessage("system-error", `❌ Failed to send message: ${error.message}`);
-				} finally {
-					sendButton      .textContent = "Send";
-					sendButton      .disabled    = false;
-					connectButton   .disabled    = false;
-					clearChatButton .disabled    = false;
-				}
-			}
-
-			function addMessage(role, content) {
-				if (messagePrevRole != role) {
-					const messageDiv = document.createElement("div");
-					messageDiv.className = `message ${role}`;
-					if (role == "system") {
-						const display = systemMsgButton.checked ? "block" : "none";
-						messageDiv.style.display = display;
-					}
-					messageDiv.innerHTML = "";
-					chatContainer.appendChild(messageDiv);
-					messagePrevRole    = role;
-					messagePrevElement = messageDiv;
-				} else if (role == "system") {
-					content = `<br/>${content}`;
-				}
-				messagePrevElement.innerHTML += content;
-				chatContainer.scrollTop = chatContainer.scrollHeight;
-			}
-
-			function updateStatus(type, message) {
-				statusDiv.className = `status ${type}`;
-				statusDiv.textContent = message;
-			}
-
-			function enableInput(enabled) {
-				messageInput .disabled = !enabled;
-				sendButton   .disabled = !enabled;
-			}
-
-			function toggleConnection() {
-				if (isConnected) {
-					disconnect();
-				} else {
-					connect();
-				}
-			}
-
-			async function setAppStatus() {
-				const status  = await aguiApp.getStatus();
-				const config  = status["config"];
-				const agents  = config["agents"];
-				let   content = "";
-				if (agents.length == 0) {
-					agentCurrIndex = -1;
-					content        = "<option value='-1'> - None - </option>";
-				}
-				else {
-					agentCurrIndex = 0;
-					for (let i=0; i<agents.length; ++i) {
-						const selected = (i == agentCurrIndex) ? " selected" : "";
-						const info     = config["infos"][agents[i]["info"]];
-						content += `<option value="${i}"${selected}>${info["name"]}</option>`;
-					}
-				}
-				appAgentSelect.innerHTML = content;
-				appAgentSelect.disabled  = false;
-				return status;
-			}
-
-			serverUrlInput.addEventListener("change", (e) => {
-				appAgentSelect.disabled  = true;
-				appAgentSelect.innerHTML = "<option value='-1'> - None - </option>";
-			});
-
-			appAgentSelect.addEventListener("change", (e) => {
-				agentCurrIndex = parseInt(e.target.value);
-			});
-
-			systemMsgButton.addEventListener("change", changeSystemVisibility);
-
-			messageInput.addEventListener("keypress", (e) => {
-				if (e.key === "Enter" && !e.shiftKey) {
-					e.preventDefault();
-					sendMessage();
-				}
-			});
-
-			const onLoaded = () => {
-				checkAGUILoaded();
-				graph = new SchemaGraphApp("sg-main-canvas");
-			}
-
-			if (document.readyState === 'loading') {
-				document.addEventListener('DOMContentLoaded', onLoaded);
-			}
-			else {
-				onLoaded();
-			}
-		</script>
-	</body>
+	<!-- Scripts -->
+	<script type="text/javascript" src="schemagraph/schemagraph.js"></script>
+	<script type="text/javascript" src="dist/agui-client.bundle.js"></script>
+	<script type="text/javascript" src="numel.js"></script>
+	<script type="text/javascript" src="numel-app.js"></script>
+</body>
 </html>
