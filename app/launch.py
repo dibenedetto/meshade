@@ -7,7 +7,7 @@ import uvicorn
 
 
 from   dotenv                  import load_dotenv
-from   fastapi                 import FastAPI
+from   fastapi                 import FastAPI, WebSocket
 from   fastapi.middleware.cors import CORSMiddleware
 
 
@@ -22,6 +22,7 @@ from   numel                   import (
 	unroll_config,
 	validate_config,
 )
+import workflow_executor
 
 
 load_dotenv()
@@ -243,6 +244,29 @@ async def shutdown_server():
 	ctrl_server = None
 	ctrl_status = None
 	return {"message": "Server shut down"}
+
+
+@ctrl_app.post("/workflow/execute")
+async def execute_workflow(workflow_data: dict):
+    """Execute a workflow graph"""
+    try:
+        # Parse workflow nodes and edges
+        nodes = workflow_data.get('nodes', [])
+        edges = workflow_data.get('edges', [])
+        
+        # Execute workflow logic
+        result = await workflow_executor.run(nodes, edges)
+        
+        return {"status": "success", "result": result}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@ctrl_app.websocket("/ws/workflow")
+async def workflow_websocket(websocket: WebSocket):
+    """Stream workflow execution events"""
+    await websocket.accept()
+    # Emit events during workflow execution
 
 
 async def run_server():

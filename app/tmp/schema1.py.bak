@@ -1,18 +1,12 @@
-# schema
-
 from   pydantic        import BaseModel
 from   typing          import Any, Dict, List, Optional, Union
 
 
-from   workflow_schema import WorkflowConfig
-
-
 DEFAULT_APP_MAX_AGENTS                            : int  = 100
 DEFAULT_APP_PORT                                  : int  = 8000
+DEFAULT_APP_RELOAD                                : bool = True
+DEFAULT_APP_SEED                                  : int  = 42
 DEFAULT_APP_API_KEY                               : str  = None
-
-DEFAULT_APP_OPTIONS_RELOAD                        : bool = True
-DEFAULT_APP_OPTIONS_SEED                          : int  = None
 
 DEFAULT_BACKEND_TYPE                              : str  = "agno"
 DEFAULT_BACKEND_VERSION                           : str  = ""
@@ -48,8 +42,8 @@ DEFAULT_SESSION_MANAGER_CONTENT_DB_TABLE_NAME     : str  = "session_manager_cont
 
 DEFAULT_KNOWLEDGE_MANAGER_QUERY                   : bool = True
 DEFAULT_KNOWLEDGE_MANAGER_MAX_RESULTS             : int  = 10
-DEFAULT_KNOWLEDGE_MANAGER_CONTENT_DB_TABLE_NAME   : str  = "knowledge_manager_content_db_table"
-DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME     : str  = "knowledge_manager_index_db_table"
+DEFAULT_KNOWLEDGE_MANAGER_CONTENT_DB_TABLE_NAME   : str  = "knowledge_base_content_db_table"
+DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME     : str  = "knowledge_base_index_db_table"
 
 DEFAULT_TOOL_FALLBACK                             : bool = False
 DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS               : int  = 5
@@ -167,51 +161,49 @@ class AgentConfig(ConfigModel):
 	port          : int                                               = 0
 
 
-# class TeamOptionsConfig(ConfigModel):
-# 	tag : int = 0
+class TeamOptionsConfig(ConfigModel):
+	tag : int = 0
 
 
-# class TeamConfig(ConfigModel):
-# 	info    : Optional[InfoConfig]                      = InfoConfig()
-# 	options : Optional[Union[TeamOptionsConfig, Index]] = TeamOptionsConfig()
-# 	agents  : List[Union[AgentConfig, Index]]           = []
+class TeamConfig(ConfigModel):
+	info    : Optional[InfoConfig]                      = InfoConfig()
+	options : Optional[Union[TeamOptionsConfig, Index]] = TeamOptionsConfig()
+	agents  : List[Union[AgentConfig, Index]]           = []
 
 
-# class WorkflowOptionsConfig(ConfigModel):
-# 	tag : int = 0
+class WorkflowOptionsConfig(ConfigModel):
+	tag : int = 0
 
 
-# class WorkflowConfig(ConfigModel):
-# 	info    : Optional[InfoConfig]                          = InfoConfig()
-# 	options : Optional[Union[WorkflowOptionsConfig, Index]] = WorkflowOptionsConfig()
-# 	agents  : List[Union[AgentConfig, Index]]               = []
-# 	teams   : List[Union[TeamConfig, Index]]                = []
+class WorkflowConfig(ConfigModel):
+	info    : Optional[InfoConfig]                          = InfoConfig()
+	options : Optional[Union[WorkflowOptionsConfig, Index]] = WorkflowOptionsConfig()
+	agents  : List[Union[AgentConfig, Index]]               = []
+	teams   : List[Union[TeamConfig, Index]]                = []
 
 
 class AppOptionsConfig(ConfigModel):
-	seed   : Optional[int] = DEFAULT_APP_OPTIONS_SEED
-	reload : bool          = DEFAULT_APP_OPTIONS_RELOAD
+	seed   : Optional[int] = None
+	reload : bool          = DEFAULT_APP_RELOAD
 
 
 class AppConfig(ConfigModel):
-	info             : Optional[Union[InfoConfig      , Index]] = InfoConfig()
-	options          : Optional[Union[AppOptionsConfig, Index]] = AppOptionsConfig()
-	infos            : Optional[List[InfoConfig              ]] = []
-	app_options      : Optional[List[AppOptionsConfig        ]] = []
-	backends         : Optional[List[BackendConfig           ]] = []
-	models           : Optional[List[ModelConfig             ]] = []
-	embeddings       : Optional[List[EmbeddingConfig         ]] = []
-	prompts          : Optional[List[PromptConfig            ]] = []
-	content_dbs      : Optional[List[ContentDBConfig         ]] = []
-	index_dbs        : Optional[List[IndexDBConfig           ]] = []
-	memory_mgrs      : Optional[List[MemoryManagerConfig     ]] = []
-	session_mgrs     : Optional[List[SessionManagerConfig    ]] = []
-	knowledge_mgrs   : Optional[List[KnowledgeManagerConfig  ]] = []
-	tools            : Optional[List[ToolConfig              ]] = []
-	agent_options    : Optional[List[AgentOptionsConfig      ]] = []
-	agents           : Optional[List[AgentConfig             ]] = []
-	# team_options     : Optional[List[TeamOptionsConfig       ]] = []
-	# teams            : Optional[List[TeamConfig              ]] = []
-	# workflow_options : Optional[List[WorkflowOptionsConfig   ]] = []
-	workflows        : Optional[List[WorkflowConfig          ]] = []
-	port             : int                                      = DEFAULT_APP_PORT
+	info             : Optional[InfoConfig                  ] = InfoConfig()
+	options          : Optional[AppOptionsConfig            ] = AppOptionsConfig()
+	backends         : Optional[List[BackendConfig         ]] = []
+	models           : Optional[List[ModelConfig           ]] = []
+	embeddings       : Optional[List[EmbeddingConfig       ]] = []
+	prompts          : Optional[List[PromptConfig          ]] = []
+	content_dbs      : Optional[List[ContentDBConfig       ]] = []
+	index_dbs        : Optional[List[IndexDBConfig         ]] = []
+	memory_mgrs      : Optional[List[MemoryManagerConfig   ]] = []
+	session_mgrs     : Optional[List[SessionManagerConfig  ]] = []
+	knowledge_mgrs   : Optional[List[KnowledgeManagerConfig]] = []
+	tools            : Optional[List[ToolConfig            ]] = []
+	agent_options    : Optional[List[AgentOptionsConfig    ]] = []
+	agents           : Optional[List[AgentConfig           ]] = []
+	team_options     : Optional[List[TeamOptionsConfig     ]] = []
+	teams            : Optional[List[TeamConfig            ]] = []
+	workflow_options : Optional[List[WorkflowOptionsConfig ]] = []
+	workflows        : Optional[List[WorkflowConfig        ]] = []
+	port             : int                                    = DEFAULT_APP_PORT

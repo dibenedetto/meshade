@@ -155,15 +155,44 @@
 		</div>
 	</div>
 
+	<!-- Workflow Editor Panel -->
+	<div class="workflow-panel">
+		<h2>Workflow Editor</h2>
+		
+		<!-- Node Palette -->
+		<div id="nodePalette" class="node-palette">
+			<h3>Nodes</h3>
+			<button data-node-type="start">▶️ Start</button>
+			<button data-node-type="agent">🤖 Agent</button>
+			<button data-node-type="decision">◆ Decision</button>
+			<button data-node-type="tool_call">🔧 Tool</button>
+			<button data-node-type="transform">⚙️ Transform</button>
+			<button data-node-type="end">⏹️ End</button>
+		</div>
+		
+		<!-- Workflow Canvas -->
+		<canvas id="workflowCanvas"></canvas>
+		
+		<!-- Controls -->
+		<div class="workflow-controls">
+			<button id="executeWorkflow">▶️ Execute</button>
+			<button id="exportWorkflow">💾 Export</button>
+			<button id="importWorkflow">📁 Import</button>
+			<button id="clearWorkflow">🗑️ Clear</button>
+		</div>
+	</div>
+
 	<!-- Footer -->
 	<div class="numel-footer">
 		&copy; 2025 - <a href="mailto:marco.dibenedetto@isti.cnr.it">Marco Di Benedetto</a>
 	</div>
 
 	<!-- Scripts -->
-	<script type="text/javascript" src="schemagraph/schemagraph.js"></script>
 	<script type="text/javascript" src="dist/agui-client.bundle.js"></script>
+	<script type="text/javascript" src="schemagraph/schemagraph.js"></script>
+	<script type="text/javascript" src="schemagraph-workflow.js"></script>
 	<script type="text/javascript" src="numel.js"></script>
 	<script type="text/javascript" src="numel-app.js"></script>
+	<script type="text/javascript" src="numel-workflow.js"></script>
 </body>
 </html>

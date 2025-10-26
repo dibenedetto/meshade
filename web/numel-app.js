@@ -55,6 +55,39 @@ function initializeApp() {
 	// Initialize SchemaGraph
 	graph = new SchemaGraphApp("sg-main-canvas");
 
+	// Initialize Workflow Extension if available
+	if (typeof initWorkflowExtension === "function") {
+		initWorkflowExtension(graph);
+
+		// Listen for workflow execution requests
+		graph.eventBus.on("workflow:execute", async (workflowData) => {
+			const url = aguiApp.url + "/workflow/execute";
+			const response = await fetch(url, {
+				method: "POST",
+				headers: {"Content-Type": "application/json"},
+				body: JSON.stringify({
+					nodes: workflowData.nodes,
+					edges: workflowData.edges,
+					context: workflowData.context
+				})
+			});
+			const result = await response.json();
+			gApp.eventBus.emit("workflow:complete", result);
+		});
+
+		// Listen for agent node execution
+		graph.eventBus.on("workflow:agent_call", async (data) => {
+			// Use your existing aguiApp to call agents
+			const response = await aguiApp.send(data.message, data.agent_ref);
+			// Workflow continues automatically
+		});
+
+		console.log("✅ Workflow extension initialized");
+
+		// Optional: Create a sample workflow template
+		// graph.api.workflow.createTemplate();
+	}
+
 	// Setup event listeners
 	setupEventListeners();
 }
@@ -371,12 +404,8 @@ function changeSystemVisibility() {
 // ENTRY POINT
 // ========================================================================
 
-const onLoaded = () => {
-	initializeApp();
-};
-
 if (document.readyState === 'loading') {
-	document.addEventListener('DOMContentLoaded', onLoaded);
+	document.addEventListener('DOMContentLoaded', initializeApp);
 } else {
-	onLoaded();
+	initializeApp();
 }
