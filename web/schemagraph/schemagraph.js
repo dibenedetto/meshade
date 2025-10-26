@@ -1349,6 +1349,14 @@ class SchemaGraphApp {
     this.eventBus.on('keyboard:down', (data) => this.handleKeyDown(data));
     this.eventBus.on('keyboard:up', (data) => this.handleKeyUp(data));
     
+    // *** UI update events ***
+    this.eventBus.on('ui:update', (data) => {
+      const element = document.getElementById('sg-' + data.id);
+      if (element && data.content !== undefined) {
+        element.textContent = data.content;
+      }
+    });
+    
     // Graph events (for auto-updating displays)
     this.eventBus.on('node:created', () => {
       this.ui.update.schemaList();
