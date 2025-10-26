@@ -2302,19 +2302,24 @@ class SchemaGraphApp {
 
   // Keyboard handlers
   handleKeyDown(data) {
-    if (data.code === 'Space' && !this.spacePressed && !this.editingNode) {
+    // Don't handle keyboard shortcuts if user is typing in an input/textarea
+    const isTyping = data.event.target.tagName === 'INPUT' || 
+                     data.event.target.tagName === 'TEXTAREA' ||
+                     data.event.target.isContentEditable;
+    
+    if (data.code === 'Space' && !this.spacePressed && !this.editingNode && !isTyping) {
       data.event.preventDefault();
       this.spacePressed = true;
       this.canvas.style.cursor = 'grab';
     }
     
-    if ((data.key === 'Delete' || data.key === 'Backspace') && this.selectedNodes.size > 0 && !this.editingNode) {
+    if ((data.key === 'Delete' || data.key === 'Backspace') && this.selectedNodes.size > 0 && !this.editingNode && !isTyping) {
       data.event.preventDefault();
       this.deleteSelectedNodes();
     }
     
     // Select all with Ctrl+A
-    if ((data.event.ctrlKey || data.event.metaKey) && data.key === 'a' && !this.editingNode) {
+    if ((data.event.ctrlKey || data.event.metaKey) && data.key === 'a' && !this.editingNode && !isTyping) {
       data.event.preventDefault();
       this.clearSelection();
       for (const node of this.graph.nodes) {
@@ -2327,12 +2332,12 @@ class SchemaGraphApp {
       this.clearSelection();
     }
     
-    if ((data.event.ctrlKey || data.event.metaKey) && data.key === 's') {
+    if ((data.event.ctrlKey || data.event.metaKey) && data.key === 's' && !isTyping) {
       data.event.preventDefault();
       this.eventBus.emit('ui:export-graph', {});
     }
     
-    if ((data.event.ctrlKey || data.event.metaKey) && data.key === 'o') {
+    if ((data.event.ctrlKey || data.event.metaKey) && data.key === 'o' && !isTyping) {
       data.event.preventDefault();
       this.eventBus.emit('ui:import-graph', {});
     }
