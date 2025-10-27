@@ -299,8 +299,13 @@ class _AgnoAgentApp(AgentApp):
 			interfaces = [AGUI(agent=agent)]
 		)
 		app = agent_os.get_app()
-		agent.agent_os = agent_os
 		return app
+
+
+	def run(self, agent_index: int, *args, **kwargs) -> Any:
+		agent  = self.config_impl.agents[agent_index]
+		result = agent.run(*args, **kwargs)
+		return result
 
 
 	def close(self) -> bool:

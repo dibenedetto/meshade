@@ -110,7 +110,7 @@ class AgentNodeExecutor(NodeExecutor):
         message = agent_input.get("message", "")
         
         # Execute agent
-        response = await agent.run(message)
+        response = await agent(message)
         
         # Emit events during execution
         await event_bus.emit(Event(
@@ -196,7 +196,7 @@ class ToolCallNodeExecutor(NodeExecutor):
         resolved_args = self._resolve_args(args, state.variables)
         
         # Execute tool
-        result = await tool.execute(**resolved_args)
+        result = await tool(**resolved_args)
         
         return {"result": result}
     

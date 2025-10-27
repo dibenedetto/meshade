@@ -6,7 +6,7 @@ import json
 
 from   collections.abc import Callable
 from   fastapi         import FastAPI
-from   typing          import Dict, List, Tuple
+from   typing          import Any, Dict, List, Tuple
 
 
 from   schema          import *
@@ -73,7 +73,7 @@ def unroll_config(config: AppConfig) -> AppConfig:
 			if True:
 				if isinstance(agent.options, AgentOptionsConfig):
 					config_copy.agent_options.append(agent.options)
-					agent.options = len(config_copy.options) - 1
+					agent.options = len(config_copy.agent_options) - 1
 				if not isinstance(agent.options, int) or agent.options < 0 or agent.options >= len(config_copy.agent_options):
 					raise ValueError("Invalid agent options")
 
@@ -142,7 +142,7 @@ def unroll_config(config: AppConfig) -> AppConfig:
 					memory_mgr.prompt = len(config_copy.prompts) - 1
 				if not isinstance(memory_mgr.prompt, int) or memory_mgr.prompt < 0 or memory_mgr.prompt >= len(config_copy.prompts):
 					raise ValueError("Invalid memory prompt")
-				prompt = config_copy.prompt[memory_mgr.prompt]
+				prompt = config_copy.prompts[memory_mgr.prompt]
 
 				if True:
 					if prompt.model is None:
@@ -170,7 +170,7 @@ def unroll_config(config: AppConfig) -> AppConfig:
 					session_mgr.prompt = len(config_copy.prompts) - 1
 				if not isinstance(session_mgr.prompt, int) or session_mgr.prompt < 0 or session_mgr.prompt >= len(config_copy.prompts):
 					raise ValueError("Invalid session prompt")
-				prompt = config_copy.prompt[session_mgr.prompt]
+				prompt = config_copy.prompts[session_mgr.prompt]
 
 				if True:
 					if prompt.model is None:
@@ -674,6 +674,10 @@ class AgentApp:
 
 	def generate_app(self, agent_index: int) -> FastAPI:
 		raise NotImplementedError("Subclasses must implement the generate_app method")
+
+
+	def run(self, agent_index: int, *args, **kwargs) -> Any:
+		raise NotImplementedError("Subclasses must implement the run method")
 
 
 	def close(self) -> bool:

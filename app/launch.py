@@ -7,11 +7,13 @@ import uvicorn
 
 
 from   dotenv                  import load_dotenv
-from   fastapi                 import FastAPI, WebSocket
+from   fastapi                 import FastAPI
 from   fastapi.middleware.cors import CORSMiddleware
+from   functools               import partial
+from   typing                  import Any
 
 
-from   utils                   import get_time_str, log_print, seed_everything
+from   app_context             import AppContext
 from   numel                   import (
 	DEFAULT_APP_PORT,
 	AppConfig,
@@ -22,7 +24,8 @@ from   numel                   import (
 	unroll_config,
 	validate_config,
 )
-import workflow_executor
+from   utils                   import get_time_str, log_print, seed_everything
+# from   workflow_executor       import WorkflowExecutor
 
 
 load_dotenv()
@@ -46,6 +49,11 @@ def adjust_config(config: AppConfig) -> AppConfig:
 		return None
 	config = compact_config(config)
 	return config
+
+
+async def run_agent(agent: Any, *args, **kwargs) -> Any:
+	result = await agent.run(*args, **kwargs)
+	return result
 
 
 def try_apply_seed(config: AppConfig) -> None:
@@ -102,7 +110,9 @@ if True:
 		"status" : "waiting",
 	}
 
-	apps = None
+	apps            = None
+	app_ctx         = None
+	workflows       = None
 	running_servers = []
 
 	ctrl_app = FastAPI(title="Control")
@@ -146,7 +156,7 @@ async def export_config():
 
 @ctrl_app.post("/start")
 async def start_app():
-	global apps, config, ctrl_status, running_servers
+	global apps, app_ctx, config, ctrl_status, running_servers, workflows
 	if apps is not None:
 		return {"error": "App is already running"}
 	try:
@@ -158,15 +168,22 @@ async def start_app():
 		active_agents = [True] * len(config.agents)
 		backends      = get_backends()
 		apps          = []
+		app_agents    = []
+		app_tools     = []
 
 		agent_index = 0
 		for backend, ctor in backends.values():
 			bkd_cfg = extract_config(config, backend, active_agents)
 			if not bkd_cfg.agents:
+				apps       .append(None)
+				app_agents .append(None)
 				continue
 
-			app = ctor(bkd_cfg)
-			apps.append(app)
+			app       = ctor(bkd_cfg)
+			app_agent = partial(run_agent, app)
+
+			apps       .append(app)
+			app_agents .append(app_agent)
 
 			for i in range(len(app.config.agents)):
 				agent_app = app.generate_app(i)
@@ -185,6 +202,9 @@ async def start_app():
 				agent_index += 1
 				agent_port  += 1
 
+		# app_ctx   = AppContext(config, app_agents, app_tools)
+		# workflows = dict()
+
 		ctrl_status["config"] = config
 		ctrl_status["status"] = "running"
 	except Exception as e:
@@ -194,7 +214,7 @@ async def start_app():
 
 @ctrl_app.post("/stop")
 async def stop_app():
-	global apps, config, ctrl_status, running_servers
+	global apps, app_ctx, config, ctrl_status, running_servers, workflows
 	if apps is None:
 		return {"error": "App is not running"}
 	try:
@@ -206,11 +226,14 @@ async def stop_app():
 			if task:
 				await task
 		for app in apps:
-			app.close()
+			if app is not None:
+				app.close()
 		for agent in config.agents:
 			agent.port = 0
-		apps                  = None
-		running_servers       = []
+		apps            = None
+		app_ctx         = None
+		workflows       = None
+		running_servers = []
 		ctrl_status["config"] = None
 		ctrl_status["status"] = "stopped"
 	except Exception as e:
@@ -233,6 +256,85 @@ async def server_status():
 	return ctrl_status
 
 
+# @ctrl_app.post("/workflow/start")
+# async def start_workflow(data: dict):
+# 	global app_ctx, config, workflows
+# 	if data is None:
+# 		data = dict()
+# 	index = data.get("index")
+# 	if index is None or index < 0 or index >= len(config.workflows):
+# 		return {"error": "invalid workflow index"}
+# 	args      = data.get("args", dict())
+# 	workflow  = config.workflows[index]
+# 	executor  = WorkflowExecutor(app_ctx)
+# 	execution = await executor.execute_workflow(workflow, args)
+# 	info = {
+# 		"index"     : index,
+# 		"executor"  : executor,
+# 		"execution" : execution,
+# 		"args"      : args,
+# 	}
+# 	workflows[execution.execution_id] = info
+# 	result = {
+# 		"workflow_id"  : index,
+# 		"execution_id" : execution.execution_id,
+# 		"status"       : execution.status.value,
+# 		"outputs"      : execution.state.outputs,
+# 	}
+# 	return result
+
+
+# @ctrl_app.post("/workflow/stop")
+# async def stop_workflow(data: dict):
+# 	global app_ctx, config, workflows
+# 	if data is None:
+# 		data = dict()
+# 	execution_id = data.get("execution_id")
+# 	info = workflows.get(execution_id)
+# 	if not info:
+# 		return {"error": "invalid workflow execution id"}
+# 	info["executor"]
+# 	return {"status": 0}
+
+
+# @ctrl_app.post("/workflow/status")
+# async def workflow_status(data: dict):
+# 	global app_ctx, config, workflows
+# 	if data is None:
+# 		data = dict()
+# 	index = data.get("index")
+# 	if index is None or index < 0 or index >= len(config.workflows):
+# 		return {"error": "invalid workflow index"}
+# 	args = data.get("args", dict())
+# 	res  = None
+# 	# TODO: implement workflow start
+# 	return res
+
+
+# @app.websocket("/events/{execution_id}")
+# async def workflow_events(websocket: WebSocket, execution_id: str):
+# 	"""Stream workflow events via WebSocket"""
+# 	await websocket.accept()
+
+# 	async def event_handler(event: Event):
+# 		if event.execution_id == execution_id:
+# 			await websocket.send_json({
+# 				"type": event.type.value,
+# 				"data": event.data,
+# 				"timestamp": event.timestamp
+# 			})
+
+# 	self.executor.subscribe_to_events("*", event_handler)
+
+# 	try:
+# 		while True:
+# 			await sleep(1)
+# 	except:
+# 		pass
+
+# return app
+
+
 @ctrl_app.post("/shutdown")
 async def shutdown_server():
 	global apps, ctrl_app, ctrl_server, ctrl_status
@@ -244,29 +346,6 @@ async def shutdown_server():
 	ctrl_server = None
 	ctrl_status = None
 	return {"message": "Server shut down"}
-
-
-@ctrl_app.post("/workflow/execute")
-async def execute_workflow(workflow_data: dict):
-    """Execute a workflow graph"""
-    try:
-        # Parse workflow nodes and edges
-        nodes = workflow_data.get('nodes', [])
-        edges = workflow_data.get('edges', [])
-        
-        # Execute workflow logic
-        result = await workflow_executor.run(nodes, edges)
-        
-        return {"status": "success", "result": result}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-@ctrl_app.websocket("/ws/workflow")
-async def workflow_websocket(websocket: WebSocket):
-    """Stream workflow execution events"""
-    await websocket.accept()
-    # Emit events during workflow execution
 
 
 async def run_server():
