@@ -7,7 +7,7 @@ import uvicorn
 
 
 from   dotenv                  import load_dotenv
-from   fastapi                 import FastAPI
+from   fastapi                 import FastAPI, WebSocket
 from   fastapi.middleware.cors import CORSMiddleware
 from   functools               import partial
 from   typing                  import Any
@@ -25,7 +25,8 @@ from   numel                   import (
 	validate_config,
 )
 from   utils                   import get_time_str, log_print, seed_everything
-# from   workflow_executor       import WorkflowExecutor
+from   workflow_executor       import WorkflowExecutor
+from   workflow_schema         import Event
 
 
 load_dotenv()
@@ -256,83 +257,79 @@ async def server_status():
 	return ctrl_status
 
 
-# @ctrl_app.post("/workflow/start")
-# async def start_workflow(data: dict):
-# 	global app_ctx, config, workflows
-# 	if data is None:
-# 		data = dict()
-# 	index = data.get("index")
-# 	if index is None or index < 0 or index >= len(config.workflows):
-# 		return {"error": "invalid workflow index"}
-# 	args      = data.get("args", dict())
-# 	workflow  = config.workflows[index]
-# 	executor  = WorkflowExecutor(app_ctx)
-# 	execution = await executor.execute_workflow(workflow, args)
-# 	info = {
-# 		"index"     : index,
-# 		"executor"  : executor,
-# 		"execution" : execution,
-# 		"args"      : args,
-# 	}
-# 	workflows[execution.execution_id] = info
-# 	result = {
-# 		"workflow_id"  : index,
-# 		"execution_id" : execution.execution_id,
-# 		"status"       : execution.status.value,
-# 		"outputs"      : execution.state.outputs,
-# 	}
-# 	return result
+@ctrl_app.post("/workflow/start")
+async def start_workflow(data: dict):
+	global app_ctx, config, workflows
+	if data is None:
+		data = dict()
+	index = data.get("index")
+	if index is None or index < 0 or index >= len(config.workflows):
+		return {"error": "invalid workflow index"}
+	args      = data.get("args", dict())
+	workflow  = config.workflows[index]
+	executor  = WorkflowExecutor(app_ctx)
+	execution = await executor.execute_workflow(workflow, args)
+	info = {
+		"index"     : index,
+		"executor"  : executor,
+		"execution" : execution,
+		"args"      : args,
+	}
+	workflows[execution.execution_id] = info
+	result = {
+		"workflow_id"  : index,
+		"execution_id" : execution.execution_id,
+		"status"       : execution.status.value,
+		"outputs"      : execution.state.outputs,
+	}
+	return result
 
 
-# @ctrl_app.post("/workflow/stop")
-# async def stop_workflow(data: dict):
-# 	global app_ctx, config, workflows
-# 	if data is None:
-# 		data = dict()
-# 	execution_id = data.get("execution_id")
-# 	info = workflows.get(execution_id)
-# 	if not info:
-# 		return {"error": "invalid workflow execution id"}
-# 	info["executor"]
-# 	return {"status": 0}
+@ctrl_app.post("/workflow/stop/{execution_id}")
+async def stop_workflow(execution_id: str):
+	global app_ctx, config, workflows
+	info = workflows.get(execution_id)
+	if not info:
+		return {"error": "invalid workflow execution id"}
+	# TODO: stop workflow execution
+	return {"error": "not implemented"}
 
 
-# @ctrl_app.post("/workflow/status")
-# async def workflow_status(data: dict):
-# 	global app_ctx, config, workflows
-# 	if data is None:
-# 		data = dict()
-# 	index = data.get("index")
-# 	if index is None or index < 0 or index >= len(config.workflows):
-# 		return {"error": "invalid workflow index"}
-# 	args = data.get("args", dict())
-# 	res  = None
-# 	# TODO: implement workflow start
-# 	return res
+@ctrl_app.post("/workflow/status/{execution_id}")
+async def workflow_status(execution_id: str):
+	global app_ctx, config, workflows
+	info = workflows.get(execution_id)
+	if not info:
+		return {"error": "invalid workflow execution id"}
+	# TODO: get workflow status
+	return {"error": "not implemented"}
 
 
-# @app.websocket("/events/{execution_id}")
-# async def workflow_events(websocket: WebSocket, execution_id: str):
-# 	"""Stream workflow events via WebSocket"""
-# 	await websocket.accept()
+@ctrl_app.websocket("/workflow/events/{execution_id}")
+async def workflow_events(websocket: WebSocket, execution_id: str):
+	"""Stream workflow events via WebSocket"""
+	await websocket.accept()
 
-# 	async def event_handler(event: Event):
-# 		if event.execution_id == execution_id:
-# 			await websocket.send_json({
-# 				"type": event.type.value,
-# 				"data": event.data,
-# 				"timestamp": event.timestamp
-# 			})
+	async def event_handler(event: Event):
+		if event.execution_id == execution_id:
+			await websocket.send_json({
+				"type": event.type.value,
+				"data": event.data,
+				"timestamp": event.timestamp
+			})
 
-# 	self.executor.subscribe_to_events("*", event_handler)
+	info = workflows.get(execution_id)
+	if not info:
+		return {"error": "invalid workflow execution id"}
 
-# 	try:
-# 		while True:
-# 			await sleep(1)
-# 	except:
-# 		pass
+	executor = info["executor"]
+	executor.subscribe_to_events("*", event_handler)
 
-# return app
+	try:
+		while True:
+			await asyncio.sleep(1)
+	except:
+		pass
 
 
 @ctrl_app.post("/shutdown")
