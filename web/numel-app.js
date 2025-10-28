@@ -147,6 +147,8 @@ async function connect() {
 		return;
 	}
 
+	connectButton.disabled = true;
+
 	addMessage("system", "⌛ Connecting...");
 
 	const userId = userIdInput.value.trim();
@@ -188,7 +190,8 @@ async function connect() {
 		enableInput(true);
 		connectButton.textContent = "Disconnect";
 		connectButton.classList.remove("numel-btn-accent");
-		connectButton.classList.add("numel-btn-secondary");
+		// connectButton.classList.add("numel-btn-secondary");
+		connectButton.classList.add("numel-btn-accent-red");
 		addMessage("system", `✅ Connected to ${serverUrl}`);
 		addMessage("ui", START_MESSAGE);
 
@@ -197,10 +200,14 @@ async function connect() {
 		addMessage("system-error", `❌ Connection failed: ${error.message}`);
 		updateStatus("disconnected", "Connection failed");
 		enableAppInput(true);
+	} finally {
+		connectButton.disabled = false;
 	}
 }
 
 async function disconnect() {
+	connectButton.disabled = true;
+
 	gGraph.api.schema.remove(SCHEMA_NAME);
 
 	if (gApp) {
@@ -217,11 +224,14 @@ async function disconnect() {
 	updateStatus("disconnected", "Disconnected");
 	enableInput(false);
 	connectButton.textContent = "Connect";
-	connectButton.classList.remove("numel-btn-secondary");
+	// connectButton.classList.remove("numel-btn-secondary");
+	connectButton.classList.remove("numel-btn-accent-red");
 	connectButton.classList.add("numel-btn-accent");
 	addMessage("system", "ℹ️ Disconnected");
 	addMessage("ui", END_MESSAGE);
 	enableAppInput(true);
+
+	connectButton.disabled = false;
 }
 
 function toggleConnection() {
