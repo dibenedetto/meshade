@@ -739,12 +739,30 @@ class AppContext:
 
 	def get_agent(self, ref: int) -> Callable:
 		"""Get agent by reference"""
-		return self.agents[ref]
+		if ref is None:
+			raise ValueError("Agent reference cannot be None")
+		if not isinstance(ref, int):
+			raise ValueError(f"Agent reference must be int, got {type(ref)}")
+		if ref < 0 or ref >= len(self.agents):
+			raise ValueError(f"Agent reference {ref} out of bounds (0-{len(self.agents)-1})")
+		agent = self.agents[ref]
+		if agent is None:
+			raise ValueError(f"Agent at index {ref} is None")
+		return agent
 
 
 	def get_tool(self, ref: int) -> Callable:
 		"""Get tool by reference"""
-		return self.tools[ref]
+		if ref is None:
+			raise ValueError("Tool reference cannot be None")
+		if not isinstance(ref, int):
+			raise ValueError(f"Tool reference must be int, got {type(ref)}")
+		if ref < 0 or ref >= len(self.tools):
+			raise ValueError(f"Tool reference {ref} out of bounds (0-{len(self.tools)-1})")
+		tool = self.tools[ref]
+		if tool is None:
+			raise ValueError(f"Tool at index {ref} is None")
+		return tool
 
 
 class AgentApp:
@@ -757,7 +775,7 @@ class AgentApp:
 		raise NotImplementedError("Subclasses must implement the generate_app method")
 
 
-	def run(self, agent_index: int, *args, **kwargs) -> Any:
+	async def run(self, agent_index: int, *args, **kwargs) -> MessageModel:
 		raise NotImplementedError("Subclasses must implement the run method")
 
 

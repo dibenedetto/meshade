@@ -10,7 +10,8 @@
 body {
 	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 	margin: 0;
-	padding: 20px 20px 60px 20px;
+	padding: 20px;
+	padding-bottom: 60px;
 	background: var(--sg-bg-primary);
 	color: var(--sg-text-primary);
 	display: grid;
@@ -19,6 +20,7 @@ body {
 	height: 100vh;
 	box-sizing: border-box;
 	transition: background-color 0.3s ease, color 0.3s ease;
+	overflow: hidden;
 }
 
 /* When workflow panel is visible */
@@ -41,9 +43,12 @@ body.workflow-active {
 	border-radius: 6px;
 	padding: 20px;
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-	display: flex;
-	flex-direction: column;
+	display: grid;
+	grid-template-rows: auto auto auto 1fr auto;
+	gap: 0;
 	min-height: 0;
+	max-height: 100%;
+	overflow: hidden;
 	transition: background-color 0.3s ease, border-color 0.3s ease;
 	grid-column: 1;
 }
@@ -55,37 +60,41 @@ body.workflow-active {
 	border-radius: 6px;
 	padding: 15px;
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-	display: none; /* Hidden by default */
-	flex-direction: column;
+	display: none;
+	grid-template-rows: auto auto auto auto 1fr;
+	gap: 0;
 	min-height: 0;
+	max-height: 100%;
+	overflow: hidden;
 	transition: all 0.3s ease;
 	grid-column: 2;
-	overflow-y: auto;
 }
 
 body.workflow-active .numel-workflow-panel {
-	display: flex;
+	display: grid;
 }
 
 .numel-workflow-panel.collapsed {
 	max-height: 60px;
-	overflow: hidden;
 }
 
 /* Right side: Graph Panel */
 .numel-graph-panel {
 	display: flex;
 	flex-direction: column;
+	min-height: 0;
+	max-height: 100%;
 	min-width: 0;
-	grid-column: 2; /* Takes column 2 when workflow hidden */
+	overflow: hidden;
+	grid-column: 2;
 }
 
 body.workflow-active .numel-graph-panel {
-	grid-column: 3; /* Takes column 3 when workflow visible */
+	grid-column: 3;
 }
 
 /* ========================================================================
-   CHAT PANEL STYLES (keep existing)
+   CHAT PANEL STYLES
    ======================================================================== */
 
 .numel-title {
@@ -94,6 +103,7 @@ body.workflow-active .numel-graph-panel {
 	font-weight: 600;
 	text-align: center;
 	color: var(--sg-text-primary);
+	grid-row: 1;
 }
 
 .numel-brand {
@@ -109,6 +119,18 @@ body.workflow-active .numel-graph-panel {
 	border: 1px solid var(--sg-border-color);
 	border-radius: 6px;
 	transition: background-color 0.3s ease, border-color 0.3s ease;
+	max-height: none;
+	overflow: visible;
+}
+
+/* Config Sections - First one is grid row 2 */
+.numel-config-section:first-of-type {
+	grid-row: 2;
+}
+
+/* Config Sections - Second one is grid row 3 */
+.numel-config-section:nth-of-type(2) {
+	grid-row: 3;
 }
 
 .numel-config-row {
@@ -212,15 +234,15 @@ body.workflow-active .numel-graph-panel {
 
 /* Chat Container */
 .numel-chat-container {
-	flex: 1;
 	border: 1px solid var(--sg-border-color);
 	border-radius: 6px;
 	overflow-y: auto;
 	padding: 15px;
 	background: var(--sg-bg-quaternary);
 	margin-bottom: 15px;
-	min-height: 200px;
+	min-height: 0;
 	transition: background-color 0.3s ease, border-color 0.3s ease;
+	grid-row: 4;
 }
 
 .numel-chat-container::-webkit-scrollbar {
@@ -300,6 +322,7 @@ body.workflow-active .numel-graph-panel {
 .numel-input-group {
 	display: flex;
 	gap: 8px;
+	grid-row: 5;
 }
 
 .numel-input-group input[type="text"] {
@@ -401,7 +424,7 @@ body.workflow-active .numel-graph-panel {
 }
 
 /* ========================================================================
-   WORKFLOW PANEL STYLES - NEW SECTION
+   WORKFLOW PANEL STYLES
    ======================================================================== */
 
 /* Workflow Header */
@@ -410,6 +433,7 @@ body.workflow-active .numel-graph-panel {
 	justify-content: space-between;
 	align-items: center;
 	margin-bottom: 15px;
+	grid-row: 1;
 }
 
 .workflow-title {
@@ -431,6 +455,7 @@ body.workflow-active .numel-graph-panel {
 	border-radius: 6px;
 	padding: 10px;
 	margin-bottom: 12px;
+	grid-row: 2;
 }
 
 .workflow-status-row {
@@ -503,6 +528,7 @@ body.workflow-active .numel-graph-panel {
 /* Progress Section */
 .workflow-progress-section {
 	margin-bottom: 12px;
+	grid-row: 3;
 }
 
 .workflow-progress-label {
@@ -536,6 +562,7 @@ body.workflow-active .numel-graph-panel {
 	display: flex;
 	gap: 6px;
 	margin-bottom: 12px;
+	grid-row: 4;
 }
 
 .workflow-controls button {
@@ -550,8 +577,11 @@ body.workflow-active .numel-graph-panel {
 	border: 1px solid var(--sg-border-color);
 	border-radius: 6px;
 	padding: 10px;
-	max-height: 300px;
-	overflow-y: auto;
+	min-height: 0;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	grid-row: 5;
 }
 
 .workflow-list-title {
@@ -561,12 +591,16 @@ body.workflow-active .numel-graph-panel {
 	color: var(--sg-text-secondary);
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
+	flex-shrink: 0;
 }
 
 .workflow-list {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+	overflow-y: auto;
+	flex: 1;
+	min-height: 0;
 }
 
 .workflow-list-empty {
@@ -583,6 +617,7 @@ body.workflow-active .numel-graph-panel {
 	border-radius: 4px;
 	padding: 10px;
 	transition: all 0.15s ease;
+	flex-shrink: 0;
 }
 
 .workflow-list-item:hover {
@@ -612,43 +647,25 @@ body.workflow-active .numel-graph-panel {
 }
 
 /* Scrollbar for workflow list */
-.workflow-list-section::-webkit-scrollbar {
+.workflow-list::-webkit-scrollbar {
 	width: 6px;
 }
 
-.workflow-list-section::-webkit-scrollbar-track {
+.workflow-list::-webkit-scrollbar-track {
 	background: var(--sg-bg-secondary);
 }
 
-.workflow-list-section::-webkit-scrollbar-thumb {
+.workflow-list::-webkit-scrollbar-thumb {
 	background: var(--sg-bg-quaternary);
 	border-radius: 3px;
 }
 
-.workflow-list-section::-webkit-scrollbar-thumb:hover {
-	background: var(--sg-text-tertiary);
-}
-
-/* Scrollbar for workflow panel */
-.numel-workflow-panel::-webkit-scrollbar {
-	width: 8px;
-}
-
-.numel-workflow-panel::-webkit-scrollbar-track {
-	background: var(--sg-bg-secondary);
-}
-
-.numel-workflow-panel::-webkit-scrollbar-thumb {
-	background: var(--sg-bg-quaternary);
-	border-radius: 4px;
-}
-
-.numel-workflow-panel::-webkit-scrollbar-thumb:hover {
+.workflow-list::-webkit-scrollbar-thumb:hover {
 	background: var(--sg-text-tertiary);
 }
 
 /* ========================================================================
-   REMAINING STYLES (keep existing)
+   GRAPH PANEL STYLES
    ======================================================================== */
 
 /* Canvas Container - Match panel shadow */
@@ -657,6 +674,9 @@ body.workflow-active .numel-graph-panel {
 	border: 1px solid var(--sg-border-color);
 	background: var(--sg-canvas-bg);
 	transition: box-shadow 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
 }
 
 .numel-hidden-elements {
@@ -670,7 +690,10 @@ body.workflow-active .numel-graph-panel {
 	gap: 8px;
 }
 
-/* Footer */
+/* ========================================================================
+   FOOTER
+   ======================================================================== */
+
 .numel-footer {
 	position: fixed;
 	bottom: 10px;
@@ -684,6 +707,7 @@ body.workflow-active .numel-graph-panel {
 	border: 1px solid var(--sg-border-color);
 	border-radius: 4px;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+	z-index: 1000;
 }
 
 .numel-footer a {
@@ -721,14 +745,19 @@ body.workflow-active .numel-graph-panel {
 
 @media (max-width: 1200px) {
 	body {
-		display: flex;
-		flex-direction: column;
-		padding: 15px 15px 50px 15px;
+		display: grid;
+		grid-template-columns: 1fr;
+		grid-template-rows: minmax(400px, 50vh) 1fr;
+		padding: 15px;
+		padding-bottom: 50px;
+		overflow-y: auto;
 	}
 
 	.numel-panel {
-		flex: 0 0 auto;
+		grid-column: 1;
+		grid-row: 1;
 		max-height: 50vh;
+		min-height: 400px;
 	}
 	
 	.numel-workflow-panel {
@@ -736,7 +765,8 @@ body.workflow-active .numel-graph-panel {
 	}
 
 	.numel-graph-panel {
-		flex: 1;
+		grid-column: 1;
+		grid-row: 2;
 		min-height: 400px;
 	}
 }

@@ -30,10 +30,7 @@ let systemMsgButton;
 let appAgentSelect;
 let clearChatButton;
 
-// ====================================================================
-// WORKFLOW STATE
-// ====================================================================
-
+// Workflow State
 let currentWorkflowWS = null;
 let currentExecutionId = null;
 let workflowStartTime = null;
@@ -43,7 +40,6 @@ let workflowStartTime = null;
 // ========================================================================
 
 function initializeApp() {
-	// Get DOM elements
 	chatContainer = document.getElementById("chatContainer");
 	messageInput = document.getElementById("messageInput");
 	sendButton = document.getElementById("sendButton");
@@ -57,17 +53,11 @@ function initializeApp() {
 	appAgentSelect = document.getElementById("appAgentSelect");
 	clearChatButton = document.getElementById("clearChatButton");
 
-	// Check if required libraries are loaded
 	checkLibrariesLoaded();
-
-	// Initialize SchemaGraph
 	gGraph = new SchemaGraphApp("sg-main-canvas");
 
-	// Initialize Workflow Extension if available
 	if (typeof initWorkflowExtension === "function") {
 		initWorkflowExtension(gGraph);
-
-		// Listen for workflow execution requests
 		gGraph.eventBus.on("workflow:execute", async (workflowData) => {
 			const url = gApp.url + "/workflow/execute";
 			const response = await fetch(url, {
@@ -83,23 +73,14 @@ function initializeApp() {
 			gApp.eventBus.emit("workflow:complete", result);
 		});
 
-		// Listen for agent node execution
 		gGraph.eventBus.on("workflow:agent_call", async (data) => {
-			// Use your existing gApp to call agents
 			const response = await gApp.send(data.message, data.agent_ref);
-			// Workflow continues automatically
 		});
 
 		console.log("✅ Workflow extension initialized");
-
-		// Optional: Create a sample workflow template
-		// gGraph.api.workflow.createTemplate();
 	}
 
-	// Setup event listeners
 	setupEventListeners();
-
-	// Setup workflow controls
 	setupWorkflowControls();
 	setupWorkflowPanelToggle();
 }
@@ -116,21 +97,17 @@ function checkLibrariesLoaded() {
 }
 
 function setupEventListeners() {
-	// Server URL change
 	serverUrlInput.addEventListener("change", () => {
 		appAgentSelect.disabled = true;
 		appAgentSelect.innerHTML = "<option value='-1'> - None - </option>";
 	});
 
-	// Agent selection change
 	appAgentSelect.addEventListener("change", (e) => {
 		agentCurrIndex = parseInt(e.target.value);
 	});
 
-	// Debug message toggle
 	systemMsgButton.addEventListener("change", changeSystemVisibility);
 
-	// Message input - Enter key to send
 	messageInput.addEventListener("keypress", (e) => {
 		if (e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
@@ -138,14 +115,19 @@ function setupEventListeners() {
 		}
 	});
 
-	// Connect button
 	connectButton.addEventListener("click", toggleConnection);
-
-	// Send button
 	sendButton.addEventListener("click", sendMessage);
-
-	// Clear chat button
 	clearChatButton.addEventListener("click", clearChat);
+	
+	let resizeTimeout;
+	window.addEventListener("resize", () => {
+		clearTimeout(resizeTimeout);
+		resizeTimeout = setTimeout(() => {
+			if (gGraph) {
+				gGraph.draw();
+			}
+		}, 250);
+	});
 }
 
 // ========================================================================
@@ -160,7 +142,6 @@ async function connect() {
 	}
 
 	connectButton.disabled = true;
-
 	addMessage("system", "⌛ Connecting...");
 
 	const userId = userIdInput.value.trim();
@@ -184,29 +165,25 @@ async function connect() {
 			throw new Error("NumelApp initialization failed");
 		}
 
-		// ====================================================================
-		// INTEGRATED SCHEMA & WORKFLOW SETUP
-		// ====================================================================
-
-		// 1. Register the single merged schema
 		const config = await gApp.getConfig();
 		gGraph.api.schema.register(SCHEMA_NAME, gApp.schema, "Index", "AppConfig");
 		
-		// 2. Initialize workflow extension (adds workflow node types)
 		if (typeof initWorkflowExtension === "function") {
 			initWorkflowExtension(gGraph);
 			console.log("✅ Workflow extension initialized");
 		}
 
-		// 3. Import the full config (includes workflows)
 		gGraph.api.config.import(config, SCHEMA_NAME);
-
-		// 4. Setup workflow execution handlers
 		setupWorkflowHandlers();
-
-		// 5. Initial layout
+		createWorkflowLinks(config);
+		
 		gGraph.api.layout.apply("circular");
 		gGraph.api.view.center();
+		
+		setTimeout(() => {
+			gGraph.api.view.center();
+			gGraph.draw();
+		}, 100);
 
 		agentPrevIndex = -1;
 		agentCurrIndex = 0;
@@ -225,25 +202,15 @@ async function connect() {
 		addMessage("system", `📊 Loaded ${config.agents?.length || 0} agents, ${config.workflows?.length || 0} workflows`);
 		addMessage("ui", START_MESSAGE);
 
-		// ====================================================================
-		// SHOW WORKFLOW PANEL AND POPULATE LIST
-		// ====================================================================
-
 		if (config.workflows && config.workflows.length > 0) {
-			// Populate workflow list (also shows panel)
 			showWorkflowList();
-
 			const workflowPanel = document.getElementById("workflowPanel");
 			if (workflowPanel) {
 				workflowPanel.style.display = "block";
 			}
-
-			// Populate workflow list
 			showWorkflowList();
-
-			addMessage("system", `🔄 ${config.workflows.length} workflow(s) available`);
+			addMessage("system", `📄 ${config.workflows.length} workflow(s) available`);
 		} else {
-			// Hide workflow panel if no workflows
 			toggleWorkflowLayout(false);
 		}
 
@@ -259,7 +226,6 @@ async function connect() {
 
 async function disconnect() {
 	connectButton.disabled = true;
-
 	gGraph.api.schema.remove(SCHEMA_NAME);
 
 	if (gApp) {
@@ -268,22 +234,17 @@ async function disconnect() {
 		gApp = null;
 	}
 
-	// Close workflow WebSocket if open
 	if (currentWorkflowWS) {
 		currentWorkflowWS.close();
 		currentWorkflowWS = null;
 	}
 
-	// Hide workflow panel
 	toggleWorkflowLayout(false);
-
-	// Reset workflow state
 	currentExecutionId = null;
 	workflowStartTime = null;
 	updateWorkflowStatus("Idle", "No workflow running");
 	updateWorkflowProgress(0);
 
-	// Clear workflow list
 	const workflowListEl = document.getElementById("workflowList");
 	if (workflowListEl) {
 		workflowListEl.innerHTML = '<div class="workflow-list-empty">Connect to see workflows</div>';
@@ -303,7 +264,6 @@ async function disconnect() {
 	addMessage("system", "ℹ️ Disconnected");
 	addMessage("ui", END_MESSAGE);
 	enableAppInput(true);
-
 	connectButton.disabled = false;
 }
 
@@ -342,7 +302,6 @@ async function setAppStatus() {
 	
 	appAgentSelect.innerHTML = content;
 	appAgentSelect.disabled = false;
-	
 	return status;
 }
 
@@ -356,7 +315,6 @@ async function sendMessage() {
 
 	addMessage("user", message);
 
-	// Show which agent we're talking to if changed
 	if (agentPrevIndex !== agentCurrIndex) {
 		agentPrevIndex = agentCurrIndex;
 		const agent = gApp.status["config"]["agents"][agentPrevIndex];
@@ -417,44 +375,34 @@ function clearChat() {
 
 function handleAGUIEvent(event) {
 	console.log("AG-UI Event:", event);
-
 	if (!event) return;
 
 	switch (event.type) {
 		case NumelApp.EventType.TEXT_MESSAGE_CONTENT:
 		case NumelApp.EventType.TEXT_MESSAGE_CHUNK:
-			const content = event.delta || "No content";
-			addMessage("agent", content);
+			addMessage("agent", event.delta || "No content");
 			break;
-
 		case NumelApp.EventType.TEXT_MESSAGE_START:
 			addMessage("system", "🤖 Agent is responding...");
 			break;
-
 		case NumelApp.EventType.TEXT_MESSAGE_END:
 			addMessage("system", "✅ Response complete");
 			break;
-
 		case NumelApp.EventType.RUN_STARTED:
 			addMessage("system", "🚀 Agent run started");
 			break;
-
 		case NumelApp.EventType.RUN_FINISHED:
 			addMessage("system", "🏁 Agent run finished");
 			break;
-
 		case NumelApp.EventType.RUN_ERROR:
 			addMessage("system-error", `❌ Error: ${event.error || "Unknown error"}`);
 			break;
-
 		case NumelApp.EventType.TOOL_CALL_START:
 			addMessage("system", `🔧 Tool call: ${event.tool_name || "unknown"}`);
 			break;
-
 		case NumelApp.EventType.TOOL_CALL_RESULT:
 			addMessage("system", `✅ Tool result received`);
 			break;
-
 		default:
 			addMessage("system", `ℹ️ Event: ${event.type}`);
 			console.log("Unhandled event:", event);
@@ -491,16 +439,70 @@ function changeSystemVisibility() {
 }
 
 // ====================================================================
+// WORKFLOW NODE LINKING
+// ====================================================================
+
+function createWorkflowLinks(config) {
+	if (!config.workflows || config.workflows.length === 0) {
+		return;
+	}
+	
+	config.workflows.forEach(workflow => {
+		const nodeMap = new Map();
+		
+		for (const node of gGraph.graph.nodes) {
+			if (node.schema_type === 'NodeConfig') {
+				const nodeId = node.properties?.id;
+				if (nodeId) {
+					nodeMap.set(nodeId, node);
+				}
+			}
+		}
+		
+		if (workflow.edges) {
+			workflow.edges.forEach(edge => {
+				const sourceNode = nodeMap.get(edge.source_node_id);
+				const targetNode = nodeMap.get(edge.target_node_id);
+				
+				if (sourceNode && targetNode) {
+					let linkExists = false;
+					if (sourceNode.outputs && sourceNode.outputs[0]) {
+						const output = sourceNode.outputs[0];
+						if (output.links) {
+							for (const linkId of output.links) {
+								const existingLink = gGraph.graph.links[linkId];
+								if (existingLink && existingLink.target_id === targetNode.id) {
+									linkExists = true;
+									break;
+								}
+							}
+						}
+					}
+					
+					if (!linkExists) {
+						try {
+							gGraph.api.link.create(sourceNode, 0, targetNode, 0);
+						} catch (e) {
+							console.warn(`Could not create link between ${edge.source_node_id} and ${edge.target_node_id}:`, e);
+						}
+					}
+				}
+			});
+		}
+	});
+	
+	gGraph.draw();
+}
+
+// ====================================================================
 // WORKFLOW EXECUTION HANDLERS
 // ====================================================================
 
 function setupWorkflowHandlers() {
-	// Listen for workflow execution requests from SchemaGraph
 	gGraph.eventBus.on("workflow:execute", async (data) => {
 		executeWorkflow(data.workflow_index || 0, data.context || {});
 	});
 	
-	// Listen for agent calls within workflows
 	gGraph.eventBus.on("workflow:agent_call", async (data) => {
 		addMessage("system", `🤖 Workflow calling agent ${data.agent_ref}: "${data.message}"`);
 		
@@ -528,10 +530,13 @@ async function executeWorkflow(workflowIndex, context = {}) {
 	const workflow = config.workflows[workflowIndex];
 	addMessage("system", `🚀 Starting workflow: ${workflow.name || workflow.id}`);
 	
-	// Show workflow panel if hidden
 	const workflowPanel = document.getElementById("workflowPanel");
 	if (workflowPanel) {
 		workflowPanel.style.display = "block";
+	}
+	
+	if (!context.user_query && !context.message) {
+		context.user_query = "Hello, please help me with this workflow.";
 	}
 	
 	try {
@@ -559,7 +564,6 @@ async function executeWorkflow(workflowIndex, context = {}) {
 		addMessage("system", `✅ Workflow started (execution: ${result.execution_id})`);
 		updateWorkflowStatus("Running", "Executing workflow...");
 		
-		// Connect to WebSocket for live updates
 		connectWorkflowWebSocket(result.execution_id);
 		
 	} catch (error) {
@@ -569,14 +573,12 @@ async function executeWorkflow(workflowIndex, context = {}) {
 }
 
 function connectWorkflowWebSocket(executionId) {
-	// Close existing connection
 	if (currentWorkflowWS) {
 		currentWorkflowWS.close();
 		currentWorkflowWS = null;
 	}
 	
 	const wsUrl = gApp.url.replace('http', 'ws') + `/workflow/events/${executionId}`;
-	
 	addMessage("system", `🔌 Connecting to workflow stream...`);
 	
 	const ws = new WebSocket(wsUrl);
@@ -619,34 +621,28 @@ function handleWorkflowEvent(event) {
 			updateWorkflowStatus("Running", "Workflow started");
 			updateWorkflowProgress(0);
 			break;
-		
 		case 'node.start':
 			const nodeType = data.node_type || 'unknown';
 			addMessage("system", `⚡ Executing: ${nodeType} (${nodeId})`);
 			highlightWorkflowNode(nodeId);
 			break;
-		
 		case 'node.end':
 			addMessage("system", `✓ Completed: ${nodeId}`);
 			updateWorkflowProgress(data.progress);
 			break;
-		
 		case 'agent.response':
 			if (data.response) {
 				addMessage("agent", data.response);
 			}
 			break;
-		
 		case 'agent.message':
 			if (data.message) {
 				addMessage("system", `🤖 Agent: ${data.message}`);
 			}
 			break;
-		
 		case 'node.error':
 			addMessage("system-error", `❌ Node error (${nodeId}): ${data.error}`);
 			break;
-		
 		case 'workflow.end':
 			const status = data.status || 'completed';
 			const duration = workflowStartTime ? 
@@ -662,7 +658,6 @@ function handleWorkflowEvent(event) {
 				currentWorkflowWS = null;
 			}
 			break;
-		
 		case 'workflow.error':
 			addMessage("system-error", `❌ Workflow error: ${data.error || data.message}`);
 			updateWorkflowStatus("Failed", data.error || "Unknown error");
@@ -672,7 +667,6 @@ function handleWorkflowEvent(event) {
 				currentWorkflowWS = null;
 			}
 			break;
-		
 		case 'workflow.complete':
 			const finalStatus = data.status || 'completed';
 			addMessage("system", `🏁 Workflow complete: ${finalStatus}`);
@@ -683,19 +677,15 @@ function handleWorkflowEvent(event) {
 				addMessage("system", `📊 Outputs: ${JSON.stringify(data.outputs, null, 2)}`);
 			}
 			break;
-		
 		case 'status':
-			// Status update from server
 			updateWorkflowFromStatus(data);
 			break;
-		
 		default:
 			console.log('Unhandled workflow event:', type, data);
 	}
 }
 
 function highlightWorkflowNode(nodeId) {
-	// Highlight node in SchemaGraph if available
 	if (gGraph && gGraph.eventBus) {
 		gGraph.eventBus.emit("workflow:node_highlight", { nodeId });
 	}
@@ -710,12 +700,10 @@ async function stopCurrentWorkflow() {
 	addMessage("system", "⏹️ Stopping workflow...");
 	
 	try {
-		// Send stop command via WebSocket if connected
 		if (currentWorkflowWS && currentWorkflowWS.readyState === WebSocket.OPEN) {
 			currentWorkflowWS.send(JSON.stringify({ command: "stop" }));
 		}
 		
-		// Also send HTTP request
 		const url = gApp.url + `/workflow/stop/${currentExecutionId}`;
 		const response = await fetch(url, {
 			method: "POST",
@@ -804,15 +792,12 @@ function updateWorkflowFromStatus(status) {
 		errors
 	} = status;
 	
-	// Update status
 	updateWorkflowStatus(execStatus, `${completed_nodes}/${total_nodes} nodes`);
 	
-	// Update progress
 	if (progress !== undefined) {
 		updateWorkflowProgress(progress);
 	}
 	
-	// Update timing
 	if (duration) {
 		const durationEl = document.getElementById("workflowDuration");
 		if (durationEl) {
@@ -820,7 +805,6 @@ function updateWorkflowFromStatus(status) {
 		}
 	}
 	
-	// Show errors if any
 	if (errors && errors.length > 0) {
 		errors.forEach(err => {
 			addMessage("system-error", `❌ ${err.error || err.message}`);
@@ -840,6 +824,13 @@ function toggleWorkflowLayout(show) {
 		if (panel) {
 			panel.style.display = "none";
 		}
+	}
+	
+	if (gGraph) {
+		setTimeout(() => {
+			gGraph.api.view.center();
+			gGraph.draw();
+		}, 100);
 	}
 }
 
@@ -869,7 +860,6 @@ function showWorkflowList() {
 		workflowListEl.appendChild(item);
 	});
 	
-	// Add click handlers
 	document.querySelectorAll(".workflow-execute-btn").forEach(btn => {
 		btn.addEventListener("click", (e) => {
 			const index = parseInt(e.target.dataset.index);
@@ -879,7 +869,7 @@ function showWorkflowList() {
 }
 
 // ====================================================================
-// CONNECT WORKFLOW CONTROLS TO BUTTONS
+// WORKFLOW CONTROLS
 // ====================================================================
 
 function setupWorkflowControls() {

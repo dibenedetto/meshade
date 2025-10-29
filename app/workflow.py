@@ -167,10 +167,17 @@ class AgentNodeExecutor(NodeExecutor):
 		agent_config = node.config.get("agent", {})
 		agent_ref = agent_config.get("agent_ref")
 		
+		# Validate agent reference
+		if agent_ref is None:
+			raise ValueError(f"Agent node {node.id} has no agent_ref configured")
+		
+		if not isinstance(agent_ref, int):
+			raise ValueError(f"Agent node {node.id} has invalid agent_ref type: {type(agent_ref)}")
+		
 		# Get agent from app context
 		agent = self.app_context.get_agent(agent_ref)
 		if not agent:
-			raise ValueError(f"Agent {agent_ref} not found")
+			raise ValueError(f"Agent {agent_ref} not found in app context")
 		
 		# Map input from state
 		input_mapping = agent_config.get("input_mapping", {})
@@ -195,7 +202,7 @@ class AgentNodeExecutor(NodeExecutor):
 		
 		# Map output to state
 		output_mapping = agent_config.get("output_mapping", {})
-		return self._map_data({"response": response}, output_mapping)
+		return self._map_data({"agent_response": response}, output_mapping)
 	
 	def _map_data(self, source: Dict[str, Any], mapping: Dict[str, str]) -> Dict[str, Any]:
 		"""Map data using mapping dictionary"""

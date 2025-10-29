@@ -52,9 +52,11 @@ def adjust_config(config: AppConfig) -> AppConfig:
 	return config
 
 
-async def run_agent(agent: Any, *args, **kwargs) -> Any:
-	result = await agent.run(*args, **kwargs)
-	return result
+async def run_agent(app: Any, agent_index, *args, **kwargs) -> Any:
+	result = await app.run(agent_index, *args, **kwargs)
+	if result.content_type == "str":
+		return result.content
+	return None
 
 
 def try_apply_seed(config: AppConfig) -> None:
@@ -181,7 +183,7 @@ async def start_app():
 				continue
 
 			app       = ctor(bkd_cfg)
-			app_agent = partial(run_agent, app)
+			app_agent = partial(run_agent, app, agent_index)
 
 			apps       .append(app)
 			app_agents .append(app_agent)

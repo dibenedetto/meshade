@@ -29,8 +29,9 @@ from   numel                           import (
 	DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS,
 	AppConfig,
 	AgentApp,
-	BackendConfig,
 	AgentOptionsConfig,
+	BackendConfig,
+	MessageModel,
 	register_backend
 )
 
@@ -302,9 +303,13 @@ class _AgnoAgentApp(AgentApp):
 		return app
 
 
-	def run(self, agent_index: int, *args, **kwargs) -> Any:
+	async def run(self, agent_index: int, *args, **kwargs) -> MessageModel:
 		agent  = self.config_impl.agents[agent_index]
-		result = agent.run(*args, **kwargs)
+		raw    = await agent.arun(*args, **kwargs)
+		result = MessageModel(
+			content_type = raw.content_type,
+			content      = raw.content,
+		)
 		return result
 
 
