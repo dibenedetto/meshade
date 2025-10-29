@@ -729,7 +729,7 @@ def get_backends() -> Dict[Tuple[str, str], Callable]:
 
 
 class AppContext:
-	"""Context providing access to app resources for node executors"""
+	"""Context providing access to app resources"""
 
 	def __init__(self, config: AppConfig, agents: List[Callable], tools: List[Callable]):
 		self.config = copy.deepcopy (config)
