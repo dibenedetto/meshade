@@ -193,7 +193,7 @@ async function connect() {
 		setupWorkflowHandlers();
 		
 		// 5. Initial layout
-		gGraph.api.layout.apply("hierarchical-vertical");
+		gGraph.api.layout.apply("circular");
 		gGraph.api.view.center();
 
 		agentPrevIndex = -1;

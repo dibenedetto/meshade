@@ -4,7 +4,6 @@ import copy
 import json
 
 
-from   collections.abc import Callable
 from   fastapi         import FastAPI
 from   typing          import Any, Dict, List, Tuple
 
@@ -727,6 +726,25 @@ def get_backends() -> Dict[Tuple[str, str], Callable]:
 	global _backends
 	result = copy.deepcopy(_backends)
 	return result
+
+
+class AppContext:
+	"""Context providing access to app resources for node executors"""
+
+	def __init__(self, config: AppConfig, agents: List[Callable], tools: List[Callable]):
+		self.config = copy.deepcopy (config)
+		self.agents = copy.copy     (agents)
+		self.tools  = copy.copy     (tools )
+
+
+	def get_agent(self, ref: int) -> Callable:
+		"""Get agent by reference"""
+		return self.agents[ref]
+
+
+	def get_tool(self, ref: int) -> Callable:
+		"""Get tool by reference"""
+		return self.tools[ref]
 
 
 class AgentApp:

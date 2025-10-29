@@ -13,10 +13,8 @@ from   functools               import partial
 from   typing                  import Any
 
 
-from   app_context             import AppContext
 from   numel                   import (
-	DEFAULT_APP_PORT,
-	AppConfig,
+	AppContext,
 	compact_config,
 	extract_config,
 	get_backends,
@@ -24,9 +22,9 @@ from   numel                   import (
 	unroll_config,
 	validate_config,
 )
+from   schema                  import DEFAULT_APP_PORT, AppConfig, Event
 from   utils                   import get_time_str, log_print, seed_everything
-from   workflow_executor       import WorkflowExecutor
-from   workflow_schema         import Event
+from   workflow                import WorkflowExecutor
 
 
 load_dotenv()
@@ -203,8 +201,8 @@ async def start_app():
 				agent_index += 1
 				agent_port  += 1
 
-		# app_ctx   = AppContext(config, app_agents, app_tools)
-		# workflows = dict()
+		app_ctx   = AppContext(config, app_agents, app_tools)
+		workflows = dict()
 
 		ctrl_status["config"] = config
 		ctrl_status["status"] = "running"

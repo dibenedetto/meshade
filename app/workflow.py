@@ -11,8 +11,8 @@ from   collections  import defaultdict
 from   schema       import (
 	Event, EventType,
 	NodeConfig, NodeType, EdgeConfig, EdgeType,
-	WorkflowConfig, WorkflowExecutionState, WorkflowState,
-	NodeExecutionRecord, ExecutionStatus
+	WorkflowConfig, WorkflowState,
+	ExecutionStatus
 )
 
 

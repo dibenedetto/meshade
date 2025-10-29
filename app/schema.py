@@ -1,5 +1,6 @@
 # schema
 
+from   collections.abc import Callable
 from   enum            import Enum
 from   pydantic        import BaseModel
 from   typing          import Any, Dict, List, Optional, Union
@@ -213,6 +214,17 @@ class EventType(str, Enum):
 	# Custom events
 	CUSTOM = "custom"
 
+
+class Event(BaseModel):
+	"""Runtime event instance"""
+	id: str
+	type: EventType
+	name: Optional[str] = None
+	source_node_id: Optional[str] = None
+	timestamp: float
+	data: Dict[str, Any] = {}
+	workflow_id: str
+	execution_id: str
 
 class NodeType(str, Enum):
 	"""Types of nodes in workflow"""
