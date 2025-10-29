@@ -1,109 +1,74 @@
 /* ========================================================================
-   NUMEL APP - Inherits SchemaGraph Theme Variables
-   Uses SchemaGraph CSS variables (--sg-*) for theming
+   NUMEL APP - Completely Fixed Layout
    ======================================================================== */
 
 /* ========================================================================
-   BASE LAYOUT - UPDATED FOR THREE PANELS
+   RESET & BASE
    ======================================================================== */
+
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
 
 body {
 	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-	margin: 0;
-	padding: 20px;
-	padding-bottom: 60px;
 	background: var(--sg-bg-primary);
 	color: var(--sg-text-primary);
+	
+	/* FIXED: Flexible grid with min/max constraints */
 	display: grid;
-	grid-template-columns: 400px 1fr;
+	grid-template-columns: minmax(350px, 400px) 1fr;
+	grid-template-rows: 1fr auto;
 	gap: 20px;
+	padding: 20px;
 	height: 100vh;
-	box-sizing: border-box;
-	transition: background-color 0.3s ease, color 0.3s ease;
+	width: 100vw;
 	overflow: hidden;
 }
 
 /* When workflow panel is visible */
 body.workflow-active {
-	grid-template-columns: 400px 350px 1fr;
-}
-
-* {
-	box-sizing: border-box;
+	grid-template-columns: minmax(350px, 400px) minmax(300px, 350px) 1fr;
 }
 
 /* ========================================================================
-   PANEL LAYOUTS
+   CHAT PANEL (Left Column)
    ======================================================================== */
 
-/* Left side: Chat Panel */
 .numel-panel {
 	background: var(--sg-bg-secondary);
 	border: 1px solid var(--sg-border-color);
-	border-radius: 6px;
+	border-radius: 8px;
 	padding: 20px;
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+	
+	/* Grid layout for internal sections */
 	display: grid;
 	grid-template-rows: auto auto auto 1fr auto;
-	gap: 0;
-	min-height: 0;
-	max-height: 100%;
-	overflow: hidden;
-	transition: background-color 0.3s ease, border-color 0.3s ease;
+	gap: 15px;
+	
+	/* Positioning */
 	grid-column: 1;
-}
-
-/* Middle: Workflow Panel */
-.numel-workflow-panel {
-	background: var(--sg-bg-secondary);
-	border: 1px solid var(--sg-border-color);
-	border-radius: 6px;
-	padding: 15px;
-	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-	display: none;
-	grid-template-rows: auto auto auto auto 1fr;
-	gap: 0;
+	grid-row: 1;
+	
+	/* CRITICAL: Prevent overflow */
 	min-height: 0;
-	max-height: 100%;
-	overflow: hidden;
-	transition: all 0.3s ease;
-	grid-column: 2;
-}
-
-body.workflow-active .numel-workflow-panel {
-	display: grid;
-}
-
-.numel-workflow-panel.collapsed {
-	max-height: 60px;
-}
-
-/* Right side: Graph Panel */
-.numel-graph-panel {
-	display: flex;
-	flex-direction: column;
-	min-height: 0;
-	max-height: 100%;
 	min-width: 0;
+	max-width: 100%;
 	overflow: hidden;
-	grid-column: 2;
 }
 
-body.workflow-active .numel-graph-panel {
-	grid-column: 3;
-}
-
-/* ========================================================================
-   CHAT PANEL STYLES
-   ======================================================================== */
-
+/* Title */
 .numel-title {
-	margin: 0 0 20px 0;
-	font-size: 24px;
+	font-size: 22px;
 	font-weight: 600;
 	text-align: center;
 	color: var(--sg-text-primary);
-	grid-row: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .numel-brand {
@@ -113,84 +78,81 @@ body.workflow-active .numel-graph-panel {
 
 /* Config Sections */
 .numel-config-section {
-	margin-bottom: 15px;
 	padding: 12px;
 	background: var(--sg-bg-tertiary);
 	border: 1px solid var(--sg-border-color);
 	border-radius: 6px;
-	transition: background-color 0.3s ease, border-color 0.3s ease;
-	max-height: none;
-	overflow: visible;
-}
-
-/* Config Sections - First one is grid row 2 */
-.numel-config-section:first-of-type {
-	grid-row: 2;
-}
-
-/* Config Sections - Second one is grid row 3 */
-.numel-config-section:nth-of-type(2) {
-	grid-row: 3;
+	
+	/* CRITICAL: Prevent overflow */
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
 }
 
 .numel-config-row {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: 8px;
 	margin: 8px 0;
+	
+	/* CRITICAL: Allow wrapping if needed */
+	flex-wrap: nowrap;
+	min-width: 0;
+}
+
+.numel-config-row:first-child {
+	margin-top: 0;
+}
+
+.numel-config-row:last-child {
+	margin-bottom: 0;
 }
 
 .numel-config-row label {
-	flex: 0 0 80px;
-	font-size: 12px;
+	flex: 0 0 auto;
+	width: 75px;
+	font-size: 11px;
 	font-weight: 600;
 	color: var(--sg-text-secondary);
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.numel-config-row input[type="text"],
+.numel-config-row input[type="url"],
+.numel-config-row select {
+	flex: 1 1 auto;
+	min-width: 0; /* CRITICAL: Allow shrinking */
+	max-width: 100%;
+	padding: 6px 8px;
+	background: var(--sg-bg-quaternary);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 4px;
+	color: var(--sg-text-primary);
+	font-size: 11px;
+	transition: all 0.15s ease;
 }
 
 .numel-config-row input[type="text"],
 .numel-config-row input[type="url"] {
-	flex: 1;
-	padding: 6px 10px;
-	background: var(--sg-bg-quaternary);
-	border: 1px solid var(--sg-border-color);
-	border-radius: 4px;
-	color: var(--sg-text-primary);
-	font-size: 12px;
 	font-family: 'Courier New', monospace;
-	transition: all 0.15s ease;
-}
-
-.numel-config-row input:focus {
-	outline: none;
-	border-color: var(--sg-accent-blue);
-	box-shadow: 0 0 0 2px rgba(70, 162, 218, 0.2);
-}
-
-.numel-config-row input:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
 }
 
 .numel-config-row select {
-	flex: 1;
-	padding: 6px 10px;
-	background: var(--sg-bg-quaternary);
-	border: 1px solid var(--sg-border-color);
-	border-radius: 4px;
-	color: var(--sg-text-primary);
-	font-size: 12px;
 	cursor: pointer;
-	transition: all 0.15s ease;
 }
 
+.numel-config-row input:focus,
 .numel-config-row select:focus {
 	outline: none;
 	border-color: var(--sg-accent-blue);
 	box-shadow: 0 0 0 2px rgba(70, 162, 218, 0.2);
 }
 
+.numel-config-row input:disabled,
 .numel-config-row select:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
@@ -200,16 +162,21 @@ body.workflow-active .numel-graph-panel {
 	width: 18px;
 	height: 18px;
 	cursor: pointer;
+	flex: 0 0 auto;
 }
 
 /* Status */
 .numel-status {
-	flex: 1;
-	font-size: 12px;
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: 11px;
 	font-weight: 600;
 	padding: 4px 8px;
 	border-radius: 3px;
 	text-align: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .numel-status-idle {
@@ -236,26 +203,29 @@ body.workflow-active .numel-graph-panel {
 .numel-chat-container {
 	border: 1px solid var(--sg-border-color);
 	border-radius: 6px;
-	overflow-y: auto;
 	padding: 15px;
 	background: var(--sg-bg-quaternary);
-	margin-bottom: 15px;
+	
+	/* CRITICAL: Proper scrolling */
+	overflow-y: auto;
+	overflow-x: hidden;
 	min-height: 0;
-	transition: background-color 0.3s ease, border-color 0.3s ease;
-	grid-row: 4;
+	max-width: 100%;
 }
 
 .numel-chat-container::-webkit-scrollbar {
-	width: 10px;
+	width: 8px;
 }
 
 .numel-chat-container::-webkit-scrollbar-track {
 	background: var(--sg-bg-tertiary);
+	border-radius: 4px;
 }
 
 .numel-chat-container::-webkit-scrollbar-thumb {
 	background: var(--sg-bg-quaternary);
-	border-radius: 5px;
+	border-radius: 4px;
+	border: 2px solid var(--sg-bg-tertiary);
 }
 
 .numel-chat-container::-webkit-scrollbar-thumb:hover {
@@ -265,10 +235,12 @@ body.workflow-active .numel-graph-panel {
 /* Messages */
 .message {
 	margin: 10px 0;
-	padding: 10px 14px;
+	padding: 10px 12px;
 	border-radius: 8px;
-	max-width: 80%;
-	line-height: 1.5;
+	max-width: 85%;
+	line-height: 1.4;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
 	animation: messageSlideIn 0.2s ease;
 }
 
@@ -302,6 +274,7 @@ body.workflow-active .numel-graph-panel {
 	font-size: 0.85em;
 	font-style: italic;
 	border-left: 3px solid var(--sg-text-quaternary);
+	max-width: 100%;
 }
 
 .message.system-error {
@@ -309,6 +282,7 @@ body.workflow-active .numel-graph-panel {
 	color: var(--sg-accent-red);
 	font-size: 0.85em;
 	border-left: 3px solid var(--sg-accent-red);
+	max-width: 100%;
 }
 
 .message.ui {
@@ -316,23 +290,27 @@ body.workflow-active .numel-graph-panel {
 	color: var(--sg-accent-green);
 	font-size: 0.9em;
 	border-left: 3px solid var(--sg-accent-green);
+	max-width: 100%;
 }
 
 /* Input Group */
 .numel-input-group {
 	display: flex;
-	gap: 8px;
-	grid-row: 5;
+	gap: 6px;
+	align-items: stretch;
+	min-width: 0;
+	max-width: 100%;
 }
 
 .numel-input-group input[type="text"] {
-	flex: 1;
-	padding: 10px 12px;
+	flex: 1 1 auto;
+	min-width: 0; /* CRITICAL */
+	padding: 9px 10px;
 	border: 1px solid var(--sg-border-color);
 	border-radius: 6px;
 	background: var(--sg-bg-quaternary);
 	color: var(--sg-text-primary);
-	font-size: 14px;
+	font-size: 13px;
 	transition: all 0.15s ease;
 }
 
@@ -349,22 +327,24 @@ body.workflow-active .numel-graph-panel {
 
 /* Buttons */
 .numel-btn {
-	padding: 10px 16px;
+	padding: 9px 14px;
 	border: none;
 	border-radius: 6px;
 	cursor: pointer;
-	font-size: 14px;
+	font-size: 13px;
 	font-weight: 600;
 	transition: all 0.15s ease;
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+	white-space: nowrap;
+	flex: 0 0 auto;
 }
 
-.numel-btn:hover {
+.numel-btn:hover:not(:disabled) {
 	transform: translateY(-1px);
 	box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
 }
 
-.numel-btn:active {
+.numel-btn:active:not(:disabled) {
 	transform: translateY(0);
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
@@ -372,16 +352,11 @@ body.workflow-active .numel-graph-panel {
 .numel-btn:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
-	transform: none !important;
 }
 
 .numel-btn-primary {
 	background: var(--sg-accent-blue);
 	color: #ffffff;
-}
-
-.numel-btn-primary:hover:not(:disabled) {
-	background: var(--sg-accent-blue-light);
 }
 
 .numel-btn-secondary {
@@ -390,27 +365,14 @@ body.workflow-active .numel-graph-panel {
 	border: 1px solid var(--sg-border-color);
 }
 
-.numel-btn-secondary:hover:not(:disabled) {
-	background: var(--sg-bg-quaternary);
-	border-color: var(--sg-border-highlight);
-}
-
 .numel-btn-accent {
 	background: var(--sg-accent-green);
 	color: #ffffff;
 }
 
-.numel-btn-accent:hover:not(:disabled) {
-	background: #7ab854;
-}
-
 .numel-btn-accent-red {
 	background: var(--sg-accent-red);
 	color: #ffffff;
-}
-
-.numel-btn-accent-red:hover:not(:disabled) {
-	background: #c83232;
 }
 
 /* Loading */
@@ -424,28 +386,71 @@ body.workflow-active .numel-graph-panel {
 }
 
 /* ========================================================================
-   WORKFLOW PANEL STYLES
+   WORKFLOW PANEL (Middle Column)
    ======================================================================== */
+
+.numel-workflow-panel {
+	background: var(--sg-bg-secondary);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 8px;
+	padding: 15px;
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+	
+	/* FIXED: Show when body has workflow-active class */
+	display: none;
+	grid-template-rows: auto auto auto auto 1fr;
+	gap: 12px;
+	
+	/* Positioning */
+	grid-column: 2;
+	grid-row: 1;
+	
+	/* CRITICAL: Prevent overflow */
+	min-height: 0;
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
+}
+
+/* Show workflow panel when active */
+body.workflow-active .numel-workflow-panel {
+	display: grid;
+}
+
+/* Collapsed state */
+.numel-workflow-panel.collapsed {
+	grid-template-rows: auto 0 0 0 0;
+}
+
+.numel-workflow-panel.collapsed > *:not(.workflow-header) {
+	display: none;
+	overflow: hidden;
+}
 
 /* Workflow Header */
 .workflow-header {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	margin-bottom: 15px;
-	grid-row: 1;
+	gap: 10px;
+	min-width: 0;
 }
 
 .workflow-title {
-	margin: 0;
-	font-size: 18px;
+	font-size: 16px;
 	font-weight: 600;
 	color: var(--sg-text-primary);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+	min-width: 0;
 }
 
 .workflow-toggle {
 	padding: 4px 8px;
-	font-size: 12px;
+	font-size: 11px;
+	flex: 0 0 auto;
 }
 
 /* Status Section */
@@ -454,8 +459,8 @@ body.workflow-active .numel-graph-panel {
 	border: 1px solid var(--sg-border-color);
 	border-radius: 6px;
 	padding: 10px;
-	margin-bottom: 12px;
-	grid-row: 2;
+	min-width: 0;
+	max-width: 100%;
 }
 
 .workflow-status-row {
@@ -463,21 +468,44 @@ body.workflow-active .numel-graph-panel {
 	justify-content: space-between;
 	align-items: center;
 	margin: 6px 0;
-	font-size: 12px;
+	font-size: 11px;
+	gap: 8px;
+	min-width: 0;
+}
+
+.workflow-status-row:first-child {
+	margin-top: 0;
+}
+
+.workflow-status-row:last-child {
+	margin-bottom: 0;
 }
 
 .workflow-status-row label {
 	font-weight: 600;
 	color: var(--sg-text-secondary);
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
+.workflow-status,
+.workflow-message,
+.workflow-duration {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .workflow-status {
-	padding: 3px 10px;
+	padding: 3px 8px;
 	border-radius: 3px;
-	font-size: 11px;
+	font-size: 10px;
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
+	text-align: right;
 }
 
 .workflow-status-idle {
@@ -513,22 +541,24 @@ body.workflow-active .numel-graph-panel {
 }
 
 .workflow-message {
-	font-size: 11px;
+	font-size: 10px;
 	color: var(--sg-text-secondary);
 	font-style: italic;
+	font-family: 'Courier New', monospace;
 }
 
 .workflow-duration {
-	font-size: 11px;
+	font-size: 10px;
 	font-weight: 600;
 	color: var(--sg-accent-blue);
 	font-family: 'Courier New', monospace;
+	text-align: right;
 }
 
 /* Progress Section */
 .workflow-progress-section {
-	margin-bottom: 12px;
-	grid-row: 3;
+	min-width: 0;
+	max-width: 100%;
 }
 
 .workflow-progress-label {
@@ -561,14 +591,15 @@ body.workflow-active .numel-graph-panel {
 .workflow-controls {
 	display: flex;
 	gap: 6px;
-	margin-bottom: 12px;
-	grid-row: 4;
+	min-width: 0;
+	max-width: 100%;
 }
 
 .workflow-controls button {
-	flex: 1;
-	padding: 8px 10px;
-	font-size: 12px;
+	flex: 1 1 0;
+	min-width: 0;
+	padding: 7px 8px;
+	font-size: 11px;
 }
 
 /* Workflow List */
@@ -577,21 +608,24 @@ body.workflow-active .numel-graph-panel {
 	border: 1px solid var(--sg-border-color);
 	border-radius: 6px;
 	padding: 10px;
-	min-height: 0;
-	overflow: hidden;
+	
+	/* CRITICAL: Proper scrolling */
 	display: flex;
 	flex-direction: column;
-	grid-row: 5;
+	min-height: 0;
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
 }
 
 .workflow-list-title {
 	margin: 0 0 10px 0;
-	font-size: 13px;
+	font-size: 12px;
 	font-weight: 600;
 	color: var(--sg-text-secondary);
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
-	flex-shrink: 0;
+	flex: 0 0 auto;
 }
 
 .workflow-list {
@@ -599,60 +633,19 @@ body.workflow-active .numel-graph-panel {
 	flex-direction: column;
 	gap: 8px;
 	overflow-y: auto;
-	flex: 1;
+	overflow-x: hidden;
+	flex: 1 1 auto;
 	min-height: 0;
+	padding-right: 4px;
 }
 
-.workflow-list-empty {
-	padding: 20px;
-	text-align: center;
-	color: var(--sg-text-tertiary);
-	font-size: 12px;
-	font-style: italic;
-}
-
-.workflow-list-item {
-	background: var(--sg-bg-quaternary);
-	border: 1px solid var(--sg-border-color);
-	border-radius: 4px;
-	padding: 10px;
-	transition: all 0.15s ease;
-	flex-shrink: 0;
-}
-
-.workflow-list-item:hover {
-	border-color: var(--sg-accent-blue);
-	background: var(--sg-bg-primary);
-	transform: translateX(3px);
-}
-
-.workflow-item-name {
-	font-size: 13px;
-	font-weight: 600;
-	color: var(--sg-text-primary);
-	margin-bottom: 4px;
-}
-
-.workflow-item-desc {
-	font-size: 11px;
-	color: var(--sg-text-tertiary);
-	margin-bottom: 8px;
-	font-style: italic;
-}
-
-.workflow-execute-btn {
-	width: 100%;
-	padding: 6px 10px;
-	font-size: 11px;
-}
-
-/* Scrollbar for workflow list */
 .workflow-list::-webkit-scrollbar {
 	width: 6px;
 }
 
 .workflow-list::-webkit-scrollbar-track {
 	background: var(--sg-bg-secondary);
+	border-radius: 3px;
 }
 
 .workflow-list::-webkit-scrollbar-thumb {
@@ -664,30 +657,111 @@ body.workflow-active .numel-graph-panel {
 	background: var(--sg-text-tertiary);
 }
 
+.workflow-list-empty {
+	padding: 20px;
+	text-align: center;
+	color: var(--sg-text-tertiary);
+	font-size: 11px;
+	font-style: italic;
+}
+
+.workflow-list-item {
+	background: var(--sg-bg-quaternary);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 4px;
+	padding: 10px;
+	transition: all 0.15s ease;
+	flex: 0 0 auto;
+	min-width: 0;
+	max-width: 100%;
+}
+
+.workflow-list-item:hover {
+	border-color: var(--sg-accent-blue);
+	background: var(--sg-bg-primary);
+	transform: translateX(3px);
+}
+
+.workflow-item-name {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--sg-text-primary);
+	margin-bottom: 4px;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+}
+
+.workflow-item-desc {
+	font-size: 10px;
+	color: var(--sg-text-tertiary);
+	margin-bottom: 8px;
+	font-style: italic;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+}
+
+.workflow-execute-btn {
+	width: 100%;
+	padding: 6px 10px;
+	font-size: 11px;
+}
+
 /* ========================================================================
-   GRAPH PANEL STYLES
+   GRAPH PANEL (Right Column)
    ======================================================================== */
 
-/* Canvas Container - Match panel shadow */
+.numel-graph-panel {
+	display: flex;
+	flex-direction: column;
+	
+	/* Positioning */
+	grid-column: 2;
+	grid-row: 1;
+	
+	/* CRITICAL: Prevent overflow */
+	min-height: 0;
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
+}
+
+/* When workflow is active, graph moves to column 3 */
+body.workflow-active .numel-graph-panel {
+	grid-column: 3;
+}
+
+/* Canvas Container */
 .numel-graph-panel .sg-canvas-container {
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 	border: 1px solid var(--sg-border-color);
+	border-radius: 8px;
 	background: var(--sg-canvas-bg);
 	transition: box-shadow 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
-	flex: 1;
+	
+	/* CRITICAL: Fill available space */
+	flex: 1 1 auto;
 	min-height: 0;
+	min-width: 0;
 	overflow: hidden;
+	position: relative;
+}
+
+.numel-graph-panel .sg-canvas-container > canvas {
+	display: block;
+	width: 100% !important;
+	height: 100% !important;
 }
 
 .numel-hidden-elements {
 	display: none;
 }
 
-/* Toolbar Adjustments */
+/* Toolbar */
 .numel-toolbar {
 	flex-wrap: wrap;
-	padding: 8px 12px;
-	gap: 8px;
+	padding: 8px 10px;
+	gap: 6px;
+	align-items: center;
 }
 
 /* ========================================================================
@@ -695,10 +769,8 @@ body.workflow-active .numel-graph-panel {
    ======================================================================== */
 
 .numel-footer {
-	position: fixed;
-	bottom: 10px;
-	left: 50%;
-	transform: translateX(-50%);
+	grid-column: 1 / -1;
+	grid-row: 2;
 	text-align: center;
 	font-size: 11px;
 	color: var(--sg-text-tertiary);
@@ -707,7 +779,6 @@ body.workflow-active .numel-graph-panel {
 	border: 1px solid var(--sg-border-color);
 	border-radius: 4px;
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-	z-index: 1000;
 }
 
 .numel-footer a {
@@ -727,11 +798,11 @@ body.workflow-active .numel-graph-panel {
 
 @media (max-width: 1400px) {
 	body {
-		grid-template-columns: 400px 1fr;
+		grid-template-columns: minmax(320px, 380px) 1fr;
 	}
 	
 	body.workflow-active {
-		grid-template-columns: 400px 1fr;
+		grid-template-columns: minmax(320px, 380px) 1fr;
 	}
 	
 	.numel-workflow-panel {
@@ -743,21 +814,19 @@ body.workflow-active .numel-graph-panel {
 	}
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1024px) {
 	body {
-		display: grid;
 		grid-template-columns: 1fr;
-		grid-template-rows: minmax(400px, 50vh) 1fr;
+		grid-template-rows: minmax(280px, 35vh) 1fr auto;
 		padding: 15px;
-		padding-bottom: 50px;
-		overflow-y: auto;
+		gap: 15px;
 	}
 
 	.numel-panel {
 		grid-column: 1;
 		grid-row: 1;
-		max-height: 50vh;
-		min-height: 400px;
+		max-height: 35vh;
+		min-height: 280px;
 	}
 	
 	.numel-workflow-panel {
@@ -767,6 +836,77 @@ body.workflow-active .numel-graph-panel {
 	.numel-graph-panel {
 		grid-column: 1;
 		grid-row: 2;
-		min-height: 400px;
+		min-height: 350px;
+	}
+	
+	.numel-footer {
+		grid-row: 3;
+	}
+}
+
+@media (max-width: 768px) {
+	body {
+		padding: 10px;
+		gap: 10px;
+		grid-template-rows: minmax(250px, 40vh) 1fr auto;
+	}
+	
+	.numel-panel {
+		padding: 15px;
+		min-height: 250px;
+		max-height: 40vh;
+	}
+	
+	.numel-title {
+		font-size: 18px;
+	}
+	
+	.numel-config-section {
+		padding: 10px;
+	}
+	
+	.numel-config-row {
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	
+	.numel-config-row label {
+		flex: 0 0 100%;
+		width: 100%;
+	}
+	
+	.numel-input-group {
+		flex-wrap: wrap;
+	}
+	
+	.numel-input-group button {
+		flex: 1 1 auto;
+		min-width: 70px;
+	}
+	
+	.workflow-controls button {
+		font-size: 10px;
+		padding: 6px 6px;
+	}
+}
+
+@media (max-width: 480px) {
+	body {
+		padding: 8px;
+		gap: 8px;
+	}
+	
+	.numel-panel {
+		padding: 12px;
+		min-height: 220px;
+	}
+	
+	.numel-title {
+		font-size: 16px;
+	}
+	
+	.numel-btn {
+		font-size: 12px;
+		padding: 8px 10px;
 	}
 }

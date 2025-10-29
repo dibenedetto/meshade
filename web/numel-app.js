@@ -203,11 +203,7 @@ async function connect() {
 		addMessage("ui", START_MESSAGE);
 
 		if (config.workflows && config.workflows.length > 0) {
-			showWorkflowList();
-			const workflowPanel = document.getElementById("workflowPanel");
-			if (workflowPanel) {
-				workflowPanel.style.display = "block";
-			}
+			toggleWorkflowLayout(true);
 			showWorkflowList();
 			addMessage("system", `📄 ${config.workflows.length} workflow(s) available`);
 		} else {
@@ -816,16 +812,23 @@ function toggleWorkflowLayout(show) {
 	const body = document.body;
 	const panel = document.getElementById("workflowPanel");
 	
-	if (show && panel) {
+	if (show) {
+		// Show workflow panel
 		body.classList.add("workflow-active");
-		panel.style.display = "flex";
+		if (panel) {
+			panel.style.display = ""; // Remove inline style to let CSS control it
+		}
+		console.log("✅ Workflow panel shown");
 	} else {
+		// Hide workflow panel
 		body.classList.remove("workflow-active");
 		if (panel) {
-			panel.style.display = "none";
+			panel.style.display = ""; // Remove inline style
 		}
+		console.log("❌ Workflow panel hidden");
 	}
 	
+	// Force graph redraw after layout change
 	if (gGraph) {
 		setTimeout(() => {
 			gGraph.api.view.center();
@@ -834,6 +837,7 @@ function toggleWorkflowLayout(show) {
 	}
 }
 
+// Also update the showWorkflowList function to ensure panel is visible:
 function showWorkflowList() {
 	const config = gApp?.status?.config;
 	if (!config || !config.workflows) {
@@ -841,10 +845,18 @@ function showWorkflowList() {
 		return;
 	}
 	
+	// Make sure workflow panel is visible
+	toggleWorkflowLayout(true);
+	
 	const workflowListEl = document.getElementById("workflowList");
 	if (!workflowListEl) return;
 	
 	workflowListEl.innerHTML = "";
+	
+	if (config.workflows.length === 0) {
+		workflowListEl.innerHTML = '<div class="workflow-list-empty">No workflows configured</div>';
+		return;
+	}
 	
 	config.workflows.forEach((workflow, index) => {
 		const item = document.createElement("div");
@@ -860,12 +872,15 @@ function showWorkflowList() {
 		workflowListEl.appendChild(item);
 	});
 	
+	// Attach event listeners
 	document.querySelectorAll(".workflow-execute-btn").forEach(btn => {
 		btn.addEventListener("click", (e) => {
 			const index = parseInt(e.target.dataset.index);
 			executeWorkflow(index);
 		});
 	});
+	
+	console.log(`✅ Workflow list populated with ${config.workflows.length} workflows`);
 }
 
 // ====================================================================
