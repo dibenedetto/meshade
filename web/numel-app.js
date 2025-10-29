@@ -172,11 +172,28 @@ async function connect() {
 			throw new Error("NumelApp initialization failed");
 		}
 
-		// Load schema and config into SchemaGraph
+		// ====================================================================
+		// INTEGRATED SCHEMA & WORKFLOW SETUP
+		// ====================================================================
+		
+		// 1. Register the single merged schema
 		const config = await gApp.getConfig();
 		gGraph.api.schema.register(SCHEMA_NAME, gApp.schema, "Index", "AppConfig");
+		
+		// 2. Initialize workflow extension (adds workflow node types)
+		if (typeof initWorkflowExtension === "function") {
+			initWorkflowExtension(gGraph);
+			console.log("✅ Workflow extension initialized");
+		}
+		
+		// 3. Import the full config (includes workflows)
 		gGraph.api.config.import(config, SCHEMA_NAME);
-		gGraph.api.layout.apply("circular");
+		
+		// 4. Setup workflow execution handlers
+		setupWorkflowHandlers();
+		
+		// 5. Initial layout
+		gGraph.api.layout.apply("hierarchical-vertical");
 		gGraph.api.view.center();
 
 		agentPrevIndex = -1;
@@ -193,6 +210,7 @@ async function connect() {
 		// connectButton.classList.add("numel-btn-secondary");
 		connectButton.classList.add("numel-btn-accent-red");
 		addMessage("system", `✅ Connected to ${serverUrl}`);
+		addMessage("system", `📊 Loaded ${config.agents?.length || 0} agents, ${config.workflows?.length || 0} workflows`);
 		addMessage("ui", START_MESSAGE);
 
 	} catch (error) {
@@ -415,6 +433,153 @@ function changeSystemVisibility() {
 	for (let div of divs) {
 		div.style.display = display;
 	}
+}
+
+// ====================================================================
+// WORKFLOW EXECUTION HANDLERS
+// ====================================================================
+
+function setupWorkflowHandlers() {
+	// Listen for workflow execution requests from SchemaGraph
+	gGraph.eventBus.on("workflow:execute", async (data) => {
+		addMessage("system", `🚀 Executing workflow: ${data.workflow_id || 'unnamed'}`);
+		
+		try {
+			const url = gApp.url + "/workflow/start";
+			const response = await fetch(url, {
+				method: "POST",
+				headers: {"Content-Type": "application/json"},
+				body: JSON.stringify({
+					index: data.workflow_index,
+					args: data.context || {}
+				})
+			});
+			
+			const result = await response.json();
+			
+			if (result.error) {
+				addMessage("system-error", `❌ Workflow error: ${result.error}`);
+				gGraph.eventBus.emit("workflow:error", result);
+			} else {
+				addMessage("system", `✅ Workflow ${result.workflow_id} started (execution: ${result.execution_id})`);
+				
+				// Connect to WebSocket for live updates
+				connectWorkflowWebSocket(result.execution_id);
+				
+				gGraph.eventBus.emit("workflow:started", result);
+			}
+		} catch (error) {
+			addMessage("system-error", `❌ Failed to execute workflow: ${error.message}`);
+			gGraph.eventBus.emit("workflow:error", {error: error.message});
+		}
+	});
+	
+	// Listen for agent calls within workflows
+	gGraph.eventBus.on("workflow:agent_call", async (data) => {
+		addMessage("system", `🤖 Workflow calling agent ${data.agent_ref}: "${data.message}"`);
+		
+		try {
+			const response = await gApp.send(data.message, data.agent_ref);
+			addMessage("system", `✅ Agent ${data.agent_ref} responded`);
+		} catch (error) {
+			addMessage("system-error", `❌ Agent call failed: ${error.message}`);
+		}
+	});
+	
+	// Workflow status updates
+	gGraph.eventBus.on("workflow:node_executing", (data) => {
+		console.log(`⚡ Executing node: ${data.nodeType} (${data.nodeId})`);
+	});
+	
+	gGraph.eventBus.on("workflow:completed", (data) => {
+		addMessage("system", `✅ Workflow completed in ${data.duration}ms (${data.nodesExecuted} nodes)`);
+	});
+	
+	gGraph.eventBus.on("workflow:failed", (data) => {
+		addMessage("system-error", `❌ Workflow failed: ${data.error}`);
+	});
+}
+
+function connectWorkflowWebSocket(executionId) {
+	const wsUrl = gApp.url.replace('http', 'ws') + `/workflow/events/${executionId}`;
+	const ws = new WebSocket(wsUrl);
+	
+	ws.onmessage = (event) => {
+		const data = JSON.parse(event.data);
+		
+		switch (data.type) {
+			case 'node.start':
+				addMessage("system", `⚡ Node executing: ${data.data.node_type}`);
+				// Highlight node in graph
+				gGraph.eventBus.emit("workflow:node_highlight", {
+					nodeId: data.data.node_id
+				});
+				break;
+			
+			case 'node.end':
+				addMessage("system", `✓ Node completed: ${data.data.node_id}`);
+				break;
+			
+			case 'agent.response':
+				addMessage("agent", data.data.response);
+				break;
+			
+			case 'workflow.end':
+				addMessage("system", `✅ Workflow ${data.data.status}`);
+				ws.close();
+				break;
+		}
+	};
+	
+	ws.onerror = (error) => {
+		console.error('WebSocket error:', error);
+		addMessage("system-error", "❌ Workflow connection lost");
+	};
+}
+
+// ====================================================================
+// VIEW MODE SWITCHING
+// ====================================================================
+
+// Add UI controls for switching between config view and workflow view
+function addViewModeControls() {
+	// This can be added to your toolbar
+	const modeSelect = document.createElement('select');
+	modeSelect.id = 'viewMode';
+	modeSelect.innerHTML = `
+		<option value="config">📋 Config View</option>
+		<option value="workflow">🔄 Workflow View</option>
+	`;
+	
+	modeSelect.addEventListener('change', (e) => {
+		switchViewMode(e.target.value);
+	});
+	
+	// Add to toolbar or control panel
+	document.querySelector('.numel-toolbar').appendChild(modeSelect);
+}
+
+function switchViewMode(mode) {
+	if (mode === 'workflow') {
+		// Show only workflow nodes
+		gGraph.api.filter.apply((node) => {
+			return node.type?.startsWith('Workflow.') || 
+				   node.schema_type === 'WorkflowConfig' ||
+				   node.schema_type === 'NodeConfig' ||
+				   node.schema_type === 'EdgeConfig';
+		});
+		
+		addMessage("system", "📊 Switched to Workflow View");
+		gGraph.api.layout.apply("hierarchical-vertical");
+		
+	} else {
+		// Show full config
+		gGraph.api.filter.clear();
+		addMessage("system", "📋 Switched to Config View");
+		gGraph.api.layout.apply("circular");
+	}
+	
+	gGraph.api.view.center();
 }
 
 // ========================================================================

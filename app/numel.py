@@ -233,6 +233,47 @@ def unroll_config(config: AppConfig) -> AppConfig:
 				if not isinstance(prompt.embedding, int) or prompt.embedding < 0 or prompt.embedding >= len(config_copy.embeddings):
 					raise ValueError("Invalid prompt embedding")
 
+	# ========================================================================
+	# WORKFLOW PROCESSING - Add after existing code
+	# ========================================================================
+
+	if True:
+		for workflow in config_copy.workflows:
+			# Process workflow nodes
+			if workflow.nodes:
+				for node in workflow.nodes:
+					# If node references agents/tools, validate indices
+					if node.type == NodeType.AGENT:
+						agent_ref = node.config.get("agent", {}).get("agent_ref")
+						if agent_ref is not None:
+							if not isinstance(agent_ref, int) or agent_ref < 0 or agent_ref >= len(config_copy.agents):
+								raise ValueError(f"Invalid agent reference in workflow node {node.id}")
+					
+					elif node.type == NodeType.TOOL_CALL:
+						tool_ref = node.config.get("tool", {}).get("tool_ref")
+						if tool_ref is not None:
+							if not isinstance(tool_ref, int) or tool_ref < 0 or tool_ref >= len(config_copy.tools):
+								raise ValueError(f"Invalid tool reference in workflow node {node.id}")
+			
+			# Process workflow edges - validate node references
+			if workflow.edges:
+				node_ids = {node.id for node in workflow.nodes}
+				for edge in workflow.edges:
+					if edge.source_node_id not in node_ids:
+						raise ValueError(f"Edge {edge.id} references non-existent source node {edge.source_node_id}")
+					if edge.target_node_id not in node_ids:
+						raise ValueError(f"Edge {edge.id} references non-existent target node {edge.target_node_id}")
+			
+			# Validate start and end nodes exist
+			if workflow.start_node_id:
+				node_ids = {node.id for node in workflow.nodes}
+				if workflow.start_node_id not in node_ids:
+					raise ValueError(f"Workflow start node {workflow.start_node_id} not found")
+			
+			for end_node_id in workflow.end_node_ids:
+				if end_node_id not in node_ids:
+					raise ValueError(f"Workflow end node {end_node_id} not found")
+
 	return config_copy
 
 
@@ -337,10 +378,32 @@ def validate_config(config: AppConfig) -> bool:
 			# TODO: check workflow_option
 			pass
 
+	# ========================================================================
+	# WORKFLOW VALIDATION
+	# ========================================================================
+	
 	if True:
 		for workflow in config.workflows:
-			# TODO: check workflow
-			pass
+			# Check for at least one start node
+			has_start = any(node.id == workflow.start_node_id for node in workflow.nodes)
+			if not has_start:
+				print(f"Workflow {workflow.id} missing start node")
+				return False
+			
+			# Check for at least one end node
+			if not workflow.end_node_ids:
+				print(f"Workflow {workflow.id} missing end nodes")
+				return False
+			
+			# Validate all end nodes exist
+			node_ids = {node.id for node in workflow.nodes}
+			for end_id in workflow.end_node_ids:
+				if end_id not in node_ids:
+					print(f"Workflow {workflow.id} references non-existent end node {end_id}")
+					return False
+			
+			# Check for cycles (optional - workflows can have intentional loops)
+			# ... add cycle detection if needed ...
 
 	return True
 
