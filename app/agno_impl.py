@@ -25,15 +25,17 @@ from   agno.vectordb.search            import SearchType
 
 
 from   numel                           import (
-	DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME,
-	DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS,
-	AppConfig,
 	AgentApp,
-	BackendConfig,
-	AgentOptionsConfig,
 	register_backend
 )
 
+from   schema                          import (
+	DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME,
+	DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS,
+	AppConfig,
+	BackendConfig,
+	AgentOptionsConfig
+)
 
 def _validate_config(config: AppConfig) -> bool:
 	# TODO: Implement validation logic for the Agno app configuration
