@@ -328,6 +328,17 @@ body {
 	background: #7ab854;
 }
 
+.numel-btn-accent-red {
+	background: var(--sg-accent-red);
+	color: var(--sg-text-primary);
+	border: 1px solid var(--sg-border-color);
+}
+
+.numel-btn-accent-red:hover:not(:disabled) {
+	background: var(--sg-accent-red);
+	border-color: var(--sg-border-highlight);
+}
+
 /* Loading */
 .numel-loading {
 	display: none;

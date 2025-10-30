@@ -73,7 +73,7 @@ def unroll_config(config: AppConfig) -> AppConfig:
 			if True:
 				if isinstance(agent.options, AgentOptionsConfig):
 					config_copy.agent_options.append(agent.options)
-					agent.options = len(config_copy.options) - 1
+					agent.options = len(config_copy.agent_options) - 1
 				if not isinstance(agent.options, int) or agent.options < 0 or agent.options >= len(config_copy.agent_options):
 					raise ValueError("Invalid agent options")
 
@@ -142,7 +142,7 @@ def unroll_config(config: AppConfig) -> AppConfig:
 					memory_mgr.prompt = len(config_copy.prompts) - 1
 				if not isinstance(memory_mgr.prompt, int) or memory_mgr.prompt < 0 or memory_mgr.prompt >= len(config_copy.prompts):
 					raise ValueError("Invalid memory prompt")
-				prompt = config_copy.prompt[memory_mgr.prompt]
+				prompt = config_copy.prompts[memory_mgr.prompt]
 
 				if True:
 					if prompt.model is None:

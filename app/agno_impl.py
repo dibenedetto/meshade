@@ -24,7 +24,7 @@ from   agno.vectordb.lancedb           import LanceDb
 from   agno.vectordb.search            import SearchType
 
 
-from   numel                     import (
+from   numel                           import (
 	DEFAULT_KNOWLEDGE_MANAGER_INDEX_DB_TABLE_NAME,
 	DEFAULT_TOOL_MAX_WEB_SEARCH_RESULTS,
 	AppConfig,

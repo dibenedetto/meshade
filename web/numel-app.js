@@ -114,6 +114,9 @@ async function connect() {
 		return;
 	}
 
+	clearChatButton .disabled = true;
+	connectButton   .disabled = true;
+
 	addMessage("system", "⌛ Connecting...");
 
 	const userId = userIdInput.value.trim();
@@ -155,7 +158,8 @@ async function connect() {
 		enableInput(true);
 		connectButton.textContent = "Disconnect";
 		connectButton.classList.remove("numel-btn-accent");
-		connectButton.classList.add("numel-btn-secondary");
+		// connectButton.classList.add("numel-btn-secondary");
+		connectButton.classList.add("numel-btn-accent-red");
 		addMessage("system", `✅ Connected to ${serverUrl}`);
 		addMessage("ui", START_MESSAGE);
 
@@ -164,10 +168,16 @@ async function connect() {
 		addMessage("system-error", `❌ Connection failed: ${error.message}`);
 		updateStatus("disconnected", "Connection failed");
 		enableAppInput(true);
+	} finally {
+		clearChatButton .disabled = false;
+		connectButton   .disabled = false;
 	}
 }
 
 async function disconnect() {
+	clearChatButton .disabled = true;
+	connectButton   .disabled = true;
+
 	graph.api.schema.remove(SCHEMA_NAME);
 
 	if (aguiApp) {
@@ -184,11 +194,15 @@ async function disconnect() {
 	updateStatus("disconnected", "Disconnected");
 	enableInput(false);
 	connectButton.textContent = "Connect";
-	connectButton.classList.remove("numel-btn-secondary");
+	// connectButton.classList.remove("numel-btn-secondary");
+	connectButton.classList.remove("numel-btn-accent-red");
 	connectButton.classList.add("numel-btn-accent");
 	addMessage("system", "ℹ️ Disconnected");
 	addMessage("ui", END_MESSAGE);
 	enableAppInput(true);
+
+	clearChatButton .disabled = false;
+	connectButton   .disabled = false;
 }
 
 function toggleConnection() {
@@ -371,12 +385,8 @@ function changeSystemVisibility() {
 // ENTRY POINT
 // ========================================================================
 
-const onLoaded = () => {
-	initializeApp();
-};
-
 if (document.readyState === 'loading') {
-	document.addEventListener('DOMContentLoaded', onLoaded);
+	document.addEventListener('DOMContentLoaded', initializeApp);
 } else {
-	onLoaded();
+	initializeApp();
 }
