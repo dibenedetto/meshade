@@ -202,7 +202,7 @@ class AgentNodeExecutor(NodeExecutor):
 		
 		# Map output to state
 		output_mapping = agent_config.get("output_mapping", {})
-		return self._map_data({"agent_response": response}, output_mapping)
+		return self._map_data({"response": response}, output_mapping)
 	
 	def _map_data(self, source: Dict[str, Any], mapping: Dict[str, str]) -> Dict[str, Any]:
 		"""Map data using mapping dictionary"""

@@ -230,7 +230,7 @@
 						"agent": {
 							"agent_ref": 0,
 							"input_mapping": {"message": "user_query"},
-							"output_mapping": {"response": "agent_response"}
+							"output_mapping": {"response": "content"}
 						}
 					}
 				},

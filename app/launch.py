@@ -54,9 +54,7 @@ def adjust_config(config: AppConfig) -> AppConfig:
 
 async def run_agent(app: Any, agent_index, *args, **kwargs) -> Any:
 	result = await app.run(agent_index, *args, **kwargs)
-	if result.content_type == "str":
-		return result.content
-	return None
+	return result
 
 
 def try_apply_seed(config: AppConfig) -> None:
