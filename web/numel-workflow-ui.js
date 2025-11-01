@@ -142,9 +142,16 @@ function switchMode(mode) {
 			initWorkflowClient();
 		}
 		
-		// Show current workflow in graph
-		if (currentWorkflow && workflowVisualizer) {
-			workflowVisualizer.loadWorkflow(currentWorkflow);
+		if (workflowVisualizer) {
+			// Enter workflow mode
+			if (!workflowVisualizer.isInWorkflowMode()) {
+				workflowVisualizer.enterWorkflowMode();
+			}
+
+			// Show current workflow in graph
+			if (currentWorkflow) {
+				workflowVisualizer.loadWorkflow(currentWorkflow);
+			}
 		}
 	}
 }

@@ -376,7 +376,47 @@ class WorkflowVisualizer {
 			return null;
 		}
 		
-		const link = this.schemaGraph.api.link.create(sourceNode, 0, targetNode, 0);
+		// 🔧 FIX: Determine correct output slot
+		let outputSlot = 0;
+		const sourceType = sourceNode.workflowData?.type;
+		
+		if (sourceType === 'decision' && workflowEdge.condition) {
+			// For decision nodes, find the output slot matching the branch
+			const branchName = this.getBranchNameFromCondition(workflowEdge.condition);
+			outputSlot = sourceNode.outputs.findIndex(o => o.name === branchName);
+			if (outputSlot === -1) outputSlot = 0; // Fallback
+		} else if (sourceType === 'loop') {
+			// For loop nodes, determine if this is body or exit
+			const isExitEdge = workflowEdge.label?.toLowerCase().includes('exit') || 
+							workflowEdge.label?.toLowerCase().includes('done');
+			outputSlot = isExitEdge ? 1 : 0; // body=0, exit=1
+		} else if (sourceType === 'parallel') {
+			// For parallel nodes, find next available output slot
+			outputSlot = sourceNode.outputs.findIndex(o => !o.links || o.links.length === 0);
+			if (outputSlot === -1) outputSlot = sourceNode.outputs.length - 1;
+		}
+		// For all other nodes, use slot 0 (default single output)
+		
+		// 🔧 FIX: Determine correct input slot
+		let inputSlot = 0;
+		const targetType = targetNode.workflowData?.type;
+		
+		if (targetType === 'merge') {
+			// For merge nodes, find next available input slot
+			inputSlot = targetNode.inputs.findIndex(i => i.link === null);
+			if (inputSlot === -1) {
+				// All slots used, add a new one dynamically
+				inputSlot = targetNode.inputs.length;
+				targetNode.inputs.push({
+					name: `input_${inputSlot}`, 
+					type: 'Any', 
+					link: null
+				});
+			}
+		}
+		// For all other nodes, use slot 0 (default single input)
+		
+		const link = this.schemaGraph.api.link.create(sourceNode, outputSlot, targetNode, inputSlot);
 		
 		if (!link) {
 			console.error('❌ Failed to create edge:', `[${workflowEdge.source}] -> [${workflowEdge.target}]`);
@@ -389,7 +429,9 @@ class WorkflowVisualizer {
 			source: workflowEdge.source,
 			target: workflowEdge.target,
 			condition: workflowEdge.condition,
-			label: workflowEdge.label
+			label: workflowEdge.label,
+			outputSlot: outputSlot,
+			inputSlot: inputSlot
 		};
 		
 		if (workflowEdge.label) {
@@ -400,8 +442,19 @@ class WorkflowVisualizer {
 			this.styleConditionalEdge(link, workflowEdge.condition);
 		}
 		
-		console.log(`✓ Created edge: [${workflowEdge.source}] -> [${workflowEdge.target}]`);
+		console.log(`✔ Created edge: [${workflowEdge.source}:${outputSlot}] -> [${workflowEdge.target}:${inputSlot}]`);
 		return link;
+	}
+
+	// Helper method to extract branch name from condition
+	getBranchNameFromCondition(condition) {
+		if (condition.value !== undefined) {
+			return condition.value; // e.g., "technical", "billing", "general"
+		}
+		if (condition.label) {
+			return condition.label;
+		}
+		return 'default';
 	}
 
 	styleConditionalEdge(link, condition) {
