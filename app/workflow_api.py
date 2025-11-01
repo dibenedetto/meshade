@@ -4,14 +4,14 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
-from schema import WorkflowConfig
 from workflow_engine import WorkflowEngine, WorkflowExecutionState
 from event_bus import EventBus, EventType
+from utils import log_print
 
 
 # Request/Response models
 class WorkflowStartRequest(BaseModel):
-	workflow: WorkflowConfig
+	workflow: Dict[str, Any]  # Changed from WorkflowConfig to Dict to avoid circular import
 	initial_data: Optional[Dict[str, Any]] = None
 
 
@@ -33,14 +33,32 @@ class EventFilterRequest(BaseModel):
 
 
 def setup_workflow_api(app: FastAPI, workflow_engine: WorkflowEngine, event_bus: EventBus):
-	"""Setup workflow API endpoints"""
+	"""
+	Setup workflow API endpoints on the provided FastAPI app.
+	This should be called ONCE during app initialization.
+	"""
 	
-	@app.post("/workflow/start")
-	async def start_workflow(request: WorkflowStartRequest) -> WorkflowStartResponse:
+	log_print("Setting up workflow API endpoints...")
+	
+	# Check if routes already exist to avoid duplicates
+	existing_paths = [route.path for route in app.routes]
+	
+	if "/workflow/start" in existing_paths:
+		log_print("Warning: Workflow routes already registered, skipping...")
+		return
+	
+	@app.post("/workflow/start", response_model=WorkflowStartResponse)
+	async def start_workflow(request: WorkflowStartRequest):
 		"""Start a new workflow execution"""
 		try:
+			# Import here to avoid circular dependency
+			from workflow_schema import WorkflowConfig
+			
+			# Convert dict to WorkflowConfig
+			workflow_config = WorkflowConfig(**request.workflow)
+			
 			execution_id = await workflow_engine.start_workflow(
-				workflow=request.workflow,
+				workflow=workflow_config,
 				initial_data=request.initial_data
 			)
 			return WorkflowStartResponse(
@@ -48,6 +66,7 @@ def setup_workflow_api(app: FastAPI, workflow_engine: WorkflowEngine, event_bus:
 				status="started"
 			)
 		except Exception as e:
+			log_print(f"Error starting workflow: {e}")
 			raise HTTPException(status_code=500, detail=str(e))
 	
 	@app.post("/workflow/{execution_id}/cancel")
@@ -57,10 +76,11 @@ def setup_workflow_api(app: FastAPI, workflow_engine: WorkflowEngine, event_bus:
 			await workflow_engine.cancel_execution(execution_id)
 			return {"status": "cancelled", "execution_id": execution_id}
 		except Exception as e:
+			log_print(f"Error canceling workflow: {e}")
 			raise HTTPException(status_code=500, detail=str(e))
 	
-	@app.get("/workflow/{execution_id}/status")
-	async def get_workflow_status(execution_id: str) -> WorkflowExecutionState:
+	@app.get("/workflow/{execution_id}/status", response_model=WorkflowExecutionState)
+	async def get_workflow_status(execution_id: str):
 		"""Get workflow execution status"""
 		state = workflow_engine.get_execution_state(execution_id)
 		if not state:
@@ -83,6 +103,7 @@ def setup_workflow_api(app: FastAPI, workflow_engine: WorkflowEngine, event_bus:
 			)
 			return {"status": "input_received"}
 		except Exception as e:
+			log_print(f"Error providing user input: {e}")
 			raise HTTPException(status_code=500, detail=str(e))
 	
 	@app.post("/workflow/events/history")
@@ -109,89 +130,66 @@ def setup_workflow_api(app: FastAPI, workflow_engine: WorkflowEngine, event_bus:
 		try:
 			while True:
 				# Keep connection alive and handle client messages
-				data = await websocket.receive_text()
-				# Client can send commands here if needed
-				
+				try:
+					data = await websocket.receive_text()
+					log_print(f"Received WebSocket message: {data}")
+					# Client can send commands here if needed
+				except Exception as e:
+					log_print(f"WebSocket receive error: {e}")
+					break
+					
 		except WebSocketDisconnect:
+			log_print("WebSocket client disconnected")
 			event_bus.remove_websocket_client(websocket)
 		except Exception as e:
-			print(f"WebSocket error: {e}")
+			log_print(f"WebSocket error: {e}")
 			event_bus.remove_websocket_client(websocket)
+	
+	log_print(f"? Workflow API endpoints registered on {app.title}")
 
 
 # ========================================================================
-# Integration with launch.py
+# Workflow Manager Integration (Optional)
 # ========================================================================
 
-"""
-To integrate into launch.py, add the following:
-
-1. Import at the top:
-from workflow_engine import WorkflowEngine
-from workflow_api import setup_workflow_api
-from event_bus import get_event_bus
-
-2. After creating ctrl_app, add:
-event_bus = get_event_bus()
-workflow_engine = None
-
-3. In start_app(), after creating apps:
-global workflow_engine
-workflow_engine = WorkflowEngine(config, event_bus)
-setup_workflow_api(ctrl_app, workflow_engine, event_bus)
-
-4. In stop_app(), add:
-workflow_engine = None
-
-5. Update the middleware setup for WebSocket support (already done in add_middleware)
-"""
-
-
-# Example of extended launch.py section:
-"""
-# Add after existing imports
-from workflow_engine import WorkflowEngine
-from workflow_api import setup_workflow_api
-from event_bus import get_event_bus
-
-# Add after ctrl_app creation
-event_bus = get_event_bus()
-workflow_engine = None
-
-@ctrl_app.post("/start")
-async def start_app():
-	global apps, config, ctrl_status, running_servers, workflow_engine
-	if apps is not None:
-		return {"error": "App is already running"}
-	try:
-		# ... existing code ...
+def setup_workflow_manager_api(app: FastAPI, workflow_manager):
+	"""
+	Optional: Setup workflow manager API endpoints for CRUD operations
+	on workflow definitions (not executions).
+	"""
+	
+	@app.get("/workflows/list")
+	async def list_workflow_definitions():
+		"""List all workflow definitions"""
+		return {"workflows": workflow_manager.list_workflows()}
+	
+	@app.get("/workflows/{name}")
+	async def get_workflow_definition(name: str):
+		"""Get a workflow definition by name"""
+		workflow = workflow_manager.get_workflow(name)
+		if not workflow:
+			raise HTTPException(status_code=404, detail="Workflow not found")
+		return workflow
+	
+	@app.post("/workflows")
+	async def create_workflow_definition(workflow: Dict[str, Any]):
+		"""Create or update a workflow definition"""
+		from workflow_schema import WorkflowConfig
 		
-		# Add workflow engine
-		workflow_engine = WorkflowEngine(config, event_bus)
-		setup_workflow_api(ctrl_app, workflow_engine, event_bus)
-		
-		ctrl_status["config"] = config
-		ctrl_status["status"] = "running"
-	except Exception as e:
-		return {"error": str(e)}
-	return ctrl_status
-
-@ctrl_app.post("/stop")
-async def stop_app():
-	global apps, config, ctrl_status, running_servers, workflow_engine
-	if apps is None:
-		return {"error": "App is not running"}
-	try:
-		# ... existing code ...
-		
-		# Clean up workflow engine
-		workflow_engine = None
-		
-		apps = None
-		running_servers = []
-		ctrl_status["config"] = None
-		ctrl_status["status"] = "stopped"
-	except Exception as e:
-		return {"error": str(e)}
-	return ctrl_status
-"""
+		try:
+			workflow_config = WorkflowConfig(**workflow)
+			workflow_manager.workflows[workflow_config.info.name] = workflow_config
+			workflow_manager.save_workflow(workflow_config)
+			return {"status": "created", "name": workflow_config.info.name}
+		except Exception as e:
+			raise HTTPException(status_code=400, detail=str(e))
+	
+	@app.delete("/workflows/{name}")
+	async def delete_workflow_definition(name: str):
+		"""Delete a workflow definition"""
+		if name not in workflow_manager.workflows:
+			raise HTTPException(status_code=404, detail="Workflow not found")
+		workflow_manager.delete_workflow(name)
+		return {"status": "deleted", "name": name}
+	
+	log_print("? Workflow manager API endpoints registered")

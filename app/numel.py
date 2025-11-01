@@ -44,8 +44,8 @@ def unroll_config(config: AppConfig) -> AppConfig:
 		if not config_copy.agents           : config_copy.agents           = []
 		if not config_copy.team_options     : config_copy.team_options     = []
 		if not config_copy.teams            : config_copy.teams            = []
-		if not config_copy.workflow_options : config_copy.workflow_options = []
-		if not config_copy.workflows        : config_copy.workflows        = []
+		# if not config_copy.workflow_options : config_copy.workflow_options = []
+		# if not config_copy.workflows        : config_copy.workflows        = []
 
 	if True:
 		if isinstance(config_copy.info, InfoConfig):

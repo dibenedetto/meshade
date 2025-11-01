@@ -39,41 +39,15 @@ from   workflow_api            import (
 )
 from   workflow_engine         import (
 	WorkflowEngine,
-	WorkflowExecutionState,
 )
 from   workflow_manager        import (
 	WorkflowManager,
-)
-from   workflow_schema         import (
-	WorkflowConfig,
 )
 
 
 load_dotenv()
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-
-
-class WorkflowStartRequest(BaseModel):
-	workflow: WorkflowConfig
-	initial_data: Optional[Dict[str, Any]] = None
-
-
-class WorkflowStartResponse(BaseModel):
-	execution_id: str
-	status: str
-
-
-class UserInputRequest(BaseModel):
-	node_id: str
-	input_data: Any
-
-
-class EventFilterRequest(BaseModel):
-	workflow_id: Optional[str] = None
-	execution_id: Optional[str] = None
-	event_type: Optional[EventType] = None
-	limit: int = 100
 
 
 def add_middleware(app: FastAPI) -> None:
@@ -123,6 +97,21 @@ if True:
 
 
 if True:
+	# Load workflow schema too
+	workflow_schema = None
+	try:
+		workflow_schema_path = os.path.join(current_dir, "workflow_schema.py")
+		with open(workflow_schema_path, "r", encoding="utf-8") as f:
+			workflow_schema_text = f.read()
+		workflow_schema = {
+			"schema": workflow_schema_text,
+		}
+	except Exception as e:
+		log_print(f"Warning: Could not load workflow schema: {e}")
+		workflow_schema = {"schema": ""}
+
+
+if True:
 	config = load_config(args.config_path) or AppConfig()
 	config.port = args.port
 	config = adjust_config(config)
@@ -164,164 +153,7 @@ if True:
 
 
 # ========================================================================
-# Workflow API Endpoints
-# ========================================================================
-
-@ctrl_app.post("/workflow/start")
-async def start_workflow(request: WorkflowStartRequest) -> WorkflowStartResponse:
-	"""Start a new workflow execution"""
-	global workflow_eng
-	
-	if workflow_eng is None:
-		raise HTTPException(status_code=503, detail="Workflow engine not initialized")
-	
-	try:
-		execution_id = await workflow_eng.start_workflow(
-			workflow=request.workflow,
-			initial_data=request.initial_data
-		)
-		return WorkflowStartResponse(
-			execution_id=execution_id,
-			status="started"
-		)
-	except Exception as e:
-		log_print(f"Error starting workflow: {e}")
-		raise HTTPException(status_code=500, detail=str(e))
-
-
-@ctrl_app.post("/workflow/{execution_id}/cancel")
-async def cancel_workflow(execution_id: str):
-	"""Cancel a running workflow"""
-	global workflow_eng
-	
-	if workflow_eng is None:
-		raise HTTPException(status_code=503, detail="Workflow engine not initialized")
-	
-	try:
-		await workflow_eng.cancel_execution(execution_id)
-		return {"status": "cancelled", "execution_id": execution_id}
-	except Exception as e:
-		log_print(f"Error canceling workflow: {e}")
-		raise HTTPException(status_code=500, detail=str(e))
-
-
-@ctrl_app.get("/workflow/{execution_id}/status")
-async def get_workflow_status(execution_id: str) -> WorkflowExecutionState:
-	"""Get workflow execution status"""
-	global workflow_eng
-	
-	if workflow_eng is None:
-		raise HTTPException(status_code=503, detail="Workflow engine not initialized")
-	
-	state = workflow_eng.get_execution_state(execution_id)
-	if not state:
-		raise HTTPException(status_code=404, detail="Execution not found")
-	return state
-
-
-@ctrl_app.get("/workflow/list")
-async def list_workflows() -> List[WorkflowExecutionState]:
-	"""List all workflow executions"""
-	global workflow_eng
-	
-	if workflow_eng is None:
-		raise HTTPException(status_code=503, detail="Workflow engine not initialized")
-	
-	return workflow_eng.list_executions()
-
-
-@ctrl_app.post("/workflow/{execution_id}/input")
-async def provide_user_input(execution_id: str, request: UserInputRequest):
-	"""Provide user input for waiting workflow"""
-	global workflow_eng
-	
-	if workflow_eng is None:
-		raise HTTPException(status_code=503, detail="Workflow engine not initialized")
-	
-	try:
-		await workflow_eng.provide_user_input(
-			execution_id=execution_id,
-			node_id=request.node_id,
-			user_input=request.input_data
-		)
-		return {"status": "input_received"}
-	except Exception as e:
-		log_print(f"Error providing user input: {e}")
-		raise HTTPException(status_code=500, detail=str(e))
-
-
-@ctrl_app.post("/workflow/events/history")
-async def get_event_history(request: EventFilterRequest):
-	"""Get filtered event history"""
-	global event_bus
-	
-	events = event_bus.get_event_history(
-		workflow_id=request.workflow_id,
-		execution_id=request.execution_id,
-		event_type=request.event_type,
-		limit=request.limit
-	)
-	return {"events": [e.dict() for e in events]}
-
-
-@ctrl_app.delete("/workflow/events/history")
-async def clear_event_history():
-	"""Clear event history"""
-	global event_bus
-	event_bus.clear_history()
-	return {"status": "cleared"}
-
-
-@ctrl_app.websocket("/workflow/events")
-async def workflow_events_websocket(websocket: WebSocket):
-	"""WebSocket endpoint for real-time workflow events"""
-	global event_bus
-	
-	await event_bus.add_websocket_client(websocket)
-	try:
-		while True:
-			# Keep connection alive and handle client messages
-			try:
-				data = await websocket.receive_text()
-				# Client can send commands here if needed
-				log_print(f"Received WebSocket message: {data}")
-			except Exception as e:
-				log_print(f"WebSocket receive error: {e}")
-				break
-				
-	except WebSocketDisconnect:
-		log_print("WebSocket client disconnected")
-		event_bus.remove_websocket_client(websocket)
-	except Exception as e:
-		log_print(f"WebSocket error: {e}")
-		event_bus.remove_websocket_client(websocket)
-
-
-# # API endpoints can now work with workflow manager
-# @ctrl_app.get("/workflows/list")
-# async def list_workflows():
-# 	return {"workflows": workflow_manager.list_workflows()}
-
-# @ctrl_app.get("/workflows/{name}")
-# async def get_workflow(name: str):
-# 	workflow = workflow_manager.get_workflow(name)
-# 	if not workflow:
-# 		raise HTTPException(status_code=404, detail="Workflow not found")
-# 	return workflow
-
-# @ctrl_app.post("/workflows")
-# async def create_workflow(workflow: WorkflowConfig):
-# 	# Validate against app config
-# 	errors = workflow.validate_against_app_config(config)
-# 	if errors:
-# 		raise HTTPException(status_code=400, detail=errors)
-	
-# 	workflow_manager.workflows[workflow.info.name] = workflow
-# 	workflow_manager.save_workflow(workflow)
-# 	return {"status": "created", "name": workflow.info.name}
-
-# ========================================================================
-# Original API Endpoints (with workflow integration)
+# Original API Endpoints (App Schema & Config)
 # ========================================================================
 
 @ctrl_app.post("/ping")
@@ -336,8 +168,16 @@ async def ping():
 
 @ctrl_app.post("/schema")
 async def export_schema():
+	"""Export app schema"""
 	global schema
 	return schema
+
+
+@ctrl_app.post("/workflow/schema")
+async def export_workflow_schema():
+	"""Export workflow schema - NEW ENDPOINT"""
+	global workflow_schema
+	return workflow_schema
 
 
 @ctrl_app.post("/import")
@@ -349,6 +189,7 @@ async def import_config(cfg: dict):
 	new_config = adjust_config(new_config)
 	if new_config is None:
 		return {"error": "Invalid app configuration"}
+	config = new_config
 	ctrl_status["status"] = "ready"
 	return config
 
@@ -400,9 +241,13 @@ async def start_app():
 				agent_index += 1
 				agent_port  += 1
 
+		# Initialize workflow engine ONCE
 		workflow_eng = WorkflowEngine(config, event_bus)
 		workflow_eng.set_workflow_manager(workflow_manager)
+		
+		# Setup workflow API endpoints ONCE
 		setup_workflow_api(ctrl_app, workflow_eng, event_bus)
+		
 		log_print("Workflow engine initialized")
 
 		ctrl_status["config"] = config

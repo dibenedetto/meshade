@@ -2,6 +2,8 @@
    NUMEL WORKFLOW - Fixed with Proper Schema Registration & Edge Conditions
    ======================================================================== */
 
+const WORKFLOW_SCHEMA_NAME = "workflow";
+
 class WorkflowVisualizer {
 	constructor(schemaGraphApp) {
 		this.schemaGraph = schemaGraphApp;
@@ -30,7 +32,7 @@ class WorkflowVisualizer {
 		try {
 			// Register workflow schema (similar to how app schema is registered)
 			this.schemaGraph.api.schema.register(
-				'workflow',           // Schema name
+				WORKFLOW_SCHEMA_NAME,           // Schema name
 				workflowSchemaCode,   // Python schema code
 				'int',                // Index type (nodes referenced by index)
 				'WorkflowConfig'      // Root type
@@ -62,8 +64,8 @@ class WorkflowVisualizer {
 			'loop': 'LoopNodeConfig',
 			'user_input': 'UserInputNodeConfig'
 		};
-		
-		return typeMap[workflowType] || 'WorkflowNodeConfig';
+
+		return `${WORKFLOW_SCHEMA_NAME}.${typeMap[workflowType] || 'WorkflowNodeConfig'}`;
 	}
 
 	// ====================================================================

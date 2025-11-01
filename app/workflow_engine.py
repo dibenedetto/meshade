@@ -524,6 +524,7 @@ class WorkflowEngine:
 		self.executions: Dict[str, WorkflowExecutionState] = {}
 		self.contexts: Dict[str, WorkflowExecutionContext] = {}
 		self.execution_tasks: Dict[str, asyncio.Task] = {}
+		self.workflow_manager = None
 		
 		# Register node executors
 		self.executors = {
@@ -539,7 +540,23 @@ class WorkflowEngine:
 			WorkflowNodeType.TOOL: ToolNodeExecutor(app_config, self.event_bus),
 			WorkflowNodeType.USER_INPUT: UserInputNodeExecutor(app_config, self.event_bus),
 		}
+
+	def set_workflow_manager(self, workflow_manager):
+		"""Set the workflow manager for accessing workflow definitions"""
+		self.workflow_manager = workflow_manager
 	
+	async def start_workflow_by_name(self, workflow_name: str, 
+	                                  initial_data = None):
+		"""Start a workflow by name from the workflow manager"""
+		if not self.workflow_manager:
+			raise ValueError("Workflow manager not set")
+		
+		workflow = self.workflow_manager.get_workflow(workflow_name)
+		if not workflow:
+			raise ValueError(f"Workflow not found: {workflow_name}")
+		
+		return await self.start_workflow(workflow, initial_data)
+
 	async def start_workflow(self, workflow: WorkflowConfig, 
 							initial_data: Optional[Dict[str, Any]] = None) -> str:
 		"""Start workflow execution"""
