@@ -2,6 +2,7 @@
 
 from   pydantic        import BaseModel
 from   typing          import Any, Dict, List, Optional, Union
+from   enum            import Enum
 
 
 DEFAULT_APP_MAX_AGENTS                            : int  = 100
@@ -174,15 +175,132 @@ class TeamConfig(ConfigModel):
 	agents  : List[Union[AgentConfig, Index]]           = []
 
 
+class WorkflowNodeType(str, Enum):
+	START = "start"
+	END = "end"
+	DECISION = "decision"
+	MERGE = "merge"
+	PARALLEL = "parallel"
+	LOOP = "loop"
+	AGENT = "agent"
+	PROMPT = "prompt"
+	TRANSFORM = "transform"
+	TOOL = "tool"
+	USER_INPUT = "user_input"
+
+
+class WorkflowNodeStatus(str, Enum):
+	PENDING = "pending"
+	RUNNING = "running"
+	COMPLETED = "completed"
+	FAILED = "failed"
+	SKIPPED = "skipped"
+	WAITING = "waiting"
+
+
+class WorkflowEdgeCondition(ConfigModel):
+	type: str = "always"  # always, equals, contains, greater, less, custom
+	field: Optional[str] = None
+	value: Optional[Any] = None
+	expression: Optional[str] = None
+
+
+class WorkflowEdgeConfig(ConfigModel):
+	id: str
+	source: str  # source node id
+	target: str  # target node id
+	condition: Optional[WorkflowEdgeCondition] = None
+	label: Optional[str] = None
+
+
+class WorkflowNodeConfig(ConfigModel):
+	id: str
+	type: WorkflowNodeType
+	label: Optional[str] = None
+	timeout: Optional[int] = None  # timeout in seconds
+
+
+class StartNodeConfig(WorkflowNodeConfig):
+	type: WorkflowNodeType = WorkflowNodeType.START
+	initial_data: Optional[Dict[str, Any]] = None
+
+
+class EndNodeConfig(WorkflowNodeConfig):
+	type: WorkflowNodeType = WorkflowNodeType.END
+	output_mapping: Optional[Dict[str, str]] = None
+
+
+class DecisionNodeConfig(WorkflowNodeConfig):
+	type: WorkflowNodeType = WorkflowNodeType.DECISION
+	condition_field: str
+	branches: Dict[str, Any]  # branch_name -> condition_value
+
+
+class MergeNodeConfig(WorkflowNodeConfig):
+	type: WorkflowNodeType = WorkflowNodeType.MERGE
+	strategy: str = "first"  # first, last, all, custom
+
+
+class ParallelNodeConfig(WorkflowNodeConfig):
+	type: WorkflowNodeType = WorkflowNodeType.PARALLEL
+	wait_for_all: bool = True
+	max_concurrent: Optional[int] = None
+
+
+class LoopNodeConfig(WorkflowNodeConfig):
+	type: WorkflowNodeType = WorkflowNodeType.LOOP
+	max_iterations: int = 10
+	condition_field: Optional[str] = None
+	condition_value: Optional[Any] = None
+
+
+class AgentNodeConfig(WorkflowNodeConfig):
+	type: WorkflowNodeType = WorkflowNodeType.AGENT
+	agent: Index  # reference to agent by index
+	input_mapping: Optional[Dict[str, str]] = None
+	output_mapping: Optional[Dict[str, str]] = None
+
+
+class PromptNodeConfig(WorkflowNodeConfig):
+	type: WorkflowNodeType = WorkflowNodeType.PROMPT
+	prompt: Index  # reference to prompt by index
+	model: Optional[Index] = None
+	input_mapping: Optional[Dict[str, str]] = None
+	output_mapping: Optional[Dict[str, str]] = None
+
+
+class TransformNodeConfig(WorkflowNodeConfig):
+	type: WorkflowNodeType = WorkflowNodeType.TRANSFORM
+	transform_type: str = "jq"  # jq, python, custom
+	transform_script: str
+	input_mapping: Optional[Dict[str, str]] = None
+	output_mapping: Optional[Dict[str, str]] = None
+
+
+class ToolNodeConfig(WorkflowNodeConfig):
+	type: WorkflowNodeType = WorkflowNodeType.TOOL
+	tool: Index  # reference to tool by index
+	input_mapping: Optional[Dict[str, str]] = None
+	output_mapping: Optional[Dict[str, str]] = None
+
+
+class UserInputNodeConfig(WorkflowNodeConfig):
+	type: WorkflowNodeType = WorkflowNodeType.USER_INPUT
+	prompt_text: str
+	input_schema: Optional[Dict[str, Any]] = None
+	timeout: Optional[int] = 300  # 5 minutes default
+
+
 class WorkflowOptionsConfig(ConfigModel):
 	tag : int = 0
 
 
 class WorkflowConfig(ConfigModel):
-	info    : Optional[InfoConfig]                          = InfoConfig()
-	options : Optional[Union[WorkflowOptionsConfig, Index]] = WorkflowOptionsConfig()
-	agents  : List[Union[AgentConfig, Index]]               = []
-	teams   : List[Union[TeamConfig, Index]]                = []
+	info: Optional[InfoConfig] = InfoConfig()
+	options: Optional[Union[WorkflowOptionsConfig, Index]] = WorkflowOptionsConfig()
+	nodes: List[WorkflowNodeConfig] = []
+	edges: List[WorkflowEdgeConfig] = []
+	variables: Optional[Dict[str, Any]] = None
 
 
 class AppOptionsConfig(ConfigModel):

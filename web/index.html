@@ -12,6 +12,7 @@
 	
 	<!-- Numel App Styles (inherits SchemaGraph theme) -->
 	<link rel="stylesheet" href="numel-app.css">
+	<link rel="stylesheet" href="numel-workflow.css">
 </head>
 <body>
 	<!-- Chat Panel -->
@@ -20,49 +21,138 @@
 			<span class="numel-brand">Numel AI</span> Playground
 		</h1>
 
-		<!-- Connection Config -->
-		<div class="numel-config-section">
-			<div class="numel-config-row">
-				<label for="serverUrl">URL:</label>
-				<input type="url" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000" />
+		<!-- Mode Switcher -->
+		<div class="numel-mode-switcher">
+			<button id="chatModeBtn" class="numel-mode-btn active">💬 Chat</button>
+			<button id="workflowModeBtn" class="numel-mode-btn">🔄 Workflow</button>
+		</div>
+
+		<!-- Chat Mode (existing) -->
+		<div id="chatMode" class="numel-mode-content">
+			<!-- Connection Config -->
+			<div class="numel-config-section">
+				<div class="numel-config-row">
+					<label for="serverUrl">URL:</label>
+					<input type="url" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000" />
+				</div>
+				<div class="numel-config-row">
+					<label for="userId">User ID:</label>
+					<input type="text" id="userId" placeholder="Optional User ID" />
+				</div>
+				<div class="numel-config-row">
+					<label for="sessionId">Session ID:</label>
+					<input type="text" id="sessionId" placeholder="Optional Session ID" />
+				</div>
+				<div class="numel-config-row">
+					<label for="status">Status:</label>
+					<div id="status" class="numel-status numel-status-idle">Not connected</div>
+				</div>
 			</div>
-			<div class="numel-config-row">
-				<label for="userId">User ID:</label>
-				<input type="text" id="userId" placeholder="Optional User ID" />
+
+			<!-- Agent Config -->
+			<div class="numel-config-section">
+				<div class="numel-config-row">
+					<label for="appAgentSelect">Agent:</label>
+					<select id="appAgentSelect" disabled>
+						<option value="-1"> - None - </option>
+					</select>
+				</div>
+				<div class="numel-config-row">
+					<label for="debugMessage">Debug:</label>
+					<input type="checkbox" id="debugMessage" />
+				</div>
 			</div>
-			<div class="numel-config-row">
-				<label for="sessionId">Session ID:</label>
-				<input type="text" id="sessionId" placeholder="Optional Session ID" />
-			</div>
-			<div class="numel-config-row">
-				<label for="status">Status:</label>
-				<div id="status" class="numel-status numel-status-idle">Not connected</div>
+
+			<!-- Chat Container -->
+			<div id="chatContainer" class="numel-chat-container"></div>
+
+			<!-- Input Group -->
+			<div class="numel-input-group">
+				<input type="text" id="messageInput" placeholder="Type your message..." disabled>
+				<button id="sendButton" class="numel-btn numel-btn-primary" disabled>Send</button>
+				<button id="clearChatButton" class="numel-btn numel-btn-secondary">🗑️</button>
+				<button id="connectButton" class="numel-btn numel-btn-accent">Connect</button>
 			</div>
 		</div>
 
-		<!-- Agent Config -->
-		<div class="numel-config-section">
-			<div class="numel-config-row">
-				<label for="appAgentSelect">Agent:</label>
-				<select id="appAgentSelect" disabled>
-					<option value="-1"> - None - </option>
-				</select>
+		<!-- Workflow Mode (new) -->
+		<div id="workflowMode" class="numel-mode-content" style="display: none;">
+			<!-- Workflow Selection -->
+			<div class="numel-config-section">
+				<div class="numel-config-row">
+					<label for="workflowSelect">Workflow:</label>
+					<select id="workflowSelect">
+						<option value="">Select workflow...</option>
+					</select>
+				</div>
+				<div class="numel-config-row">
+					<button id="loadWorkflowBtn" class="numel-btn numel-btn-secondary">📂 Load</button>
+					<button id="saveWorkflowBtn" class="numel-btn numel-btn-secondary">💾 Save</button>
+					<button id="newWorkflowBtn" class="numel-btn numel-btn-secondary">➕ New</button>
+				</div>
 			</div>
-			<div class="numel-config-row">
-				<label for="debugMessage">Debug:</label>
-				<input type="checkbox" id="debugMessage" />
+
+			<!-- Workflow Controls -->
+			<div class="numel-config-section">
+				<div class="numel-workflow-controls">
+					<button id="startWorkflowBtn" class="numel-btn numel-btn-accent" disabled>
+						▶️ Start
+					</button>
+					<button id="pauseWorkflowBtn" class="numel-btn numel-btn-secondary" disabled>
+						⏸️ Pause
+					</button>
+					<button id="stopWorkflowBtn" class="numel-btn numel-btn-accent-red" disabled>
+						⏹️ Stop
+					</button>
+				</div>
+				<div class="numel-config-row">
+					<label for="workflowStatus">Status:</label>
+					<div id="workflowStatus" class="numel-status numel-status-idle">No workflow</div>
+				</div>
 			</div>
-		</div>
 
-		<!-- Chat Container -->
-		<div id="chatContainer" class="numel-chat-container"></div>
+			<!-- Current Execution Info -->
+			<div class="numel-config-section numel-execution-info" style="display: none;">
+				<h3 class="numel-section-title">Current Execution</h3>
+				<div class="numel-execution-details">
+					<div class="numel-execution-row">
+						<span class="label">ID:</span>
+						<span id="executionId" class="value">-</span>
+					</div>
+					<div class="numel-execution-row">
+						<span class="label">Progress:</span>
+						<div class="numel-progress-bar">
+							<div id="executionProgress" class="numel-progress-fill"></div>
+						</div>
+					</div>
+					<div class="numel-execution-row">
+						<span class="label">Current Node:</span>
+						<span id="currentNode" class="value">-</span>
+					</div>
+					<div class="numel-execution-row">
+						<span class="label">Time:</span>
+						<span id="executionTime" class="value">0s</span>
+					</div>
+				</div>
+			</div>
 
-		<!-- Input Group -->
-		<div class="numel-input-group">
-			<input type="text" id="messageInput" placeholder="Type your message..." disabled>
-			<button id="sendButton" class="numel-btn numel-btn-primary" disabled>Send</button>
-			<button id="clearChatButton" class="numel-btn numel-btn-secondary">🗑️</button>
-			<button id="connectButton" class="numel-btn numel-btn-accent">Connect</button>
+			<!-- Event Log -->
+			<div class="numel-config-section">
+				<div class="numel-section-header">
+					<h3 class="numel-section-title">Event Log</h3>
+					<button id="clearEventsBtn" class="numel-btn-icon" title="Clear events">🗑️</button>
+				</div>
+				<div id="eventLog" class="numel-event-log"></div>
+			</div>
+
+			<!-- Workflow Executions List -->
+			<div class="numel-config-section">
+				<div class="numel-section-header">
+					<h3 class="numel-section-title">Recent Executions</h3>
+					<button id="refreshExecutionsBtn" class="numel-btn-icon" title="Refresh">🔄</button>
+				</div>
+				<div id="executionsList" class="numel-executions-list"></div>
+			</div>
 		</div>
 
 		<div id="loading" class="numel-loading">Loading NumelApp...</div>
@@ -91,6 +181,7 @@
 			<input type="file" id="sg-uploadSchemaFile" accept=".py" />
 			<input type="file" id="sg-importFile" accept=".json" />
 			<input type="file" id="sg-importConfigFile" accept=".json" />
+			<input type="file" id="workflowFileInput" accept=".json" style="display: none;" />
 			
 			<button id="sg-textScalingToggle" class="sg-text-scaling-toggle">
 				<span class="sg-text-scaling-icon">🔤</span>
@@ -107,9 +198,29 @@
 			<!-- Toolbar -->
 			<div class="sg-zoom-indicator numel-toolbar">
 				<div class="sg-status">
-					Status: <span class="sg-status-value" id="sg-status">None</span>
+					Mode: <span class="sg-status-value" id="sg-modeDisplay">Chat</span>
 				</div>
 				<div class="sg-divider"></div>
+				
+				<!-- Workflow Tools (shown in workflow mode) -->
+				<div id="workflowTools" style="display: none;">
+					<button id="addNodeBtn" class="sg-action-btn" title="Add Node">➕ Node</button>
+					<select id="nodeTypeSelect" class="sg-drawing-style-select">
+						<option value="">Node Type...</option>
+						<option value="start">🎬 Start</option>
+						<option value="end">🏁 End</option>
+						<option value="agent">🤖 Agent</option>
+						<option value="prompt">💭 Prompt</option>
+						<option value="tool">🔧 Tool</option>
+						<option value="transform">🔄 Transform</option>
+						<option value="decision">🔀 Decision</option>
+						<option value="merge">🔗 Merge</option>
+						<option value="parallel">⚡ Parallel</option>
+						<option value="loop">🔁 Loop</option>
+						<option value="user_input">👤 User Input</option>
+					</select>
+					<div class="sg-divider"></div>
+				</div>
 				
 				<!-- Voice Controls -->
 				<div class="sg-voice-controls">
@@ -160,10 +271,30 @@
 		&copy; 2025 - <a href="mailto:marco.dibenedetto@isti.cnr.it">Marco Di Benedetto</a>
 	</div>
 
+	<!-- User Input Modal -->
+	<div id="userInputModal" class="numel-modal" style="display: none;">
+		<div class="numel-modal-content">
+			<div class="numel-modal-header">
+				<h3>User Input Required</h3>
+				<button id="closeModalBtn" class="numel-modal-close">&times;</button>
+			</div>
+			<div class="numel-modal-body">
+				<p id="userInputPrompt">Please provide input:</p>
+				<textarea id="userInputField" class="numel-modal-input" rows="4"></textarea>
+			</div>
+			<div class="numel-modal-footer">
+				<button id="cancelInputBtn" class="numel-btn numel-btn-secondary">Cancel</button>
+				<button id="submitInputBtn" class="numel-btn numel-btn-primary">Submit</button>
+			</div>
+		</div>
+	</div>
+
 	<!-- Scripts -->
 	<script type="text/javascript" src="dist/agui-client.bundle.js"></script>
 	<script type="text/javascript" src="schemagraph/schemagraph.js"></script>
 	<script type="text/javascript" src="numel.js"></script>
 	<script type="text/javascript" src="numel-app.js"></script>
+	<script type="text/javascript" src="numel-workflow.js"></script>
+	<script type="text/javascript" src="numel-workflow-ui.js"></script>
 </body>
 </html>

@@ -8,8 +8,8 @@ const START_MESSAGE = "🤖 Hi, I am Numel, an AI playground. Ask me anything yo
 const END_MESSAGE = "🤖 See you soon 👋";
 
 // Application State
-let aguiApp = null;
-let graph = null;
+let gApp = null;
+let gGraph = null;
 let isConnected = false;
 let agentPrevIndex = -1;
 let agentCurrIndex = -1;
@@ -53,7 +53,7 @@ function initializeApp() {
 	checkLibrariesLoaded();
 
 	// Initialize SchemaGraph
-	graph = new SchemaGraphApp("sg-main-canvas");
+	gGraph = new SchemaGraphApp("sg-main-canvas");
 
 	// Setup event listeners
 	setupEventListeners();
@@ -126,7 +126,7 @@ async function connect() {
 	updateStatus("connecting", "Connecting...");
 
 	try {
-		aguiApp = await NumelApp.connect(serverUrl, {
+		gApp = await NumelApp.connect(serverUrl, {
 			userId: userId,
 			sessionId: sessionId,
 			subscriber: {
@@ -136,16 +136,16 @@ async function connect() {
 			}
 		});
 
-		if (!aguiApp) {
+		if (!gApp) {
 			throw new Error("NumelApp initialization failed");
 		}
 
 		// Load schema and config into SchemaGraph
-		const config = await aguiApp.getConfig();
-		graph.api.schema.register(SCHEMA_NAME, aguiApp.schema, "Index", "AppConfig");
-		graph.api.config.import(config, SCHEMA_NAME);
-		graph.api.layout.apply("circular");
-		graph.api.view.center();
+		const config = await gApp.getConfig();
+		gGraph.api.schema.register(SCHEMA_NAME, gApp.schema, "Index", "AppConfig");
+		gGraph.api.config.import(config, SCHEMA_NAME);
+		gGraph.api.layout.apply("circular");
+		gGraph.api.view.center();
 
 		agentPrevIndex = -1;
 		agentCurrIndex = 0;
@@ -178,12 +178,12 @@ async function disconnect() {
 	clearChatButton .disabled = true;
 	connectButton   .disabled = true;
 
-	graph.api.schema.remove(SCHEMA_NAME);
+	gGraph.api.schema.remove(SCHEMA_NAME);
 
-	if (aguiApp) {
+	if (gApp) {
 		addMessage("system", "⌛ Disconnecting...");
-		await aguiApp.disconnect();
-		aguiApp = null;
+		await gApp.disconnect();
+		gApp = null;
 	}
 
 	isConnected = false;
@@ -214,7 +214,7 @@ function toggleConnection() {
 }
 
 async function setAppStatus() {
-	const status = await aguiApp.getStatus();
+	const status = await gApp.getStatus();
 	const config = status["config"];
 	const agents = config["agents"];
 	
@@ -243,15 +243,15 @@ async function setAppStatus() {
 
 async function sendMessage() {
 	const message = messageInput.value.trim();
-	if (!message || !isConnected || !aguiApp) return;
+	if (!message || !isConnected || !gApp) return;
 
 	addMessage("user", message);
 
 	// Show which agent we're talking to if changed
 	if (agentPrevIndex !== agentCurrIndex) {
 		agentPrevIndex = agentCurrIndex;
-		const agent = aguiApp.status["config"]["agents"][agentPrevIndex];
-		const agentName = aguiApp.status["config"]["infos"][agent["info"]]["name"];
+		const agent = gApp.status["config"]["agents"][agentPrevIndex];
+		const agentName = gApp.status["config"]["infos"][agent["info"]]["name"];
 		addMessage("ui", `🤖 Talking to Agent "${agentName}"`);
 	}
 
@@ -262,7 +262,7 @@ async function sendMessage() {
 	clearChatButton.disabled = true;
 
 	try {
-		await aguiApp.send(message, agentPrevIndex);
+		await gApp.send(message, agentPrevIndex);
 	} catch (error) {
 		console.error("Failed to send message:", error);
 		addMessage("system-error", `❌ Failed to send message: ${error.message}`);

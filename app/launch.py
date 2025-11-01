@@ -7,14 +7,17 @@ import uvicorn
 
 
 from   dotenv                  import load_dotenv
-from   fastapi                 import FastAPI
+from   fastapi                 import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from   fastapi.middleware.cors import CORSMiddleware
+from   pydantic                import BaseModel
+from   typing                  import Any, Dict, List, Optional
 
 
-from   utils                   import get_time_str, log_print, seed_everything
+from   event_bus               import (
+	EventType,
+	get_event_bus,
+)
 from   numel                   import (
-	DEFAULT_APP_PORT,
-	AppConfig,
 	compact_config,
 	extract_config,
 	get_backends,
@@ -22,11 +25,51 @@ from   numel                   import (
 	unroll_config,
 	validate_config,
 )
+from   schema                  import (
+	DEFAULT_APP_PORT,
+	AppConfig,
+	WorkflowConfig,
+)
+from   utils                   import (
+	get_time_str,
+	log_print,
+	seed_everything,
+)
+from   workflow_api            import (
+	setup_workflow_api,
+)
+from   workflow_engine         import (
+	WorkflowConfig,
+	WorkflowEngine,
+	WorkflowExecutionState,
+)
 
 
 load_dotenv()
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
+
+
+class WorkflowStartRequest(BaseModel):
+	workflow: WorkflowConfig
+	initial_data: Optional[Dict[str, Any]] = None
+
+
+class WorkflowStartResponse(BaseModel):
+	execution_id: str
+	status: str
+
+
+class UserInputRequest(BaseModel):
+	node_id: str
+	input_data: Any
+
+
+class EventFilterRequest(BaseModel):
+	workflow_id: Optional[str] = None
+	execution_id: Optional[str] = None
+	event_type: Optional[EventType] = None
+	limit: int = 100
 
 
 def add_middleware(app: FastAPI) -> None:
@@ -104,9 +147,151 @@ if True:
 	apps = None
 	running_servers = []
 
+	# Workflow system state
+	event_bus = get_event_bus()
+	workflow_eng = None
+
 	ctrl_app = FastAPI(title="Control")
 	add_middleware(ctrl_app)
 
+
+# ========================================================================
+# Workflow API Endpoints
+# ========================================================================
+
+@ctrl_app.post("/workflow/start")
+async def start_workflow(request: WorkflowStartRequest) -> WorkflowStartResponse:
+	"""Start a new workflow execution"""
+	global workflow_eng
+	
+	if workflow_eng is None:
+		raise HTTPException(status_code=503, detail="Workflow engine not initialized")
+	
+	try:
+		execution_id = await workflow_eng.start_workflow(
+			workflow=request.workflow,
+			initial_data=request.initial_data
+		)
+		return WorkflowStartResponse(
+			execution_id=execution_id,
+			status="started"
+		)
+	except Exception as e:
+		log_print(f"Error starting workflow: {e}")
+		raise HTTPException(status_code=500, detail=str(e))
+
+
+@ctrl_app.post("/workflow/{execution_id}/cancel")
+async def cancel_workflow(execution_id: str):
+	"""Cancel a running workflow"""
+	global workflow_eng
+	
+	if workflow_eng is None:
+		raise HTTPException(status_code=503, detail="Workflow engine not initialized")
+	
+	try:
+		await workflow_eng.cancel_execution(execution_id)
+		return {"status": "cancelled", "execution_id": execution_id}
+	except Exception as e:
+		log_print(f"Error canceling workflow: {e}")
+		raise HTTPException(status_code=500, detail=str(e))
+
+
+@ctrl_app.get("/workflow/{execution_id}/status")
+async def get_workflow_status(execution_id: str) -> WorkflowExecutionState:
+	"""Get workflow execution status"""
+	global workflow_eng
+	
+	if workflow_eng is None:
+		raise HTTPException(status_code=503, detail="Workflow engine not initialized")
+	
+	state = workflow_eng.get_execution_state(execution_id)
+	if not state:
+		raise HTTPException(status_code=404, detail="Execution not found")
+	return state
+
+
+@ctrl_app.get("/workflow/list")
+async def list_workflows() -> List[WorkflowExecutionState]:
+	"""List all workflow executions"""
+	global workflow_eng
+	
+	if workflow_eng is None:
+		raise HTTPException(status_code=503, detail="Workflow engine not initialized")
+	
+	return workflow_eng.list_executions()
+
+
+@ctrl_app.post("/workflow/{execution_id}/input")
+async def provide_user_input(execution_id: str, request: UserInputRequest):
+	"""Provide user input for waiting workflow"""
+	global workflow_eng
+	
+	if workflow_eng is None:
+		raise HTTPException(status_code=503, detail="Workflow engine not initialized")
+	
+	try:
+		await workflow_eng.provide_user_input(
+			execution_id=execution_id,
+			node_id=request.node_id,
+			user_input=request.input_data
+		)
+		return {"status": "input_received"}
+	except Exception as e:
+		log_print(f"Error providing user input: {e}")
+		raise HTTPException(status_code=500, detail=str(e))
+
+
+@ctrl_app.post("/workflow/events/history")
+async def get_event_history(request: EventFilterRequest):
+	"""Get filtered event history"""
+	global event_bus
+	
+	events = event_bus.get_event_history(
+		workflow_id=request.workflow_id,
+		execution_id=request.execution_id,
+		event_type=request.event_type,
+		limit=request.limit
+	)
+	return {"events": [e.dict() for e in events]}
+
+
+@ctrl_app.delete("/workflow/events/history")
+async def clear_event_history():
+	"""Clear event history"""
+	global event_bus
+	event_bus.clear_history()
+	return {"status": "cleared"}
+
+
+@ctrl_app.websocket("/workflow/events")
+async def workflow_events_websocket(websocket: WebSocket):
+	"""WebSocket endpoint for real-time workflow events"""
+	global event_bus
+	
+	await event_bus.add_websocket_client(websocket)
+	try:
+		while True:
+			# Keep connection alive and handle client messages
+			try:
+				data = await websocket.receive_text()
+				# Client can send commands here if needed
+				log_print(f"Received WebSocket message: {data}")
+			except Exception as e:
+				log_print(f"WebSocket receive error: {e}")
+				break
+				
+	except WebSocketDisconnect:
+		log_print("WebSocket client disconnected")
+		event_bus.remove_websocket_client(websocket)
+	except Exception as e:
+		log_print(f"WebSocket error: {e}")
+		event_bus.remove_websocket_client(websocket)
+
+
+# ========================================================================
+# Original API Endpoints (with workflow integration)
+# ========================================================================
 
 @ctrl_app.post("/ping")
 async def ping():
@@ -145,7 +330,7 @@ async def export_config():
 
 @ctrl_app.post("/start")
 async def start_app():
-	global apps, config, ctrl_status, running_servers
+	global apps, config, ctrl_status, running_servers, workflow_eng
 	if apps is not None:
 		return {"error": "App is already running"}
 	try:
@@ -184,16 +369,22 @@ async def start_app():
 				agent_index += 1
 				agent_port  += 1
 
+		# Initialize workflow engine
+		workflow_eng = WorkflowEngine(config, event_bus)
+		setup_workflow_api(ctrl_app, workflow_eng, event_bus)
+		log_print("Workflow engine initialized")
+
 		ctrl_status["config"] = config
 		ctrl_status["status"] = "running"
 	except Exception as e:
+		log_print(f"Error starting app: {e}")
 		return {"error": str(e)}
 	return ctrl_status
 
 
 @ctrl_app.post("/stop")
 async def stop_app():
-	global apps, config, ctrl_status, running_servers
+	global apps, config, ctrl_status, running_servers, workflow_eng
 	if apps is None:
 		return {"error": "App is not running"}
 	try:
@@ -208,11 +399,17 @@ async def stop_app():
 			app.close()
 		for agent in config.agents:
 			agent.port = 0
+		
+		# Clean up workflow engine
+		workflow_eng = None
+		log_print("Workflow engine stopped")
+		
 		apps                  = None
 		running_servers       = []
 		ctrl_status["config"] = None
 		ctrl_status["status"] = "stopped"
 	except Exception as e:
+		log_print(f"Error stopping app: {e}")
 		return {"error": str(e)}
 	return ctrl_status
 
@@ -228,17 +425,31 @@ async def restart_app():
 
 @ctrl_app.post("/status")
 async def server_status():
-	global ctrl_status
-	return ctrl_status
+	global ctrl_status, workflow_eng
+	
+	status = dict(ctrl_status)
+	
+	# Add workflow engine status
+	if workflow_eng:
+		status["workflow_eng"] = {
+			"active_executions": len(workflow_eng.executions),
+			"event_history_size": len(event_bus._event_history)
+		}
+	
+	return status
 
 
 @ctrl_app.post("/shutdown")
 async def shutdown_server():
-	global apps, ctrl_app, ctrl_server, ctrl_status
+	global apps, ctrl_app, ctrl_server, ctrl_status, workflow_eng
 	if apps is not None:
 		return {"error": "App is running"}
 	if ctrl_server and ctrl_server.should_exit is False:
 		ctrl_server.should_exit = True
+	
+	# Clean up workflow engine
+	workflow_eng = None
+	
 	ctrl_app    = None
 	ctrl_server = None
 	ctrl_status = None
