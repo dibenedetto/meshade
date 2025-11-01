@@ -1,5 +1,5 @@
 /* ========================================================================
-   NUMEL WORKFLOW - Fixed with Proper Schema Registration & Edge Conditions
+   NUMEL WORKFLOW
    ======================================================================== */
 
 const WORKFLOW_SCHEMA_NAME = "workflow";
@@ -20,24 +20,13 @@ class WorkflowVisualizer {
 	// Schema Registration
 	// ====================================================================
 
-	/**
-	 * Register workflow schema with SchemaGraph
-	 */
 	registerWorkflowSchema(workflowSchemaCode) {
 		if (this.workflowSchemaRegistered) {
 			console.log('📋 Workflow schema already registered');
 			return;
 		}
-
 		try {
-			// Register workflow schema (similar to how app schema is registered)
-			this.schemaGraph.api.schema.register(
-				WORKFLOW_SCHEMA_NAME,           // Schema name
-				workflowSchemaCode,   // Python schema code
-				'int',                // Index type (nodes referenced by index)
-				'WorkflowConfig'      // Root type
-			);
-			
+			this.schemaGraph.api.schema.register(WORKFLOW_SCHEMA_NAME, workflowSchemaCode, 'int', 'WorkflowConfig');
 			this.workflowSchemaRegistered = true;
 			console.log('✅ Workflow schema registered successfully');
 		} catch (error) {
@@ -46,14 +35,10 @@ class WorkflowVisualizer {
 		}
 	}
 
-	/**
-	 * Get workflow node type from schema
-	 */
 	getWorkflowNodeType(workflowType) {
-		// Map workflow node type to schema type
 		const typeMap = {
-			'start': 'WorkflowNodeConfig',
-			'end': 'WorkflowNodeConfig',
+			'start': 'StartNodeConfig',
+			'end': 'EndNodeConfig',
 			'agent': 'AgentNodeConfig',
 			'prompt': 'PromptNodeConfig',
 			'tool': 'ToolNodeConfig',
@@ -64,7 +49,6 @@ class WorkflowVisualizer {
 			'loop': 'LoopNodeConfig',
 			'user_input': 'UserInputNodeConfig'
 		};
-
 		return `${WORKFLOW_SCHEMA_NAME}.${typeMap[workflowType] || 'WorkflowNodeConfig'}`;
 	}
 
@@ -74,52 +58,29 @@ class WorkflowVisualizer {
 
 	enterWorkflowMode() {
 		console.log('📊 Entering workflow mode...');
-		
-		// Save current graph state
 		this.savedGraphState = this.schemaGraph.api.graph.export(false);
 		this.savedViewState = this.schemaGraph.api.view.export();
-		
-		console.log('💾 Saved graph state:', {
-			nodes: this.savedGraphState.nodes?.length || 0,
-			links: this.savedGraphState.links?.length || 0,
-			view: this.savedViewState
-		});
-		
-		// Clear graph for workflow
 		this.schemaGraph.api.graph.clear();
 		this.workflowNodes = [];
 		this.workflowEdges = [];
-		
 		this.isWorkflowMode = true;
 	}
 
 	exitWorkflowMode() {
 		console.log('📊 Exiting workflow mode...');
-		
-		if (!this.isWorkflowMode) {
-			console.warn('⚠️ Not in workflow mode');
-			return;
-		}
-		
-		// Clear workflow graph
+		if (!this.isWorkflowMode) return;
 		this.schemaGraph.api.graph.clear();
 		this.workflowNodes = [];
 		this.workflowEdges = [];
 		this.currentWorkflow = null;
-		
-		// Restore previous graph state
 		if (this.savedGraphState) {
-			console.log('📥 Restoring graph state');
 			this.schemaGraph.api.graph.import(this.savedGraphState, false);
-			
 			if (this.savedViewState) {
 				this.schemaGraph.api.view.import(this.savedViewState);
 			}
-			
 			this.savedGraphState = null;
 			this.savedViewState = null;
 		}
-		
 		this.isWorkflowMode = false;
 	}
 
@@ -133,33 +94,25 @@ class WorkflowVisualizer {
 
 	loadWorkflow(workflow) {
 		console.log('📋 Loading workflow:', workflow);
-		
 		if (!this.isWorkflowMode) {
 			this.enterWorkflowMode();
 		}
-		
-		if (!this.workflowSchemaRegistered) {
-			console.warn('⚠️ Workflow schema not registered - nodes will be basic');
-		}
-		
 		this.currentWorkflow = workflow;
-		
-		// Clear existing workflow
 		this.schemaGraph.api.graph.clear();
 		this.workflowNodes = [];
 		this.workflowEdges = [];
 		
-		// Create workflow nodes (by index)
+		// Create nodes
 		workflow.nodes.forEach((node, index) => {
 			this.createWorkflowNode(node, index);
 		});
 		
-		// Create workflow edges (using indices)
+		// Create edges
 		workflow.edges.forEach(edge => {
 			this.createWorkflowEdge(edge);
 		});
 		
-		// Apply layout and center view
+		// Apply layout and center
 		this.schemaGraph.api.layout.apply('hierarchical-vertical');
 		setTimeout(() => {
 			this.schemaGraph.api.view.center();
@@ -171,9 +124,10 @@ class WorkflowVisualizer {
 		});
 	}
 
-	/**
-	 * Create a workflow node in the graph
-	 */
+	// ====================================================================
+	// Node Creation
+	// ====================================================================
+
 	createWorkflowNode(workflowNode, index) {
 		// Calculate position
 		let x, y;
@@ -181,72 +135,200 @@ class WorkflowVisualizer {
 			x = workflowNode.position.x;
 			y = workflowNode.position.y;
 		} else {
-			// Auto-position in grid
 			const col = index % 5;
 			const row = Math.floor(index / 5);
 			x = 100 + col * 250;
 			y = 100 + row * 200;
 		}
 		
-		// Get workflow-specific node type
+		// Get proper node type
 		let nodeType;
 		if (this.workflowSchemaRegistered) {
-			// Use proper workflow schema types
 			nodeType = this.getWorkflowNodeType(workflowNode.type);
 		} else {
-			// Fallback to basic node type if schema not registered
 			nodeType = 'Native.String';
-			console.warn(`⚠️ Using fallback type for node ${index} - workflow schema not registered`);
+			console.warn(`⚠️ Using fallback type for node ${index}`);
 		}
 		
 		// Create the node
 		const graphNode = this.schemaGraph.api.node.create(nodeType, x, y);
-		
 		if (!graphNode) {
 			console.error('❌ Failed to create node at index:', index);
 			this.workflowNodes[index] = null;
 			return;
 		}
 		
-		// Set node label
+		// Set properties from workflow data
+		if (this.workflowSchemaRegistered) {
+			this.schemaGraph.api.node.setProperty(graphNode, 'id', workflowNode.id);
+			this.setNodeProperties(graphNode, workflowNode);
+		}
+		
+		// 🔧 FIX: Force compatible inputs/outputs
+		this.setupNodeConnections(graphNode, workflowNode);
+		
+		// Set visual properties
 		const label = this.getNodeLabel(workflowNode, index);
 		this.schemaGraph.api.node.setProperty(graphNode, 'label', label);
 		
-		// For typed nodes, also set the id property
-		if (this.workflowSchemaRegistered) {
-			this.schemaGraph.api.node.setProperty(graphNode, 'id', workflowNode.id);
+		const color = this.getNodeColor(workflowNode.type);
+		if (graphNode.color !== undefined) {
+			graphNode.color = color;
 		}
 		
-		// Store mapping
+		// Store node and metadata
 		this.workflowNodes[index] = graphNode;
-		
-		// Store workflow metadata in the node itself
 		graphNode.workflowData = {
 			index: index,
 			id: workflowNode.id,
 			type: workflowNode.type,
 			label: workflowNode.label,
 			status: 'pending',
-			nodeConfig: workflowNode  // Store full node config
+			nodeConfig: workflowNode
 		};
 		
 		console.log(`✓ Created node [${index}]: ${workflowNode.id} (${nodeType})`);
-		
 		return graphNode;
 	}
 
-	/**
-	 * Get display label for node
-	 */
+	setNodeProperties(graphNode, workflowNode) {
+		const type = workflowNode.type;
+		try {
+			switch (type) {
+				case 'agent':
+					if (workflowNode.agent !== undefined) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'agent', workflowNode.agent);
+					}
+					if (workflowNode.input_mapping) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'input_mapping', workflowNode.input_mapping);
+					}
+					if (workflowNode.output_mapping) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'output_mapping', workflowNode.output_mapping);
+					}
+					break;
+				case 'prompt':
+					if (workflowNode.prompt !== undefined) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'prompt', workflowNode.prompt);
+					}
+					if (workflowNode.model !== undefined) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'model', workflowNode.model);
+					}
+					break;
+				case 'tool':
+					if (workflowNode.tool !== undefined) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'tool', workflowNode.tool);
+					}
+					break;
+				case 'decision':
+					if (workflowNode.condition_field) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'condition_field', workflowNode.condition_field);
+					}
+					if (workflowNode.branches) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'branches', workflowNode.branches);
+					}
+					break;
+				case 'merge':
+					if (workflowNode.strategy) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'strategy', workflowNode.strategy);
+					}
+					if (workflowNode.wait_for) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'wait_for', workflowNode.wait_for);
+					}
+					break;
+				case 'parallel':
+					if (workflowNode.branches) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'branches', workflowNode.branches);
+					}
+					break;
+				case 'transform':
+					if (workflowNode.transform_type) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'transform_type', workflowNode.transform_type);
+					}
+					if (workflowNode.transform_script) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'transform_script', workflowNode.transform_script);
+					}
+					break;
+				case 'loop':
+					if (workflowNode.body !== undefined) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'body', workflowNode.body);
+					}
+					if (workflowNode.max_iterations !== undefined) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'max_iterations', workflowNode.max_iterations);
+					}
+					break;
+				case 'user_input':
+					if (workflowNode.prompt_text) {
+						this.schemaGraph.api.node.setProperty(graphNode, 'prompt_text', workflowNode.prompt_text);
+					}
+					break;
+			}
+		} catch (error) {
+			console.warn(`⚠️ Could not set properties for node ${workflowNode.id}:`, error);
+		}
+	}
+
+	setupNodeConnections(graphNode, workflowNode) {
+		const nodeType = workflowNode.type;
+		const universalType = 'Any';
+		
+		graphNode.inputs = [];
+		graphNode.outputs = [];
+		
+		switch (nodeType) {
+			case 'start':
+				graphNode.outputs.push({name: 'flow', type: universalType, links: []});
+				break;
+			case 'end':
+				graphNode.inputs.push({name: 'flow', type: universalType, link: null});
+				break;
+			case 'decision':
+				graphNode.inputs.push({name: 'flow', type: universalType, link: null});
+				const branches = workflowNode.branches || {};
+				Object.keys(branches).forEach(branchName => {
+					graphNode.outputs.push({name: branchName, type: universalType, links: []});
+				});
+				if (graphNode.outputs.length === 0) {
+					graphNode.outputs.push({name: 'default', type: universalType, links: []});
+				}
+				break;
+			case 'merge':
+				const waitFor = workflowNode.wait_for || [];
+				const inputCount = waitFor.length > 0 ? waitFor.length : 2;
+				for (let i = 0; i < inputCount; i++) {
+					graphNode.inputs.push({name: `input_${i}`, type: universalType, link: null});
+				}
+				graphNode.outputs.push({name: 'merged', type: universalType, links: []});
+				break;
+			case 'parallel':
+				graphNode.inputs.push({name: 'flow', type: universalType, link: null});
+				const parallelBranches = workflowNode.branches || [];
+				const outputCount = parallelBranches.length > 0 ? parallelBranches.length : 2;
+				for (let i = 0; i < outputCount; i++) {
+					graphNode.outputs.push({name: `branch_${i}`, type: universalType, links: []});
+				}
+				break;
+			case 'loop':
+				graphNode.inputs.push({name: 'flow', type: universalType, link: null});
+				graphNode.outputs.push({name: 'body', type: universalType, links: []});
+				graphNode.outputs.push({name: 'exit', type: universalType, links: []});
+				break;
+			case 'user_input':
+				graphNode.inputs.push({name: 'flow', type: universalType, link: null});
+				graphNode.outputs.push({name: 'input', type: universalType, links: []});
+				break;
+			default:
+				graphNode.inputs.push({name: 'input', type: universalType, link: null});
+				graphNode.outputs.push({name: 'output', type: universalType, links: []});
+				break;
+		}
+	}
+
 	getNodeLabel(workflowNode, index) {
 		const emoji = this.getNodeEmoji(workflowNode.type);
 		const label = workflowNode.label || workflowNode.type;
 		return `${emoji} [${index}] ${label}`;
 	}
 
-	/**
-	 * Get emoji for node type
-	 */
 	getNodeEmoji(nodeType) {
 		const emojiMap = {
 			'start': '🎬',
@@ -261,37 +343,48 @@ class WorkflowVisualizer {
 			'loop': '🔁',
 			'user_input': '👤'
 		};
-		
 		return emojiMap[nodeType] || '⚪';
 	}
 
-	/**
-	 * Create a workflow edge using node indices
-	 * Handles edge conditions and decision branches
-	 */
+	getNodeColor(nodeType) {
+		const colorMap = {
+			'start': '#4ade80',
+			'end': '#f87171',
+			'agent': '#60a5fa',
+			'prompt': '#a78bfa',
+			'tool': '#fb923c',
+			'transform': '#fbbf24',
+			'decision': '#ec4899',
+			'merge': '#14b8a6',
+			'parallel': '#8b5cf6',
+			'loop': '#06b6d4',
+			'user_input': '#f472b6'
+		};
+		return colorMap[nodeType] || '#94a3b8';
+	}
+
+	// ====================================================================
+	// Edge Creation
+	// ====================================================================
+
 	createWorkflowEdge(workflowEdge) {
 		const sourceNode = this.workflowNodes[workflowEdge.source];
 		const targetNode = this.workflowNodes[workflowEdge.target];
 		
 		if (!sourceNode || !targetNode) {
-			console.error('❌ Cannot create edge - nodes not found:', 
-				`[${workflowEdge.source}] -> [${workflowEdge.target}]`);
+			console.error('❌ Cannot create edge:', `[${workflowEdge.source}] -> [${workflowEdge.target}]`);
 			return null;
 		}
 		
-		// Create link between nodes
 		const link = this.schemaGraph.api.link.create(sourceNode, 0, targetNode, 0);
 		
 		if (!link) {
-			console.error('❌ Failed to create edge:', 
-				`[${workflowEdge.source}] -> [${workflowEdge.target}]`);
+			console.error('❌ Failed to create edge:', `[${workflowEdge.source}] -> [${workflowEdge.target}]`);
 			return null;
 		}
 		
-		// Store edge in array (might be useful for updates)
 		this.workflowEdges.push(link);
 		
-		// Store workflow metadata including condition
 		link.workflowData = {
 			source: workflowEdge.source,
 			target: workflowEdge.target,
@@ -299,42 +392,27 @@ class WorkflowVisualizer {
 			label: workflowEdge.label
 		};
 		
-		// Apply edge label if present
 		if (workflowEdge.label) {
-			// Note: SchemaGraph might not have direct edge label API
-			// Store in metadata for now
 			link.label = workflowEdge.label;
 		}
 		
-		// Apply visual styling based on condition type
 		if (workflowEdge.condition) {
 			this.styleConditionalEdge(link, workflowEdge.condition);
 		}
 		
-		console.log(`✓ Created edge: [${workflowEdge.source}] -> [${workflowEdge.target}]`, 
-			workflowEdge.condition ? `(condition: ${workflowEdge.condition.type})` : '');
-		
+		console.log(`✓ Created edge: [${workflowEdge.source}] -> [${workflowEdge.target}]`);
 		return link;
 	}
 
-	/**
-	 * Apply visual styling to conditional edges
-	 */
 	styleConditionalEdge(link, condition) {
-		// Store condition info for potential custom rendering
 		link.conditionType = condition.type;
 		link.conditionInfo = {
 			field: condition.field,
 			value: condition.value,
 			expression: condition.expression
 		};
-		
-		// Visual indication that this is a conditional edge
-		// Note: Actual rendering depends on SchemaGraph's link rendering capabilities
-		// This metadata can be used in custom rendering logic
 		link.isConditional = true;
 		
-		// Create human-readable condition label
 		if (condition.type === 'equals' && condition.field && condition.value !== undefined) {
 			link.conditionLabel = `${condition.field} == ${JSON.stringify(condition.value)}`;
 		} else if (condition.type === 'contains') {
@@ -352,6 +430,8 @@ class WorkflowVisualizer {
 
 	/**
 	 * Get edge condition information for display
+	 * USAGE: Call when you want to display edge condition details in UI
+	 * Example: const condInfo = visualizer.getEdgeConditionInfo(0, 1);
 	 */
 	getEdgeConditionInfo(sourceIndex, targetIndex) {
 		const link = this.workflowEdges.find(l => 
@@ -371,23 +451,19 @@ class WorkflowVisualizer {
 	}
 
 	/**
-	 * Highlight edges that match a condition
+	 * Highlight edges that match a condition (for decision nodes)
+	 * USAGE: Called automatically by updateNodeState when a decision node executes
+	 * Can also call manually: visualizer.highlightConditionalEdges(3, 5);
 	 */
 	highlightConditionalEdges(sourceIndex, matchedBranch) {
-		// Find all edges from source node
 		const sourceNode = this.workflowNodes[sourceIndex];
 		if (!sourceNode) return;
 		
-		// Iterate through edges and highlight/dim based on condition match
 		this.workflowEdges.forEach(link => {
 			if (link.workflowData?.source === sourceIndex) {
-				const condition = link.workflowData?.condition;
 				const targetIndex = link.workflowData?.target;
-				
-				// Check if this edge leads to the matched branch
 				const isMatchedPath = (targetIndex === matchedBranch);
 				
-				// Apply visual styling (depends on SchemaGraph API)
 				link.isActive = isMatchedPath;
 				link.isDimmed = !isMatchedPath;
 				
@@ -401,22 +477,16 @@ class WorkflowVisualizer {
 	// ====================================================================
 
 	/**
-	 * Update the execution state of a workflow node by index
+	 * Update node execution state
+	 * USAGE: Called by workflow event handlers when node state changes
+	 * Example: visualizer.updateNodeState(2, {status: 'running'});
 	 */
 	updateNodeState(nodeIndex, state) {
-		if (nodeIndex >= this.workflowNodes.length) {
-			console.warn('⚠️ Node index out of range:', nodeIndex);
-			return;
-		}
-		
+		if (nodeIndex >= this.workflowNodes.length) return;
 		const graphNode = this.workflowNodes[nodeIndex];
+		if (!graphNode) return;
 		
-		if (!graphNode) {
-			console.warn('⚠️ Node not found at index:', nodeIndex);
-			return;
-		}
-		
-		// Update workflow metadata
+		// Update metadata
 		if (graphNode.workflowData) {
 			graphNode.workflowData.status = state.status;
 			graphNode.workflowData.error = state.error;
@@ -425,54 +495,37 @@ class WorkflowVisualizer {
 		
 		// Update visual appearance
 		const statusEmoji = this.getStatusEmoji(state.status);
-		const nodeType = graphNode.workflowData?.type || 'unknown';
-		const label = graphNode.workflowData?.label || nodeType;
-		
-		this.schemaGraph.api.node.setProperty(
-			graphNode, 
-			'label', 
-			`${statusEmoji} [${nodeIndex}] ${label}`
-		);
+		const label = graphNode.workflowData?.label || graphNode.workflowData?.type || 'unknown';
+		this.schemaGraph.api.node.setProperty(graphNode, 'label', `${statusEmoji} [${nodeIndex}] ${label}`);
 		
 		// Highlight running nodes
 		if (state.status === 'running') {
 			this.schemaGraph.api.node.select(graphNode, false);
 		}
 		
-		// Handle decision node - highlight the taken branch
-		if (nodeType === 'decision' && state.output?.branch !== undefined) {
-			const matchedBranch = state.output.branch;
-			this.highlightConditionalEdges(nodeIndex, matchedBranch);
+		// 🔧 Highlight decision branches when decision completes
+		if (graphNode.workflowData?.type === 'decision' && state.output?.branch !== undefined) {
+			this.highlightConditionalEdges(nodeIndex, state.output.branch);
 		}
-		
-		console.log(`🔄 Updated node [${nodeIndex}] -> ${state.status}`);
 	}
 
-	/**
-	 * Get emoji for execution status
-	 */
 	getStatusEmoji(status) {
 		const statusMap = {
-			'pending': '⏳',
-			'running': '▶️',
-			'completed': '✅',
-			'failed': '❌',
-			'cancelled': '⏸️',
-			'waiting': '⏱️',
-			'skipped': '⏭️'
+			'pending': '⏳', 'running': '▶️', 'completed': '✅',
+			'failed': '❌', 'cancelled': '⏸️', 'waiting': '⏱️', 'skipped': '⏭️'
 		};
-		
 		return statusMap[status] || '⚪';
 	}
 
 	/**
 	 * Highlight execution path by node indices
+	 * USAGE: Call to show which nodes are part of the execution path
+	 * Example: visualizer.highlightPath([0, 1, 2, 5]);
 	 */
 	highlightPath(nodeIndices) {
-		// Clear previous selection
 		this.schemaGraph.api.node.clearSelection();
 		
-		// Select all nodes in the path
+		// Select all nodes in path
 		nodeIndices.forEach(nodeIndex => {
 			if (nodeIndex < this.workflowNodes.length) {
 				const graphNode = this.workflowNodes[nodeIndex];
@@ -482,7 +535,7 @@ class WorkflowVisualizer {
 			}
 		});
 		
-		// Highlight edges in the path
+		// Highlight edges in path
 		for (let i = 0; i < nodeIndices.length - 1; i++) {
 			const sourceIdx = nodeIndices[i];
 			const targetIdx = nodeIndices[i + 1];
@@ -501,7 +554,8 @@ class WorkflowVisualizer {
 	}
 
 	/**
-	 * Clear all highlights and reset states
+	 * Clear all highlights and reset node states
+	 * USAGE: Call when starting a new execution or resetting the visualization
 	 */
 	clearHighlights() {
 		this.schemaGraph.api.node.clearSelection();
@@ -513,14 +567,13 @@ class WorkflowVisualizer {
 			link.isInExecutionPath = false;
 		});
 		
-		// Reset all node labels
+		// Reset node labels and status
 		this.workflowNodes.forEach((graphNode, index) => {
 			if (graphNode && this.currentWorkflow) {
 				const workflowNode = this.currentWorkflow.nodes[index];
 				if (workflowNode) {
 					const label = this.getNodeLabel(workflowNode, index);
 					this.schemaGraph.api.node.setProperty(graphNode, 'label', label);
-					
 					if (graphNode.workflowData) {
 						graphNode.workflowData.status = 'pending';
 					}
@@ -536,17 +589,14 @@ class WorkflowVisualizer {
 	// ====================================================================
 
 	/**
-	 * Export current workflow with updated positions
+	 * Export workflow with updated node positions
+	 * USAGE: Call when saving workflow to file
 	 */
 	exportWorkflow() {
-		if (!this.currentWorkflow) {
-			return null;
-		}
-		
-		// Clone workflow
+		if (!this.currentWorkflow) return null;
 		const exported = JSON.parse(JSON.stringify(this.currentWorkflow));
 		
-		// Update node positions from graph
+		// Update positions from graph
 		exported.nodes.forEach((node, index) => {
 			const graphNode = this.workflowNodes[index];
 			if (graphNode && graphNode.pos) {
@@ -566,6 +616,8 @@ class WorkflowVisualizer {
 
 	/**
 	 * Get detailed info about a node for debugging
+	 * USAGE: Call from console or when displaying node details in UI
+	 * Example: const info = visualizer.inspectNode(3);
 	 */
 	inspectNode(nodeIndex) {
 		const graphNode = this.workflowNodes[nodeIndex];
@@ -582,12 +634,25 @@ class WorkflowVisualizer {
 			position: graphNode.pos,
 			config: graphNode.workflowData?.nodeConfig,
 			error: graphNode.workflowData?.error,
-			output: graphNode.workflowData?.output
+			output: graphNode.workflowData?.output,
+			// Additional graph-specific info
+			inputs: graphNode.inputs?.map(i => ({
+				name: i.name,
+				type: i.type,
+				connected: i.link !== null
+			})),
+			outputs: graphNode.outputs?.map(o => ({
+				name: o.name,
+				type: o.type,
+				connections: o.links?.length || 0
+			}))
 		};
 	}
 
 	/**
 	 * Get detailed info about edges from a node
+	 * USAGE: Call when you want to see all connections of a node
+	 * Example: const edges = visualizer.inspectNodeEdges(3);
 	 */
 	inspectNodeEdges(nodeIndex) {
 		const outgoing = [];
@@ -599,7 +664,9 @@ class WorkflowVisualizer {
 					target: link.workflowData.target,
 					condition: link.workflowData.condition,
 					label: link.workflowData.label,
-					conditionLabel: link.conditionLabel
+					conditionLabel: link.conditionLabel,
+					isActive: link.isActive,
+					isDimmed: link.isDimmed
 				});
 			}
 			if (link.workflowData?.target === nodeIndex) {
@@ -607,7 +674,9 @@ class WorkflowVisualizer {
 					source: link.workflowData.source,
 					condition: link.workflowData.condition,
 					label: link.workflowData.label,
-					conditionLabel: link.conditionLabel
+					conditionLabel: link.conditionLabel,
+					isActive: link.isActive,
+					isDimmed: link.isDimmed
 				});
 			}
 		});
@@ -615,34 +684,107 @@ class WorkflowVisualizer {
 		return { incoming, outgoing };
 	}
 
-	/**
-	 * Get SchemaGraph node by workflow index
-	 */
+	// ====================================================================
+	// Helper Methods
+	// ====================================================================
+
 	getGraphNodeByIndex(nodeIndex) {
 		return this.workflowNodes[nodeIndex] || null;
 	}
 
-	/**
-	 * Get workflow node index from SchemaGraph node
-	 */
 	getNodeIndex(graphNode) {
 		return this.workflowNodes.indexOf(graphNode);
 	}
 
-	/**
-	 * Get all workflow nodes
-	 */
 	getAllNodes() {
 		return this.workflowNodes.filter(node => node !== null);
 	}
 
-	/**
-	 * Get workflow metadata for a graph node
-	 */
 	getWorkflowData(graphNode) {
 		return graphNode?.workflowData || null;
 	}
 }
+
+
+// ========================================================================
+// USAGE EXAMPLES - Where to Call These Methods
+// ========================================================================
+
+/*
+// 1. When workflow loads:
+workflowVisualizer.loadWorkflow(workflowData);
+
+// 2. When WebSocket event arrives (in event handler):
+workflowClient.on('node.started', (event) => {
+	const nodeIndex = parseInt(event.node_id);
+	workflowVisualizer.updateNodeState(nodeIndex, { status: 'running' });
+});
+
+workflowClient.on('node.completed', (event) => {
+	const nodeIndex = parseInt(event.node_id);
+	workflowVisualizer.updateNodeState(nodeIndex, { 
+		status: 'completed',
+		output: event.data?.output 
+	});
+});
+
+// 3. When decision node completes, highlightConditionalEdges is called automatically
+// by updateNodeState, but you can also call it manually:
+workflowVisualizer.highlightConditionalEdges(3, 5); // Source node 3, matched branch at node 5
+
+// 4. To show execution path (call after workflow completes or when reviewing):
+const executionPath = [0, 1, 3, 5, 7, 9]; // Indices of nodes that executed
+workflowVisualizer.highlightPath(executionPath);
+
+// 5. To reset visualization before new execution:
+startWorkflowBtn.addEventListener('click', () => {
+	workflowVisualizer.clearHighlights();
+	// ... then start workflow
+});
+
+// 6. To inspect a node (e.g., on node click or for debugging):
+canvas.addEventListener('click', (event) => {
+	const clickedNode = getNodeAtPosition(event.x, event.y);
+	if (clickedNode) {
+		const nodeIndex = workflowVisualizer.getNodeIndex(clickedNode);
+		const nodeInfo = workflowVisualizer.inspectNode(nodeIndex);
+		console.log('Node info:', nodeInfo);
+		
+		const edges = workflowVisualizer.inspectNodeEdges(nodeIndex);
+		console.log('Node edges:', edges);
+	}
+});
+
+// 7. To get edge condition info (e.g., for tooltip):
+canvas.addEventListener('mouseover', (event) => {
+	const edge = getEdgeAtPosition(event.x, event.y);
+	if (edge) {
+		const condInfo = workflowVisualizer.getEdgeConditionInfo(
+			edge.workflowData.source, 
+			edge.workflowData.target
+		);
+		if (condInfo) {
+			showTooltip(`Condition: ${condInfo.label}`);
+		}
+	}
+});
+
+// 8. When saving workflow:
+saveWorkflowBtn.addEventListener('click', () => {
+	const exportedWorkflow = workflowVisualizer.exportWorkflow();
+	downloadJSON(exportedWorkflow, 'workflow.json');
+});
+
+// 9. Debug helpers (call from console):
+window.debugWorkflow = () => {
+	console.log('Current workflow:', workflowVisualizer.currentWorkflow);
+	console.log('All nodes:');
+	workflowVisualizer.getAllNodes().forEach((node, i) => {
+		console.log(`[${i}]`, workflowVisualizer.inspectNode(i));
+	});
+};
+*/
+
 
 // ========================================================================
 // WorkflowClient (unchanged from previous version)
