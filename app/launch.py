@@ -28,7 +28,6 @@ from   numel                   import (
 from   schema                  import (
 	DEFAULT_APP_PORT,
 	AppConfig,
-	WorkflowConfig,
 )
 from   utils                   import (
 	get_time_str,
@@ -39,9 +38,14 @@ from   workflow_api            import (
 	setup_workflow_api,
 )
 from   workflow_engine         import (
-	WorkflowConfig,
 	WorkflowEngine,
 	WorkflowExecutionState,
+)
+from   workflow_manager        import (
+	WorkflowManager,
+)
+from   workflow_schema         import (
+	WorkflowConfig,
 )
 
 
@@ -128,6 +132,11 @@ if True:
 
 
 if True:
+	workflow_manager = WorkflowManager(config, storage_dir="workflows")
+	workflow_manager.load_all_from_directory()
+
+
+if True:
 	impl_modules = [os.path.splitext(f)[0] for f in os.listdir(current_dir) if f.endswith("_impl.py")]
 	for module_name in impl_modules:
 		try:
@@ -138,20 +147,19 @@ if True:
 
 
 if True:
-	ctrl_server = None
-	ctrl_status = {
+	ctrl_server     = None
+	ctrl_status     = {
 		"config" : None,
 		"status" : "waiting",
 	}
 
-	apps = None
+	apps            = None
 	running_servers = []
 
-	# Workflow system state
-	event_bus = get_event_bus()
-	workflow_eng = None
+	event_bus       = get_event_bus()
+	workflow_eng    = None
 
-	ctrl_app = FastAPI(title="Control")
+	ctrl_app        = FastAPI(title="Control")
 	add_middleware(ctrl_app)
 
 
@@ -289,6 +297,29 @@ async def workflow_events_websocket(websocket: WebSocket):
 		event_bus.remove_websocket_client(websocket)
 
 
+# # API endpoints can now work with workflow manager
+# @ctrl_app.get("/workflows/list")
+# async def list_workflows():
+# 	return {"workflows": workflow_manager.list_workflows()}
+
+# @ctrl_app.get("/workflows/{name}")
+# async def get_workflow(name: str):
+# 	workflow = workflow_manager.get_workflow(name)
+# 	if not workflow:
+# 		raise HTTPException(status_code=404, detail="Workflow not found")
+# 	return workflow
+
+# @ctrl_app.post("/workflows")
+# async def create_workflow(workflow: WorkflowConfig):
+# 	# Validate against app config
+# 	errors = workflow.validate_against_app_config(config)
+# 	if errors:
+# 		raise HTTPException(status_code=400, detail=errors)
+	
+# 	workflow_manager.workflows[workflow.info.name] = workflow
+# 	workflow_manager.save_workflow(workflow)
+# 	return {"status": "created", "name": workflow.info.name}
+
 # ========================================================================
 # Original API Endpoints (with workflow integration)
 # ========================================================================
@@ -369,8 +400,8 @@ async def start_app():
 				agent_index += 1
 				agent_port  += 1
 
-		# Initialize workflow engine
 		workflow_eng = WorkflowEngine(config, event_bus)
+		workflow_eng.set_workflow_manager(workflow_manager)
 		setup_workflow_api(ctrl_app, workflow_eng, event_bus)
 		log_print("Workflow engine initialized")
 

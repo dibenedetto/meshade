@@ -3,7 +3,7 @@
 		"name": "Customer Support Workflow",
 		"version": "1.0.0",
 		"author": "marco@numel.app",
-		"description": "Automated customer support workflow with decision branches"
+		"description": "Automated customer support workflow with decision branches using index-based references"
 	},
 	"options": {},
 	"nodes": [
@@ -11,8 +11,8 @@
 			"id": "start_1",
 			"type": "start",
 			"label": "Start",
-			"position": {"x": 100, "y": 50},
-			"data": {
+			"position": {"x": 400, "y": 50},
+			"initial_data": {
 				"customer_query": "",
 				"priority": "normal"
 			}
@@ -21,7 +21,7 @@
 			"id": "input_1",
 			"type": "user_input",
 			"label": "Get Customer Query",
-			"position": {"x": 100, "y": 150},
+			"position": {"x": 400, "y": 150},
 			"prompt_text": "Please describe your issue:",
 			"timeout": 300
 		},
@@ -29,110 +29,109 @@
 			"id": "agent_1",
 			"type": "agent",
 			"label": "Analyze Query",
-			"position": {"x": 100, "y": 250},
+			"position": {"x": 400, "y": 280},
 			"agent": 0,
 			"input_mapping": {
-				"query": "customer_query"
+				"query": "variables.customer_query"
 			},
 			"output_mapping": {
-				"category": "agent_output.category",
-				"sentiment": "agent_output.sentiment"
+				"category": "$2.response.category",
+				"sentiment": "$2.response.sentiment"
 			}
 		},
 		{
 			"id": "decision_1",
 			"type": "decision",
 			"label": "Route by Category",
-			"position": {"x": 100, "y": 350},
+			"position": {"x": 400, "y": 410},
 			"condition_field": "category",
 			"branches": {
-				"technical": "technical",
-				"billing": "billing",
-				"general": "general"
+				"technical": 4,
+				"billing": 5,
+				"general": 6
 			}
 		},
 		{
 			"id": "agent_tech",
 			"type": "agent",
 			"label": "Technical Support",
-			"position": {"x": -100, "y": 450},
+			"position": {"x": 150, "y": 540},
 			"agent": 0,
 			"input_mapping": {
-				"query": "customer_query",
-				"category": "category"
+				"query": "variables.customer_query",
+				"category": "variables.category"
 			}
 		},
 		{
 			"id": "agent_billing",
 			"type": "agent",
 			"label": "Billing Support",
-			"position": {"x": 100, "y": 450},
+			"position": {"x": 400, "y": 540},
 			"agent": 0,
 			"input_mapping": {
-				"query": "customer_query",
-				"category": "category"
+				"query": "variables.customer_query",
+				"category": "variables.category"
 			}
 		},
 		{
 			"id": "agent_general",
 			"type": "agent",
 			"label": "General Support",
-			"position": {"x": 300, "y": 450},
+			"position": {"x": 650, "y": 540},
 			"agent": 0,
 			"input_mapping": {
-				"query": "customer_query",
-				"category": "category"
+				"query": "variables.customer_query",
+				"category": "variables.category"
 			}
 		},
 		{
 			"id": "merge_1",
 			"type": "merge",
 			"label": "Merge Responses",
-			"position": {"x": 100, "y": 550},
-			"strategy": "first"
+			"position": {"x": 400, "y": 670},
+			"strategy": "first",
+			"wait_for": [4, 5, 6]
 		},
 		{
 			"id": "transform_1",
 			"type": "transform",
 			"label": "Format Response",
-			"position": {"x": 100, "y": 650},
+			"position": {"x": 400, "y": 800},
 			"transform_type": "python",
-			"transform_script": "output = f\"Response: {input.get('response', 'No response')}\\nCategory: {input.get('category', 'unknown')}\"",
+			"transform_script": "output = f\"Response: {input.get('merged', 'No response')}\\nCategory: {context.variables.get('category', 'unknown')}\"",
 			"input_mapping": {
-				"response": "agent_output",
-				"category": "category"
+				"merged": "$7.merged"
 			}
 		},
 		{
 			"id": "end_1",
 			"type": "end",
 			"label": "End",
-			"position": {"x": 100, "y": 750},
+			"position": {"x": 400, "y": 930},
 			"output_mapping": {
-				"final_response": "transform_output"
+				"final_response": "variables.transform_output"
 			}
 		}
 	],
 	"edges": [
 		{
-			"id": "edge_1",
-			"source": "start_1",
-			"target": "input_1"
+			"source": 0,
+			"target": 1,
+			"label": "Initialize"
 		},
 		{
-			"id": "edge_2",
-			"source": "input_1",
-			"target": "agent_1"
+			"source": 1,
+			"target": 2,
+			"label": "Query received"
 		},
 		{
-			"id": "edge_3",
-			"source": "agent_1",
-			"target": "decision_1"
+			"source": 2,
+			"target": 3,
+			"label": "Analyzed"
 		},
 		{
-			"id": "edge_4",
-			"source": "decision_1",
-			"target": "agent_tech",
+			"source": 3,
+			"target": 4,
 			"condition": {
 				"type": "equals",
 				"field": "category",
@@ -141,9 +140,8 @@
 			"label": "Technical"
 		},
 		{
-			"id": "edge_5",
-			"source": "decision_1",
-			"target": "agent_billing",
+			"source": 3,
+			"target": 5,
 			"condition": {
 				"type": "equals",
 				"field": "category",
@@ -152,9 +150,8 @@
 			"label": "Billing"
 		},
 		{
-			"id": "edge_6",
-			"source": "decision_1",
-			"target": "agent_general",
+			"source": 3,
+			"target": 6,
 			"condition": {
 				"type": "equals",
 				"field": "category",
@@ -163,29 +160,29 @@
 			"label": "General"
 		},
 		{
-			"id": "edge_7",
-			"source": "agent_tech",
-			"target": "merge_1"
+			"source": 4,
+			"target": 7,
+			"label": "Tech response"
 		},
 		{
-			"id": "edge_8",
-			"source": "agent_billing",
-			"target": "merge_1"
+			"source": 5,
+			"target": 7,
+			"label": "Billing response"
 		},
 		{
-			"id": "edge_9",
-			"source": "agent_general",
-			"target": "merge_1"
+			"source": 6,
+			"target": 7,
+			"label": "General response"
 		},
 		{
-			"id": "edge_10",
-			"source": "merge_1",
-			"target": "transform_1"
+			"source": 7,
+			"target": 8,
+			"label": "Merged"
 		},
 		{
-			"id": "edge_11",
-			"source": "transform_1",
-			"target": "end_1"
+			"source": 8,
+			"target": 9,
+			"label": "Formatted"
 		}
 	],
 	"variables": {

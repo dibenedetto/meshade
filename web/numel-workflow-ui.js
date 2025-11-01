@@ -1,20 +1,17 @@
 /* ========================================================================
-   NUMEL WORKFLOW UI - UI Controller
-   Manages workflow UI interactions and connects to WorkflowClient
+   NUMEL WORKFLOW UI - Updated with Schema Registration
    ======================================================================== */
 
 // Global workflow state
 let workflowClient = null;
 let workflowVisualizer = null;
+let workflowSchemaCode = null;  // Store workflow schema
 let currentWorkflow = null;
 let currentExecutionId = null;
 let executionStartTime = null;
 let executionTimer = null;
 
-// Workflow library (in-memory for now)
-const workflowLibrary = new Map();
-
-// DOM Elements
+// ... DOM elements (same as before) ...
 let chatModeBtn, workflowModeBtn;
 let chatMode, workflowMode;
 let workflowSelect, loadWorkflowBtn, saveWorkflowBtn, newWorkflowBtn;
@@ -33,7 +30,7 @@ let workflowTools, modeDisplay;
 // ========================================================================
 
 function initWorkflowUI() {
-	// Get DOM elements
+	// Get DOM elements (same as before)
 	chatModeBtn = document.getElementById('chatModeBtn');
 	workflowModeBtn = document.getElementById('workflowModeBtn');
 	chatMode = document.getElementById('chatMode');
@@ -128,9 +125,9 @@ function switchMode(mode) {
 		workflowTools.style.display = 'none';
 		modeDisplay.textContent = 'Chat';
 		
-		// Show schema/config in graph
-		if (gApp && gGraph) {
-			// Reload config visualization
+		// Exit workflow mode
+		if (workflowVisualizer && workflowVisualizer.isInWorkflowMode()) {
+			workflowVisualizer.exitWorkflowMode();
 		}
 	} else {
 		chatModeBtn.classList.remove('active');
@@ -145,7 +142,7 @@ function switchMode(mode) {
 			initWorkflowClient();
 		}
 		
-		// Show current workflow in gGraph
+		// Show current workflow in graph
 		if (currentWorkflow && workflowVisualizer) {
 			workflowVisualizer.loadWorkflow(currentWorkflow);
 		}
@@ -156,11 +153,19 @@ function switchMode(mode) {
 // WORKFLOW CLIENT INITIALIZATION
 // ========================================================================
 
-function initWorkflowClient() {
+async function initWorkflowClient() {
 	const serverUrl = document.getElementById('serverUrl').value.trim();
 	
 	workflowClient = new WorkflowClient(serverUrl);
 	workflowVisualizer = new WorkflowVisualizer(gGraph);
+	
+	// Get workflow schema from server
+	try {
+		await loadWorkflowSchema();
+	} catch (error) {
+		console.error('Failed to load workflow schema:', error);
+		addEventLogItem('workflow-failed', '⚠️ Warning: Workflow schema not loaded - using basic visualization');
+	}
 	
 	// Connect WebSocket
 	workflowClient.connectWebSocket();
@@ -169,6 +174,29 @@ function initWorkflowClient() {
 	setupWorkflowEventHandlers();
 	
 	addEventLogItem('system', 'Workflow client initialized');
+}
+
+/**
+ * Load workflow schema from server
+ */
+async function loadWorkflowSchema() {
+	// Get schema from server (similar to how app schema is loaded)
+	const response = await fetch(`${workflowClient.baseUrl}/workflow/schema`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' }
+	});
+	
+	if (!response.ok) {
+		throw new Error('Failed to load workflow schema');
+	}
+	
+	const schemaData = await response.json();
+	workflowSchemaCode = schemaData.schema;
+	
+	// Register schema with visualizer
+	workflowVisualizer.registerWorkflowSchema(workflowSchemaCode);
+	
+	console.log('✅ Workflow schema loaded and registered');
 }
 
 function setupWorkflowEventHandlers() {
@@ -216,40 +244,55 @@ function setupWorkflowEventHandlers() {
 		refreshExecutionsList();
 	});
 	
-	// Node events
+	// Node events (now using integer indices)
 	workflowClient.on('node.started', (event) => {
-		addEventLogItem('node-started', `▶️ Node started: ${event.node_id}`);
-		if (currentNode) currentNode.textContent = event.node_id;
+		const nodeIndex = parseInt(event.node_id);
+		const nodeLabel = event.data?.node_label || `Node ${nodeIndex}`;
+		addEventLogItem('node-started', `▶️ [${nodeIndex}] ${nodeLabel} started`);
+		if (currentNode) currentNode.textContent = `[${nodeIndex}] ${nodeLabel}`;
 		if (workflowVisualizer) {
-			workflowVisualizer.updateNodeState(event.node_id, { status: 'running' });
+			workflowVisualizer.updateNodeState(nodeIndex, { status: 'running' });
 		}
 	});
 	
 	workflowClient.on('node.completed', (event) => {
-		addEventLogItem('node-completed', `✓ Node completed: ${event.node_id}`);
+		const nodeIndex = parseInt(event.node_id);
+		const nodeLabel = event.data?.node_label || `Node ${nodeIndex}`;
+		addEventLogItem('node-completed', `✓ [${nodeIndex}] ${nodeLabel} completed`);
 		if (workflowVisualizer) {
-			workflowVisualizer.updateNodeState(event.node_id, { status: 'completed' });
+			workflowVisualizer.updateNodeState(nodeIndex, { 
+				status: 'completed',
+				output: event.data?.output 
+			});
 		}
 		updateExecutionProgress(event);
 	});
 	
 	workflowClient.on('node.failed', (event) => {
-		addEventLogItem('node-failed', `✗ Node failed: ${event.node_id} - ${event.error || 'Unknown error'}`);
+		const nodeIndex = parseInt(event.node_id);
+		const nodeLabel = event.data?.node_label || `Node ${nodeIndex}`;
+		addEventLogItem('node-failed', `✗ [${nodeIndex}] ${nodeLabel} failed: ${event.error || 'Unknown error'}`);
 		if (workflowVisualizer) {
-			workflowVisualizer.updateNodeState(event.node_id, { status: 'failed' });
+			workflowVisualizer.updateNodeState(nodeIndex, { 
+				status: 'failed',
+				error: event.error 
+			});
 		}
 	});
 	
 	workflowClient.on('node.waiting', (event) => {
-		addEventLogItem('node-started', `⏸️ Node waiting: ${event.node_id}`);
+		const nodeIndex = parseInt(event.node_id);
+		const nodeLabel = event.data?.node_label || `Node ${nodeIndex}`;
+		addEventLogItem('node-started', `⏱️ [${nodeIndex}] ${nodeLabel} waiting`);
 		if (workflowVisualizer) {
-			workflowVisualizer.updateNodeState(event.node_id, { status: 'waiting' });
+			workflowVisualizer.updateNodeState(nodeIndex, { status: 'waiting' });
 		}
 	});
 	
 	// User input events
 	workflowClient.on('user_input.requested', (event) => {
-		addEventLogItem('user-input-requested', `👤 User input requested: ${event.node_id}`);
+		const nodeIndex = parseInt(event.node_id);
+		addEventLogItem('user-input-requested', `👤 User input requested: [${nodeIndex}]`);
 		showUserInputModal(event);
 	});
 	
@@ -262,6 +305,8 @@ function setupWorkflowEventHandlers() {
 // WORKFLOW MANAGEMENT
 // ========================================================================
 
+const workflowLibrary = new Map();
+
 function loadSampleWorkflows() {
 	// Add sample workflows to library
 	const simpleWorkflow = {
@@ -271,7 +316,7 @@ function loadSampleWorkflows() {
 			{ id: 'end', type: 'end', label: 'End', position: {x: 100, y: 200} }
 		],
 		edges: [
-			{ id: 'e1', source: 'start', target: 'end' }
+			{ source: 0, target: 1 }
 		]
 	};
 	
@@ -302,6 +347,15 @@ function onWorkflowSelected() {
 		startWorkflowBtn.disabled = false;
 		updateWorkflowStatus('idle', 'Ready');
 		addEventLogItem('system', `📂 Loaded workflow: ${currentWorkflow.info?.name || key}`);
+		
+		// Log edge conditions for debugging
+		if (currentWorkflow.edges) {
+			currentWorkflow.edges.forEach((edge, idx) => {
+				if (edge.condition) {
+					console.log(`Edge ${idx}: [${edge.source}] -> [${edge.target}]`, edge.condition);
+				}
+			});
+		}
 	}
 }
 
@@ -339,7 +393,9 @@ function saveWorkflowToFile() {
 		return;
 	}
 	
-	const json = JSON.stringify(currentWorkflow, null, 2);
+	// Export with updated positions from graph
+	const exportedWorkflow = workflowVisualizer.exportWorkflow();
+	const json = JSON.stringify(exportedWorkflow || currentWorkflow, null, 2);
 	const blob = new Blob([json], { type: 'application/json' });
 	const url = URL.createObjectURL(blob);
 	
@@ -397,7 +453,6 @@ async function startWorkflow() {
 }
 
 async function pauseWorkflow() {
-	// TODO: Implement pause functionality
 	addEventLogItem('system', '⏸️ Pause not yet implemented');
 }
 
@@ -426,7 +481,6 @@ function updateWorkflowControls(state) {
 		pauseWorkflowBtn.disabled = true;
 		stopWorkflowBtn.disabled = true;
 		if (state !== 'running') {
-			// Keep execution info visible for a moment
 			setTimeout(() => {
 				if (startWorkflowBtn.disabled === false) {
 					executionInfo.style.display = 'none';
@@ -450,12 +504,10 @@ function updateExecutionInfo(event) {
 }
 
 function updateExecutionProgress(event) {
-	// Calculate progress based on completed nodes
 	if (!currentWorkflow || !event.data) return;
 	
 	const totalNodes = currentWorkflow.nodes.length;
-	// This is simplified - actual progress would come from event data
-	const progress = Math.min(100, (executionProgress.style.width.replace('%', '') || 0) + (100 / totalNodes));
+	const progress = Math.min(100, (parseFloat(executionProgress.style.width) || 0) + (100 / totalNodes));
 	executionProgress.style.width = `${progress}%`;
 }
 
@@ -503,7 +555,6 @@ function addEventLogItem(type, message) {
 	eventLog.appendChild(item);
 	eventLog.scrollTop = eventLog.scrollHeight;
 	
-	// Limit log size
 	while (eventLog.children.length > 100) {
 		eventLog.removeChild(eventLog.firstChild);
 	}
@@ -515,7 +566,7 @@ function clearEventLog() {
 }
 
 // ========================================================================
-// EXECUTIONS LIST
+// EXECUTIONS LIST & USER INPUT (same as before)
 // ========================================================================
 
 async function refreshExecutionsList() {
@@ -565,7 +616,6 @@ async function selectExecution(execution) {
 	
 	try {
 		const state = await workflowClient.getWorkflowStatus(execution.execution_id);
-		// Update UI with execution state
 		console.log('Execution state:', state);
 	} catch (error) {
 		console.error('Failed to get execution state:', error);
@@ -573,10 +623,6 @@ async function selectExecution(execution) {
 	
 	refreshExecutionsList();
 }
-
-// ========================================================================
-// USER INPUT MODAL
-// ========================================================================
 
 let pendingInputEvent = null;
 
@@ -615,10 +661,6 @@ async function submitUserInput() {
 	}
 }
 
-// ========================================================================
-// NODE CREATION
-// ========================================================================
-
 function addWorkflowNode() {
 	const nodeType = nodeTypeSelect.value;
 	if (!nodeType || !currentWorkflow) {
@@ -643,10 +685,6 @@ function addWorkflowNode() {
 	addEventLogItem('system', `➕ Added ${nodeType} node: ${nodeId}`);
 }
 
-// ========================================================================
-// STATUS UPDATES
-// ========================================================================
-
 function updateWorkflowStatus(type, message) {
 	workflowStatus.className = `numel-status numel-status-${type}`;
 	workflowStatus.textContent = message;
@@ -656,12 +694,10 @@ function updateWorkflowStatus(type, message) {
 // INTEGRATION WITH MAIN APP
 // ========================================================================
 
-// Extend the existing connect function
 const originalConnect = window.connect;
 window.connect = async function() {
 	await originalConnect?.();
 	
-	// Initialize workflow client after connection
 	setTimeout(() => {
 		if (workflowModeBtn.classList.contains('active')) {
 			initWorkflowClient();
@@ -669,7 +705,6 @@ window.connect = async function() {
 	}, 500);
 };
 
-// Initialize on load
 if (document.readyState === 'loading') {
 	document.addEventListener('DOMContentLoaded', initWorkflowUI);
 } else {

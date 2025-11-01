@@ -332,15 +332,15 @@ def validate_config(config: AppConfig) -> bool:
 			# TODO: check team
 			pass
 
-	if True:
-		for workflow_option in config.workflow_options:
-			# TODO: check workflow_option
-			pass
+	# if True:
+	# 	for workflow_option in config.workflow_options:
+	# 		# TODO: check workflow_option
+	# 		pass
 
-	if True:
-		for workflow in config.workflows:
-			# TODO: check workflow
-			pass
+	# if True:
+	# 	for workflow in config.workflows:
+	# 		# TODO: check workflow
+	# 		pass
 
 	return True
 
@@ -373,8 +373,8 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 	extracted.agents           = []
 	extracted.team_options     = []
 	extracted.teams            = []
-	extracted.workflow_options = []
-	extracted.workflows        = []
+	# extracted.workflow_options = []
+	# extracted.workflows        = []
 
 	info_remap                 = dict()
 	app_options_remap          = dict()
