@@ -191,9 +191,8 @@ class WorkflowVisualizer {
 		const label = this.getNodeLabel(workflowNode, index);
 		this.schemaGraph.api.node.setProperty(graphNode, 'label', label);
 		
-		// 🔧 FIX 2: Set bgcolor for workflow nodes
-		const color = this.getNodeColor(workflowNode.type);
-		graphNode.bgcolor = color;
+		// 🔧 FIX 2: Set color for workflow nodes
+		graphNode.color = this.getNodeColor(workflowNode.type);
 		
 		// Store node and metadata
 		this.workflowNodes[index] = graphNode;
