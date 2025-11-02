@@ -165,7 +165,7 @@ class WorkflowVisualizer {
 			console.warn(`⚠️ Using fallback type for node ${index}`);
 		}
 		
-		// 🔧 FIX: Create the node using schema system
+		// Create the node using schema system
 		const graphNode = this.schemaGraph.api.node.create(nodeType, x, y);
 		if (!graphNode) {
 			console.error('❌ Failed to create node at index:', index);
@@ -179,17 +179,21 @@ class WorkflowVisualizer {
 			this.setNodeProperties(graphNode, workflowNode);
 		}
 		
-		// 🔧 FIX: Add visual connection slots (keeping existing inputs/outputs from schema)
+		// Add visual connection slots (keeping existing inputs/outputs from schema)
 		this.addVisualConnectionSlots(graphNode, workflowNode);
+		
+		// 🔧 FIX 1: Calculate proper node size based on actual slot count
+		const maxSlots = Math.max(graphNode.inputs.length, graphNode.outputs.length);
+		const nodeHeight = Math.max(100, 38 + maxSlots * 25);
+		graphNode.size = [200, nodeHeight];
 		
 		// Set visual properties
 		const label = this.getNodeLabel(workflowNode, index);
 		this.schemaGraph.api.node.setProperty(graphNode, 'label', label);
 		
+		// 🔧 FIX 2: Set bgcolor for workflow nodes
 		const color = this.getNodeColor(workflowNode.type);
-		if (graphNode.color !== undefined) {
-			graphNode.color = color;
-		}
+		graphNode.bgcolor = color;
 		
 		// Store node and metadata
 		this.workflowNodes[index] = graphNode;

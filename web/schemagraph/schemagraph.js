@@ -4403,8 +4403,9 @@ class SchemaGraphApp {
     }
     
     // Header
-    const headerColor = node.isNative ? colors.accentPurple : 
-                        (node.isRootType ? colors.accentOrange : colors.nodeHeader);
+    const hasOwnColor = node.hasOwnProperty('bgcolor') && (node.bgcolor != undefined) && (node.bgcolor != null);
+    const headerColor = hasOwnColor ? node.bgcolor : (node.isNative ? colors.accentPurple : 
+                        (node.isRootType ? colors.accentOrange : colors.nodeHeader));
     
     if (style.useGradient && style.currentStyle !== 'wireframe') {
       const headerGradient = this.ctx.createLinearGradient(x, y, x, y + 26);
