@@ -141,7 +141,7 @@ function switchMode(mode) {
 		if (!workflowClient && gApp) {
 			initWorkflowClient();
 		}
-		
+
 		if (workflowVisualizer) {
 			// Enter workflow mode
 			if (!workflowVisualizer.isInWorkflowMode()) {
@@ -149,9 +149,9 @@ function switchMode(mode) {
 			}
 
 			// Show current workflow in graph
-			if (currentWorkflow) {
-				workflowVisualizer.loadWorkflow(currentWorkflow);
-			}
+			// if (currentWorkflow) {
+			// 	workflowVisualizer.loadWorkflow(currentWorkflow);
+			// }
 		}
 	}
 }

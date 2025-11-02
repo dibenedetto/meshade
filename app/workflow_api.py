@@ -79,7 +79,7 @@ def setup_workflow_api(app: FastAPI, workflow_engine: WorkflowEngine, event_bus:
 			log_print(f"Error canceling workflow: {e}")
 			raise HTTPException(status_code=500, detail=str(e))
 	
-	@app.get("/workflow/{execution_id}/status", response_model=WorkflowExecutionState)
+	@app.post("/workflow/{execution_id}/status", response_model=WorkflowExecutionState)
 	async def get_workflow_status(execution_id: str):
 		"""Get workflow execution status"""
 		state = workflow_engine.get_execution_state(execution_id)
@@ -87,7 +87,7 @@ def setup_workflow_api(app: FastAPI, workflow_engine: WorkflowEngine, event_bus:
 			raise HTTPException(status_code=404, detail="Execution not found")
 		return state
 	
-	@app.get("/workflow/list")
+	@app.post("/workflow/list")
 	async def list_workflows() -> List[WorkflowExecutionState]:
 		"""List all workflow executions"""
 		return workflow_engine.list_executions()
@@ -117,7 +117,7 @@ def setup_workflow_api(app: FastAPI, workflow_engine: WorkflowEngine, event_bus:
 		)
 		return {"events": [e.dict() for e in events]}
 	
-	@app.delete("/workflow/events/history")
+	@app.post("/workflow/events/history/delete")
 	async def clear_event_history():
 		"""Clear event history"""
 		event_bus.clear_history()
@@ -158,12 +158,12 @@ def setup_workflow_manager_api(app: FastAPI, workflow_manager):
 	on workflow definitions (not executions).
 	"""
 	
-	@app.get("/workflows/list")
+	@app.post("/workflows/list")
 	async def list_workflow_definitions():
 		"""List all workflow definitions"""
 		return {"workflows": workflow_manager.list_workflows()}
 	
-	@app.get("/workflows/{name}")
+	@app.post("/workflows/{name}")
 	async def get_workflow_definition(name: str):
 		"""Get a workflow definition by name"""
 		workflow = workflow_manager.get_workflow(name)
@@ -184,7 +184,7 @@ def setup_workflow_manager_api(app: FastAPI, workflow_manager):
 		except Exception as e:
 			raise HTTPException(status_code=400, detail=str(e))
 	
-	@app.delete("/workflows/{name}")
+	@app.post("/workflows/{name}")
 	async def delete_workflow_definition(name: str):
 		"""Delete a workflow definition"""
 		if name not in workflow_manager.workflows:

@@ -58,9 +58,20 @@ class WorkflowVisualizer {
 
 	enterWorkflowMode() {
 		console.log('📊 Entering workflow mode...');
-		this.savedGraphState = this.schemaGraph.api.graph.export(false);
-		this.savedViewState = this.schemaGraph.api.view.export();
-		this.schemaGraph.api.graph.clear();
+
+		const currGraphState = this.schemaGraph.api.graph.export(false);
+		const currViewState  = this.schemaGraph.api.view.export();
+		if (this.savedGraphState) {
+			this.schemaGraph.api.graph.import(this.savedGraphState, false);
+			if (this.savedViewState) {
+				this.schemaGraph.api.view.import(this.savedViewState);
+			}
+		}
+		else {
+			this.schemaGraph.api.graph.clear();
+		}
+		this.savedGraphState = currGraphState;
+		this.savedViewState  = currViewState;
 		this.workflowNodes = [];
 		this.workflowEdges = [];
 		this.isWorkflowMode = true;
@@ -69,19 +80,23 @@ class WorkflowVisualizer {
 	exitWorkflowMode() {
 		console.log('📊 Exiting workflow mode...');
 		if (!this.isWorkflowMode) return;
-		this.schemaGraph.api.graph.clear();
 		this.workflowNodes = [];
 		this.workflowEdges = [];
 		this.currentWorkflow = null;
+		const currGraphState = this.schemaGraph.api.graph.export(false);
+		const currViewState  = this.schemaGraph.api.view.export();
 		if (this.savedGraphState) {
 			this.schemaGraph.api.graph.import(this.savedGraphState, false);
 			if (this.savedViewState) {
 				this.schemaGraph.api.view.import(this.savedViewState);
 			}
-			this.savedGraphState = null;
-			this.savedViewState = null;
 		}
-		this.isWorkflowMode = false;
+		else {
+			this.schemaGraph.api.graph.clear();
+		}
+		this.savedGraphState = currGraphState;
+		this.savedViewState  = currViewState;
+		this.isWorkflowMode  = false;
 	}
 
 	isInWorkflowMode() {
@@ -141,7 +156,7 @@ class WorkflowVisualizer {
 			y = 100 + row * 200;
 		}
 		
-		// Get proper node type
+		// Get proper node type from schema
 		let nodeType;
 		if (this.workflowSchemaRegistered) {
 			nodeType = this.getWorkflowNodeType(workflowNode.type);
@@ -150,7 +165,7 @@ class WorkflowVisualizer {
 			console.warn(`⚠️ Using fallback type for node ${index}`);
 		}
 		
-		// Create the node
+		// 🔧 FIX: Create the node using schema system
 		const graphNode = this.schemaGraph.api.node.create(nodeType, x, y);
 		if (!graphNode) {
 			console.error('❌ Failed to create node at index:', index);
@@ -164,8 +179,8 @@ class WorkflowVisualizer {
 			this.setNodeProperties(graphNode, workflowNode);
 		}
 		
-		// 🔧 FIX: Force compatible inputs/outputs
-		this.setupNodeConnections(graphNode, workflowNode);
+		// 🔧 FIX: Add visual connection slots (keeping existing inputs/outputs from schema)
+		this.addVisualConnectionSlots(graphNode, workflowNode);
 		
 		// Set visual properties
 		const label = this.getNodeLabel(workflowNode, index);
@@ -187,8 +202,99 @@ class WorkflowVisualizer {
 			nodeConfig: workflowNode
 		};
 		
-		console.log(`✓ Created node [${index}]: ${workflowNode.id} (${nodeType})`);
+		console.log(`✔ Created node [${index}]: ${workflowNode.id} (${nodeType})`);
 		return graphNode;
+	}
+
+	// 🔧 NEW: Add visual connection slots alongside schema fields
+	addVisualConnectionSlots(graphNode, workflowNode) {
+		const nodeType = workflowNode.type;
+		const universalType = 'Any';
+		
+		// Store original inputs/outputs from schema
+		const originalInputs = graphNode.inputs || [];
+		const originalOutputs = graphNode.outputs || [];
+		
+		// Create new arrays with flow control slots first, then schema fields
+		graphNode.inputs = [];
+		graphNode.outputs = [];
+		
+		switch (nodeType) {
+			case 'start':
+				// Start has no inputs, just output flow
+				graphNode.inputs = originalInputs;
+				graphNode.outputs = [{name: 'flow', type: universalType, links: []}, ...originalOutputs];
+				break;
+				
+			case 'end':
+				// End has input flow, no outputs
+				graphNode.inputs = [{name: 'flow', type: universalType, link: null}, ...originalInputs];
+				graphNode.outputs = originalOutputs;
+				break;
+				
+			case 'decision':
+				// Decision: input flow + schema fields, then branch outputs
+				graphNode.inputs = [{name: 'flow', type: universalType, link: null}, ...originalInputs];
+				
+				const branches = workflowNode.branches || {};
+				const branchOutputs = Object.keys(branches).map(branchName => ({
+					name: branchName,
+					type: universalType,
+					links: []
+				}));
+				if (branchOutputs.length === 0) {
+					branchOutputs.push({name: 'default', type: universalType, links: []});
+				}
+				graphNode.outputs = [...branchOutputs, ...originalOutputs];
+				break;
+				
+			case 'merge':
+				// Merge: multiple flow inputs + schema fields, then merged output
+				const waitFor = workflowNode.wait_for || [];
+				const inputCount = waitFor.length > 0 ? waitFor.length : 2;
+				
+				const flowInputs = [];
+				graphNode.multiInputs = {};
+				for (let i = 0; i < inputCount; i++) {
+					flowInputs.push({name: `input_${i}`, type: universalType, link: null});
+					graphNode.multiInputs[i] = { type: universalType, links: [] };
+				}
+				
+				graphNode.inputs = [...flowInputs, ...originalInputs];
+				graphNode.outputs = [{name: 'merged', type: universalType, links: []}, ...originalOutputs];
+				break;
+				
+			case 'parallel':
+				// Parallel: input flow + schema fields, then branch outputs
+				graphNode.inputs = [{name: 'flow', type: universalType, link: null}, ...originalInputs];
+				
+				const parallelBranches = workflowNode.branches || [];
+				const outputCount = parallelBranches.length > 0 ? parallelBranches.length : 2;
+				const parallelOutputs = [];
+				for (let i = 0; i < outputCount; i++) {
+					parallelOutputs.push({name: `branch_${i}`, type: universalType, links: []});
+				}
+				
+				graphNode.outputs = [...parallelOutputs, ...originalOutputs];
+				break;
+				
+			case 'loop':
+				// Loop: input flow + schema fields, then body/exit outputs
+				graphNode.inputs = [{name: 'flow', type: universalType, link: null}, ...originalInputs];
+				graphNode.outputs = [
+					{name: 'body', type: universalType, links: []},
+					{name: 'exit', type: universalType, links: []},
+					...originalOutputs
+				];
+				break;
+				
+			default:
+				// agent, prompt, tool, transform, user_input
+				// Keep schema inputs/outputs, add flow control
+				graphNode.inputs = [{name: 'flow', type: universalType, link: null}, ...originalInputs];
+				graphNode.outputs = [{name: 'flow', type: universalType, links: []}, ...originalOutputs];
+				break;
+		}
 	}
 
 	setNodeProperties(graphNode, workflowNode) {
@@ -267,62 +373,6 @@ class WorkflowVisualizer {
 		}
 	}
 
-	setupNodeConnections(graphNode, workflowNode) {
-		const nodeType = workflowNode.type;
-		const universalType = 'Any';
-		
-		graphNode.inputs = [];
-		graphNode.outputs = [];
-		
-		switch (nodeType) {
-			case 'start':
-				graphNode.outputs.push({name: 'flow', type: universalType, links: []});
-				break;
-			case 'end':
-				graphNode.inputs.push({name: 'flow', type: universalType, link: null});
-				break;
-			case 'decision':
-				graphNode.inputs.push({name: 'flow', type: universalType, link: null});
-				const branches = workflowNode.branches || {};
-				Object.keys(branches).forEach(branchName => {
-					graphNode.outputs.push({name: branchName, type: universalType, links: []});
-				});
-				if (graphNode.outputs.length === 0) {
-					graphNode.outputs.push({name: 'default', type: universalType, links: []});
-				}
-				break;
-			case 'merge':
-				const waitFor = workflowNode.wait_for || [];
-				const inputCount = waitFor.length > 0 ? waitFor.length : 2;
-				for (let i = 0; i < inputCount; i++) {
-					graphNode.inputs.push({name: `input_${i}`, type: universalType, link: null});
-				}
-				graphNode.outputs.push({name: 'merged', type: universalType, links: []});
-				break;
-			case 'parallel':
-				graphNode.inputs.push({name: 'flow', type: universalType, link: null});
-				const parallelBranches = workflowNode.branches || [];
-				const outputCount = parallelBranches.length > 0 ? parallelBranches.length : 2;
-				for (let i = 0; i < outputCount; i++) {
-					graphNode.outputs.push({name: `branch_${i}`, type: universalType, links: []});
-				}
-				break;
-			case 'loop':
-				graphNode.inputs.push({name: 'flow', type: universalType, link: null});
-				graphNode.outputs.push({name: 'body', type: universalType, links: []});
-				graphNode.outputs.push({name: 'exit', type: universalType, links: []});
-				break;
-			case 'user_input':
-				graphNode.inputs.push({name: 'flow', type: universalType, link: null});
-				graphNode.outputs.push({name: 'input', type: universalType, links: []});
-				break;
-			default:
-				graphNode.inputs.push({name: 'input', type: universalType, link: null});
-				graphNode.outputs.push({name: 'output', type: universalType, links: []});
-				break;
-		}
-	}
-
 	getNodeLabel(workflowNode, index) {
 		const emoji = this.getNodeEmoji(workflowNode.type);
 		const label = workflowNode.label || workflowNode.type;
@@ -384,39 +434,75 @@ class WorkflowVisualizer {
 			// For decision nodes, find the output slot matching the branch
 			const branchName = this.getBranchNameFromCondition(workflowEdge.condition);
 			outputSlot = sourceNode.outputs.findIndex(o => o.name === branchName);
-			if (outputSlot === -1) outputSlot = 0; // Fallback
+			if (outputSlot === -1) {
+				console.warn(`⚠️ Branch "${branchName}" not found, using slot 0`);
+				outputSlot = 0;
+			}
 		} else if (sourceType === 'loop') {
 			// For loop nodes, determine if this is body or exit
 			const isExitEdge = workflowEdge.label?.toLowerCase().includes('exit') || 
-							workflowEdge.label?.toLowerCase().includes('done');
+							workflowEdge.label?.toLowerCase().includes('done') ||
+							workflowEdge.label?.toLowerCase().includes('complete');
 			outputSlot = isExitEdge ? 1 : 0; // body=0, exit=1
 		} else if (sourceType === 'parallel') {
-			// For parallel nodes, find next available output slot
-			outputSlot = sourceNode.outputs.findIndex(o => !o.links || o.links.length === 0);
-			if (outputSlot === -1) outputSlot = sourceNode.outputs.length - 1;
+			// For parallel nodes, find next available output slot (excluding flow slots)
+			outputSlot = sourceNode.outputs.findIndex(o => 
+				o.name.startsWith('branch_') && (!o.links || o.links.length === 0)
+			);
+			if (outputSlot === -1) {
+				// All branch slots used, use the first one
+				outputSlot = sourceNode.outputs.findIndex(o => o.name.startsWith('branch_'));
+				if (outputSlot === -1) outputSlot = 0;
+			}
+		} else {
+			// Default: use first flow output (typically slot 0)
+			outputSlot = sourceNode.outputs.findIndex(o => o.name === 'flow');
+			if (outputSlot === -1) outputSlot = 0;
 		}
-		// For all other nodes, use slot 0 (default single output)
 		
 		// 🔧 FIX: Determine correct input slot
 		let inputSlot = 0;
 		const targetType = targetNode.workflowData?.type;
 		
 		if (targetType === 'merge') {
-			// For merge nodes, find next available input slot
-			inputSlot = targetNode.inputs.findIndex(i => i.link === null);
+			// For merge nodes, find next available input slot in the multi-input slots
+			inputSlot = Object.keys(targetNode.multiInputs || {}).findIndex(slotIdx => {
+				const slot = targetNode.multiInputs[slotIdx];
+				return slot && (!slot.links || slot.links.length === 0);
+			});
+			
 			if (inputSlot === -1) {
-				// All slots used, add a new one dynamically
-				inputSlot = targetNode.inputs.length;
-				targetNode.inputs.push({
-					name: `input_${inputSlot}`, 
-					type: 'Any', 
-					link: null
-				});
+				// All slots occupied, use slot 0 (it's multi-input anyway)
+				inputSlot = 0;
 			}
+		} else {
+			// Default: use first flow input (typically slot 0)
+			inputSlot = targetNode.inputs.findIndex(i => i.name === 'flow');
+			if (inputSlot === -1) inputSlot = 0;
 		}
-		// For all other nodes, use slot 0 (default single input)
 		
-		const link = this.schemaGraph.api.link.create(sourceNode, outputSlot, targetNode, inputSlot);
+		// Create the link
+		let link;
+		
+		if (targetType === 'merge' && targetNode.multiInputs && targetNode.multiInputs[inputSlot]) {
+			// Multi-input connection for merge nodes
+			const linkId = ++this.schemaGraph.graph.last_link_id;
+			link = new Link(
+				linkId,
+				sourceNode.id,
+				outputSlot,
+				targetNode.id,
+				inputSlot,
+				'Any'
+			);
+			
+			this.schemaGraph.graph.links[linkId] = link;
+			sourceNode.outputs[outputSlot].links.push(linkId);
+			targetNode.multiInputs[inputSlot].links.push(linkId);
+		} else {
+			// Regular single connection
+			link = this.schemaGraph.graph.connect(sourceNode, outputSlot, targetNode, inputSlot);
+		}
 		
 		if (!link) {
 			console.error('❌ Failed to create edge:', `[${workflowEdge.source}] -> [${workflowEdge.target}]`);
@@ -446,10 +532,13 @@ class WorkflowVisualizer {
 		return link;
 	}
 
-	// Helper method to extract branch name from condition
 	getBranchNameFromCondition(condition) {
+		// Extract branch name from condition value
 		if (condition.value !== undefined) {
-			return condition.value; // e.g., "technical", "billing", "general"
+			return String(condition.value); // e.g., "technical", "billing", "general"
+		}
+		if (condition.field) {
+			return condition.field;
 		}
 		if (condition.label) {
 			return condition.label;
@@ -977,7 +1066,9 @@ class WorkflowClient {
 	}
 
 	async getWorkflowStatus(executionId) {
-		const response = await fetch(`${this.baseUrl}/workflow/${executionId}/status`);
+		const response = await fetch(`${this.baseUrl}/workflow/${executionId}/status`, {
+			method: 'POST',
+		});
 
 		if (!response.ok) {
 			throw new Error(`Failed to get workflow status: ${response.statusText}`);
@@ -987,7 +1078,9 @@ class WorkflowClient {
 	}
 
 	async listWorkflows() {
-		const response = await fetch(`${this.baseUrl}/workflow/list`);
+		const response = await fetch(`${this.baseUrl}/workflow/list`, {
+			method: 'POST',
+		});
 
 		if (!response.ok) {
 			throw new Error(`Failed to list workflows: ${response.statusText}`);
@@ -1028,8 +1121,8 @@ class WorkflowClient {
 	}
 
 	async clearEventHistory() {
-		const response = await fetch(`${this.baseUrl}/workflow/events/history`, {
-			method: 'DELETE',
+		const response = await fetch(`${this.baseUrl}/workflow/events/history/delete`, {
+			method: 'POST',
 		});
 
 		if (!response.ok) {
