@@ -59,19 +59,25 @@ class WorkflowVisualizer {
 	enterWorkflowMode() {
 		console.log('📊 Entering workflow mode...');
 
+		// Save current (chat) graph state
 		const currGraphState = this.schemaGraph.api.graph.export(false);
 		const currViewState  = this.schemaGraph.api.view.export();
+		
+		// Restore or clear workflow graph
 		if (this.savedGraphState) {
 			this.schemaGraph.api.graph.import(this.savedGraphState, false);
 			if (this.savedViewState) {
 				this.schemaGraph.api.view.import(this.savedViewState);
 			}
-		}
-		else {
+		} else {
 			this.schemaGraph.api.graph.clear();
 		}
+		
+		// Save chat state for later
 		this.savedGraphState = currGraphState;
 		this.savedViewState  = currViewState;
+		
+		// Clear arrays - they'll be repopulated by loadWorkflow
 		this.workflowNodes = [];
 		this.workflowEdges = [];
 		this.isWorkflowMode = true;
@@ -80,23 +86,193 @@ class WorkflowVisualizer {
 	exitWorkflowMode() {
 		console.log('📊 Exiting workflow mode...');
 		if (!this.isWorkflowMode) return;
-		this.workflowNodes = [];
-		this.workflowEdges = [];
-		this.currentWorkflow = null;
+		
+		// Save current workflow graph state
 		const currGraphState = this.schemaGraph.api.graph.export(false);
 		const currViewState  = this.schemaGraph.api.view.export();
+		
+		// Restore chat graph
 		if (this.savedGraphState) {
 			this.schemaGraph.api.graph.import(this.savedGraphState, false);
 			if (this.savedViewState) {
 				this.schemaGraph.api.view.import(this.savedViewState);
 			}
-		}
-		else {
+		} else {
 			this.schemaGraph.api.graph.clear();
 		}
+		
+		// Save workflow state for later
 		this.savedGraphState = currGraphState;
 		this.savedViewState  = currViewState;
+		
+		this.workflowNodes = [];
+		this.workflowEdges = [];
+		this.currentWorkflow = null;
 		this.isWorkflowMode  = false;
+	}
+
+	// 🔧 COMPLETE REWRITE: Use workflow indices (0, 1, 2...) as stable identifiers
+	saveWorkflowProperties() {
+		this.savedWorkflowNodePropertiesByIndex = {};
+		this.savedWorkflowEdgePropertiesByIndex = [];
+		
+		// Save node properties - keyed by workflow index
+		for (const node of this.schemaGraph.graph.nodes) {
+			if (node.workflowData && node.workflowData.index !== undefined) {
+				const index = node.workflowData.index;
+				this.savedWorkflowNodePropertiesByIndex[index] = {
+					color: node.color,
+					workflowData: JSON.parse(JSON.stringify(node.workflowData)),
+					multiInputs: node.multiInputs ? JSON.parse(JSON.stringify(node.multiInputs)) : null,
+					size: node.size ? [...node.size] : null
+				};
+			}
+		}
+		
+		// Save edge properties - using workflow indices from workflowData
+		for (const linkId in this.schemaGraph.graph.links) {
+			const link = this.schemaGraph.graph.links[linkId];
+			if (link.workflowData) {
+				this.savedWorkflowEdgePropertiesByIndex.push({
+					sourceIndex: link.workflowData.source,
+					targetIndex: link.workflowData.target,
+					originSlot: link.workflowData.outputSlot,
+					targetSlot: link.workflowData.inputSlot,
+					workflowData: JSON.parse(JSON.stringify(link.workflowData)),
+					label: link.label,
+					conditionType: link.conditionType,
+					conditionInfo: link.conditionInfo ? JSON.parse(JSON.stringify(link.conditionInfo)) : null,
+					isConditional: link.isConditional,
+					conditionLabel: link.conditionLabel,
+					isActive: link.isActive,
+					isDimmed: link.isDimmed,
+					isInExecutionPath: link.isInExecutionPath
+				});
+			}
+		}
+		
+		console.log('💾 Saved workflow properties for', Object.keys(this.savedWorkflowNodePropertiesByIndex).length, 'nodes');
+		console.log('💾 Saved workflow properties for', this.savedWorkflowEdgePropertiesByIndex.length, 'edges');
+	}
+
+	// 🔧 COMPLETE REWRITE: Restore using workflow indices
+	restoreWorkflowProperties() {
+		if (!this.savedWorkflowNodePropertiesByIndex) return;
+		
+		// Clear and rebuild workflowNodes array
+		this.workflowNodes = [];
+		
+		// Find all nodes and map them by their workflow index
+		// After import, nodes still have their workflowData.index in properties
+		for (const node of this.schemaGraph.graph.nodes) {
+			// Check if node has workflow data in its properties
+			let nodeIndex = null;
+			try {
+				// The index should still be in the exported/imported data
+				// Check node properties that were exported
+				if (node.properties && node.properties.workflowIndex !== undefined) {
+					nodeIndex = node.properties.workflowIndex;
+				}
+			} catch (e) {
+				// Ignore
+			}
+			
+			// If we find a saved property set for any index, check if this node matches
+			for (const [indexStr, savedProps] of Object.entries(this.savedWorkflowNodePropertiesByIndex)) {
+				const index = parseInt(indexStr);
+				
+				// Try to match by position or by checking if properties match
+				// Since positions should be preserved during export/import, 
+				// we can try to match nodes in the same order
+				if (this.workflowNodes[index] === undefined || this.workflowNodes[index] === null) {
+					// This slot is empty, try to fill it
+					// We need a better way to identify nodes...
+					// Let's use a different approach: restore in order
+				}
+			}
+		}
+		
+		// Better approach: after import, nodes are in the same order
+		// So we can just iterate through nodes and restore by position
+		const nodesArray = this.schemaGraph.graph.nodes;
+		const savedIndices = Object.keys(this.savedWorkflowNodePropertiesByIndex).map(i => parseInt(i)).sort((a, b) => a - b);
+		
+		console.log('🔍 Attempting to restore', savedIndices.length, 'nodes from', nodesArray.length, 'imported nodes');
+		
+		// Match nodes by their order in the array
+		let nodeArrayIndex = 0;
+		for (const index of savedIndices) {
+			if (nodeArrayIndex >= nodesArray.length) {
+				console.warn('⚠️ Ran out of nodes to restore');
+				break;
+			}
+			
+			const node = nodesArray[nodeArrayIndex];
+			const savedProps = this.savedWorkflowNodePropertiesByIndex[index];
+			
+			if (node && savedProps) {
+				// Restore all properties
+				node.color = savedProps.color;
+				node.workflowData = savedProps.workflowData;
+				if (savedProps.multiInputs) {
+					node.multiInputs = savedProps.multiInputs;
+				}
+				if (savedProps.size) {
+					node.size = savedProps.size;
+				}
+				
+				// Place in workflowNodes array at correct index
+				this.workflowNodes[index] = node;
+				nodeArrayIndex++;
+			}
+		}
+		
+		// Restore edge properties
+		this.workflowEdges = [];
+		for (const savedEdgeProps of this.savedWorkflowEdgePropertiesByIndex) {
+			const sourceNode = this.workflowNodes[savedEdgeProps.sourceIndex];
+			const targetNode = this.workflowNodes[savedEdgeProps.targetIndex];
+			
+			if (!sourceNode || !targetNode) {
+				console.warn('⚠️ Could not find nodes for edge:', 
+					`[${savedEdgeProps.sourceIndex}] -> [${savedEdgeProps.targetIndex}]`);
+				continue;
+			}
+			
+			// Find the link connecting these nodes at these slots
+			let matchedLink = null;
+			for (const linkId in this.schemaGraph.graph.links) {
+				const link = this.schemaGraph.graph.links[linkId];
+				if (link.origin_id === sourceNode.id &&
+					link.origin_slot === savedEdgeProps.originSlot &&
+					link.target_id === targetNode.id &&
+					link.target_slot === savedEdgeProps.targetSlot) {
+					matchedLink = link;
+					break;
+				}
+			}
+			
+			if (matchedLink) {
+				// Restore all workflow-specific properties
+				matchedLink.workflowData = savedEdgeProps.workflowData;
+				matchedLink.label = savedEdgeProps.label;
+				matchedLink.conditionType = savedEdgeProps.conditionType;
+				matchedLink.conditionInfo = savedEdgeProps.conditionInfo;
+				matchedLink.isConditional = savedEdgeProps.isConditional;
+				matchedLink.conditionLabel = savedEdgeProps.conditionLabel;
+				matchedLink.isActive = savedEdgeProps.isActive;
+				matchedLink.isDimmed = savedEdgeProps.isDimmed;
+				matchedLink.isInExecutionPath = savedEdgeProps.isInExecutionPath;
+				
+				this.workflowEdges.push(matchedLink);
+			} else {
+				console.warn('⚠️ Could not find link:', 
+					`Node[${savedEdgeProps.sourceIndex}]:slot${savedEdgeProps.originSlot} -> Node[${savedEdgeProps.targetIndex}]:slot${savedEdgeProps.targetSlot}`);
+			}
+		}
+		
+		console.log('✅ Restored workflow properties for', this.workflowNodes.filter(n => n).length, 'nodes');
+		console.log('✅ Restored workflow properties for', this.workflowEdges.length, 'edges');
 	}
 
 	isInWorkflowMode() {
@@ -107,7 +283,7 @@ class WorkflowVisualizer {
 	// Workflow Loading
 	// ====================================================================
 
-	loadWorkflow(workflow) {
+	loadWorkflow(workflow, applyLayout = true) {
 		console.log('📋 Loading workflow:', workflow);
 		if (!this.isWorkflowMode) {
 			this.enterWorkflowMode();
@@ -127,16 +303,28 @@ class WorkflowVisualizer {
 			this.createWorkflowEdge(edge);
 		});
 		
-		// Apply layout and center
-		this.schemaGraph.api.layout.apply('hierarchical-vertical');
-		setTimeout(() => {
-			this.schemaGraph.api.view.center();
-		}, 100);
+		// 🔧 FIX: Only apply layout when explicitly requested (e.g., first load)
+		if (applyLayout) {
+			this.schemaGraph.api.layout.apply('hierarchical-vertical');
+			setTimeout(() => {
+				this.schemaGraph.api.view.center();
+			}, 100);
+		}
+		
+		// 🔧 NEW: Force visualization refresh
+		this.refreshVisualization();
 		
 		console.log('✅ Workflow loaded:', {
 			nodes: this.workflowNodes.length,
 			edges: this.workflowEdges.length
 		});
+	}
+
+	refreshVisualization() {
+		// Force a proper canvas refresh by calling the SchemaGraphApp's draw method
+		if (this.schemaGraph && this.schemaGraph.draw) {
+			this.schemaGraph.draw();
+		}
 	}
 
 	// ====================================================================
@@ -734,23 +922,86 @@ class WorkflowVisualizer {
 	// ====================================================================
 
 	/**
-	 * Export workflow with updated node positions
+	 * Export workflow with current nodes, edges, and positions
+	 * Re-indexes nodes to remove gaps from deletions
 	 * USAGE: Call when saving workflow to file
 	 */
 	exportWorkflow() {
 		if (!this.currentWorkflow) return null;
-		const exported = JSON.parse(JSON.stringify(this.currentWorkflow));
+		const exported = {
+			info: this.currentWorkflow.info || {},
+			options: this.currentWorkflow.options || {},
+			nodes: [],
+			edges: [],
+			variables: this.currentWorkflow.variables || {}
+		};
 		
-		// Update positions from graph
-		exported.nodes.forEach((node, index) => {
-			const graphNode = this.workflowNodes[index];
-			if (graphNode && graphNode.pos) {
-				node.position = {
-					x: Math.round(graphNode.pos[0]),
-					y: Math.round(graphNode.pos[1])
-				};
+		// 🔧 FIX: Build index mapping (old index → new index)
+		const oldToNewIndex = new Map();
+		let newIndex = 0;
+		
+		// First pass: collect existing nodes and build index mapping
+		for (let oldIndex = 0; oldIndex < this.workflowNodes.length; oldIndex++) {
+			const graphNode = this.workflowNodes[oldIndex];
+			
+			// 🔧 CRITICAL: Check if node is actually in the graph (not just in memory)
+			const isInGraph = graphNode && this.schemaGraph.graph.nodes.includes(graphNode);
+			
+			if (isInGraph && graphNode.workflowData && graphNode.workflowData.nodeConfig) {
+				oldToNewIndex.set(oldIndex, newIndex);
+				
+				const nodeData = JSON.parse(JSON.stringify(graphNode.workflowData.nodeConfig));
+				
+				// Update position
+				if (graphNode.pos) {
+					nodeData.position = {
+						x: Math.round(graphNode.pos[0]),
+						y: Math.round(graphNode.pos[1])
+					};
+				}
+				
+				exported.nodes.push(nodeData);
+				newIndex++;
 			}
-		});
+		}
+		
+		// Second pass: rebuild edges with updated indices
+		for (const linkId in this.schemaGraph.graph.links) {
+			const link = this.schemaGraph.graph.links[linkId];
+			
+			// Only export links that have workflowData
+			if (link.workflowData) {
+				const oldSourceIndex = link.workflowData.source;
+				const oldTargetIndex = link.workflowData.target;
+				
+				// Map to new indices
+				const newSourceIndex = oldToNewIndex.get(oldSourceIndex);
+				const newTargetIndex = oldToNewIndex.get(oldTargetIndex);
+				
+				// Only add edge if both nodes still exist
+				if (newSourceIndex !== undefined && newTargetIndex !== undefined) {
+					const edge = {
+						source: newSourceIndex,
+						target: newTargetIndex
+					};
+					
+					// Preserve label if it exists
+					if (link.workflowData.label) {
+						edge.label = link.workflowData.label;
+					}
+					
+					// Preserve condition if it exists
+					if (link.workflowData.condition) {
+						edge.condition = link.workflowData.condition;
+					}
+					
+					exported.edges.push(edge);
+				}
+			}
+		}
+		
+		console.log('📤 Exported workflow with', exported.nodes.length, 'nodes and', exported.edges.length, 'edges');
+		console.log('   Index mapping:', Array.from(oldToNewIndex.entries()).map(([old, newIdx]) => `${old}→${newIdx}`).join(', '));
 		
 		return exported;
 	}

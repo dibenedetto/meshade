@@ -125,8 +125,12 @@ function switchMode(mode) {
 		workflowTools.style.display = 'none';
 		modeDisplay.textContent = 'Chat';
 		
-		// Exit workflow mode
+		// Exit workflow mode (saves state)
 		if (workflowVisualizer && workflowVisualizer.isInWorkflowMode()) {
+			// 🔧 FIX: Update currentWorkflow with current graph state before exiting
+			if (currentWorkflow) {
+				currentWorkflow = workflowVisualizer.exportWorkflow() || currentWorkflow;
+			}
 			workflowVisualizer.exitWorkflowMode();
 		}
 	} else {
@@ -147,11 +151,11 @@ function switchMode(mode) {
 			if (!workflowVisualizer.isInWorkflowMode()) {
 				workflowVisualizer.enterWorkflowMode();
 			}
-
-			// Show current workflow in graph
-			// if (currentWorkflow) {
-			// 	workflowVisualizer.loadWorkflow(currentWorkflow);
-			// }
+			
+			// Always reload the workflow fresh (don't try to restore state)
+			if (currentWorkflow) {
+				workflowVisualizer.loadWorkflow(currentWorkflow, false); // false = don't re-layout
+			}
 		}
 	}
 }
@@ -350,7 +354,8 @@ function onWorkflowSelected() {
 	
 	currentWorkflow = workflowLibrary.get(key);
 	if (currentWorkflow && workflowVisualizer) {
-		workflowVisualizer.loadWorkflow(currentWorkflow);
+		// 🔧 FIX: Always apply layout when explicitly selecting a workflow
+		workflowVisualizer.loadWorkflow(currentWorkflow, true);
 		startWorkflowBtn.disabled = false;
 		updateWorkflowStatus('idle', 'Ready');
 		addEventLogItem('system', `📂 Loaded workflow: ${currentWorkflow.info?.name || key}`);
@@ -382,7 +387,13 @@ function handleWorkflowFileUpload(event) {
 			workflowLibrary.set(key, workflow);
 			updateWorkflowSelect();
 			workflowSelect.value = key;
-			onWorkflowSelected();
+			
+			// 🔧 FIX: Apply layout when loading a new workflow file
+			currentWorkflow = workflow;
+			if (workflowVisualizer) {
+				workflowVisualizer.loadWorkflow(currentWorkflow, true);
+			}
+			
 			addEventLogItem('system', `📂 Imported workflow: ${key}`);
 		} catch (error) {
 			addEventLogItem('workflow-failed', `❌ Failed to load workflow: ${error.message}`);

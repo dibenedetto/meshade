@@ -890,20 +890,52 @@ class SchemaGraph extends Graph {
         nodeData.nativeInputs = JSON.parse(JSON.stringify(node.nativeInputs));
       }
       
+      // 🔧 FIX: Save multi-input configuration
+      if (node.multiInputs) {
+        nodeData.multiInputs = JSON.parse(JSON.stringify(node.multiInputs));
+      }
+      
+      // 🔧 FIX: Save workflow-specific properties
+      if (node.color) {
+        nodeData.color = node.color;
+      }
+      if (node.workflowData) {
+        nodeData.workflowData = JSON.parse(JSON.stringify(node.workflowData));
+      }
+      
       data.nodes.push(nodeData);
     }
     
     for (const linkId in this.links) {
       if (this.links.hasOwnProperty(linkId)) {
         const link = this.links[linkId];
-        data.links.push({
+        const linkData = {
           id: link.id,
           origin_id: link.origin_id,
           origin_slot: link.origin_slot,
           target_id: link.target_id,
           target_slot: link.target_slot,
           type: link.type
-        });
+        };
+        
+        // 🔧 FIX: Save workflow-specific link data
+        if (link.workflowData) {
+          linkData.workflowData = JSON.parse(JSON.stringify(link.workflowData));
+        }
+        if (link.conditionType) {
+          linkData.conditionType = link.conditionType;
+        }
+        if (link.conditionInfo) {
+          linkData.conditionInfo = JSON.parse(JSON.stringify(link.conditionInfo));
+        }
+        if (link.isConditional) {
+          linkData.isConditional = link.isConditional;
+        }
+        if (link.conditionLabel) {
+          linkData.conditionLabel = link.conditionLabel;
+        }
+        
+        data.links.push(linkData);
       }
     }
     
@@ -957,6 +989,19 @@ class SchemaGraph extends Graph {
         node.nativeInputs = JSON.parse(JSON.stringify(nodeData.nativeInputs));
       }
       
+      // 🔧 FIX: Restore multi-input configuration
+      if (nodeData.multiInputs) {
+        node.multiInputs = JSON.parse(JSON.stringify(nodeData.multiInputs));
+      }
+      
+      // 🔧 FIX: Restore workflow-specific properties
+      if (nodeData.color) {
+        node.color = nodeData.color;
+      }
+      if (nodeData.workflowData) {
+        node.workflowData = JSON.parse(JSON.stringify(nodeData.workflowData));
+      }
+      
       this.nodes.push(node);
       this._nodes_by_id[node.id] = node;
       node.graph = this;
@@ -979,7 +1024,30 @@ class SchemaGraph extends Graph {
           
           this.links[linkData.id] = link;
           originNode.outputs[linkData.origin_slot].links.push(linkData.id);
-          targetNode.inputs[linkData.target_slot].link = linkData.id;
+          
+          // 🔧 FIX: Restore multi-input links properly
+          if (targetNode.multiInputs && targetNode.multiInputs[linkData.target_slot]) {
+            targetNode.multiInputs[linkData.target_slot].links.push(linkData.id);
+          } else {
+            targetNode.inputs[linkData.target_slot].link = linkData.id;
+          }
+          
+          // 🔧 FIX: Restore workflow-specific link data
+          if (linkData.workflowData) {
+            link.workflowData = JSON.parse(JSON.stringify(linkData.workflowData));
+          }
+          if (linkData.conditionType) {
+            link.conditionType = linkData.conditionType;
+          }
+          if (linkData.conditionInfo) {
+            link.conditionInfo = JSON.parse(JSON.stringify(linkData.conditionInfo));
+          }
+          if (linkData.isConditional) {
+            link.isConditional = linkData.isConditional;
+          }
+          if (linkData.conditionLabel) {
+            link.conditionLabel = linkData.conditionLabel;
+          }
           
           if (linkData.id > this.last_link_id) {
             this.last_link_id = linkData.id;
