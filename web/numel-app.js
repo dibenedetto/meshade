@@ -30,6 +30,9 @@ let systemMsgButton;
 let appAgentSelect;
 let clearChatButton;
 
+let downloadConfigBtn, uploadConfigBtn, newConfigBtn;
+let toolbarToggle, mainToolbar, toolbarContent;
+
 // ========================================================================
 // INITIALIZATION
 // ========================================================================
@@ -48,6 +51,16 @@ function initializeApp() {
 	systemMsgButton = document.getElementById("debugMessage");
 	appAgentSelect = document.getElementById("appAgentSelect");
 	clearChatButton = document.getElementById("clearChatButton");
+
+	// Config management buttons
+	downloadConfigBtn = document.getElementById('downloadConfigBtn');
+	uploadConfigBtn = document.getElementById('uploadConfigBtn');
+	newConfigBtn = document.getElementById('newConfigBtn');
+
+	// Toolbar elements
+	toolbarToggle = document.getElementById('toolbarToggle');
+	mainToolbar = document.getElementById('mainToolbar');
+	toolbarContent = document.getElementById('toolbarContent');
 
 	// Check if required libraries are loaded
 	checkLibrariesLoaded();
@@ -101,10 +114,24 @@ function setupEventListeners() {
 
 	// Clear chat button
 	clearChatButton.addEventListener("click", clearChat);
+	
+	// Config management buttons
+	downloadConfigBtn.addEventListener('click', downloadConfig);
+	uploadConfigBtn.addEventListener('click', uploadConfig);
+	newConfigBtn.addEventListener('click', createNewConfig);
+	
+	// Config file upload handler
+	const importConfigFile = document.getElementById('sg-importConfigFile');
+	if (importConfigFile) {
+		importConfigFile.addEventListener('change', handleConfigFileUpload);
+	}
+	
+	// Initialize toolbar collapse
+	initToolbarCollapse();
 }
 
 // ========================================================================
-// CONNECTION MANAGEMENT
+// UPDATE CONNECT/DISCONNECT FUNCTIONS
 // ========================================================================
 
 async function connect() {
@@ -114,8 +141,11 @@ async function connect() {
 		return;
 	}
 
-	clearChatButton .disabled = true;
-	connectButton   .disabled = true;
+	clearChatButton.disabled = true;
+	connectButton.disabled = true;
+	downloadConfigBtn.disabled = true;
+	uploadConfigBtn.disabled = true;
+	newConfigBtn.disabled = true;
 
 	addMessage("system", "⌛ Connecting...");
 
@@ -158,7 +188,6 @@ async function connect() {
 		enableInput(true);
 		connectButton.textContent = "Disconnect";
 		connectButton.classList.remove("numel-btn-accent");
-		// connectButton.classList.add("numel-btn-secondary");
 		connectButton.classList.add("numel-btn-accent-red");
 		addMessage("system", `✅ Connected to ${serverUrl}`);
 		addMessage("ui", START_MESSAGE);
@@ -169,14 +198,20 @@ async function connect() {
 		updateStatus("disconnected", "Connection failed");
 		enableAppInput(true);
 	} finally {
-		clearChatButton .disabled = false;
-		connectButton   .disabled = false;
+		clearChatButton.disabled = false;
+		connectButton.disabled = false;
+		downloadConfigBtn.disabled = !isConnected;
+		uploadConfigBtn.disabled = false; // Can upload when disconnected
+		newConfigBtn.disabled = false;
 	}
 }
 
 async function disconnect() {
-	clearChatButton .disabled = true;
-	connectButton   .disabled = true;
+	clearChatButton.disabled = true;
+	connectButton.disabled = true;
+	downloadConfigBtn.disabled = true;
+	uploadConfigBtn.disabled = true;
+	newConfigBtn.disabled = true;
 
 	gGraph.api.schema.remove(SCHEMA_NAME);
 
@@ -194,15 +229,17 @@ async function disconnect() {
 	updateStatus("disconnected", "Disconnected");
 	enableInput(false);
 	connectButton.textContent = "Connect";
-	// connectButton.classList.remove("numel-btn-secondary");
 	connectButton.classList.remove("numel-btn-accent-red");
 	connectButton.classList.add("numel-btn-accent");
 	addMessage("system", "ℹ️ Disconnected");
 	addMessage("ui", END_MESSAGE);
 	enableAppInput(true);
 
-	clearChatButton .disabled = false;
-	connectButton   .disabled = false;
+	clearChatButton.disabled = false;
+	connectButton.disabled = false;
+	downloadConfigBtn.disabled = true;
+	uploadConfigBtn.disabled = false;
+	newConfigBtn.disabled = false;
 }
 
 function toggleConnection() {
@@ -379,6 +416,256 @@ function changeSystemVisibility() {
 	for (let div of divs) {
 		div.style.display = display;
 	}
+}
+
+// ========================================================================
+// CONFIG MANAGEMENT
+// ========================================================================
+
+async function downloadConfig() {
+	if (!gApp || !gApp.isValid()) {
+		addMessage("system-error", "⚠️ Not connected to server");
+		return;
+	}
+
+	try {
+		downloadConfigBtn.disabled = true;
+		addMessage("system", "📥 Downloading config...");
+		
+		const config = await gApp.getConfig();
+		
+		// Create and download JSON file
+		const json = JSON.stringify(config, null, 2);
+		const blob = new Blob([json], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `config_${new Date().toISOString().slice(0,10)}.json`;
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+		
+		addMessage("system", "✅ Config downloaded successfully");
+	} catch (error) {
+		console.error("Failed to download config:", error);
+		addMessage("system-error", `❌ Failed to download config: ${error.message}`);
+	} finally {
+		downloadConfigBtn.disabled = false;
+	}
+}
+
+async function uploadConfig() {
+	if (!gApp || !gApp.isValid()) {
+		addMessage("system-error", "⚠️ Not connected to server");
+		return;
+	}
+	
+	// Trigger file input
+	const fileInput = document.getElementById('sg-importConfigFile');
+	fileInput.click();
+}
+
+async function handleConfigFileUpload(event) {
+	const file = event.target.files[0];
+	if (!file) return;
+
+	try {
+		uploadConfigBtn.disabled = true;
+		addMessage("system", "📤 Uploading config...");
+		
+		// Read file
+		const text = await file.text();
+		const config = JSON.parse(text);
+		
+		// Validate basic structure
+		if (!config || typeof config !== 'object') {
+			throw new Error("Invalid config file format");
+		}
+		
+		// Confirm before uploading (will require restart)
+		const confirmed = confirm(
+			"⚠️ Uploading a new config will stop the current application.\n" +
+			"You'll need to reconnect after upload. Continue?"
+		);
+		
+		if (!confirmed) {
+			addMessage("system", "ℹ️ Config upload cancelled");
+			event.target.value = '';
+			return;
+		}
+		
+		// Stop the app first
+		if (isConnected) {
+			await gApp.stop();
+			addMessage("system", "⏸️ Application stopped");
+		}
+		
+		// Upload config
+		const result = await gApp.putConfig(config);
+		
+		if (result.error) {
+			throw new Error(result.error);
+		}
+		
+		addMessage("system", "✅ Config uploaded successfully");
+		addMessage("system", "ℹ️ Click 'Connect' to start with new config");
+		
+		// Update UI state
+		isConnected = false;
+		gApp = null;
+		enableInput(false);
+		connectButton.textContent = "Connect";
+		connectButton.classList.remove("numel-btn-accent-red");
+		connectButton.classList.add("numel-btn-accent");
+		updateStatus("disconnected", "Ready to connect");
+		
+	} catch (error) {
+		console.error("Failed to upload config:", error);
+		addMessage("system-error", `❌ Failed to upload config: ${error.message}`);
+	} finally {
+		uploadConfigBtn.disabled = false;
+		event.target.value = '';
+	}
+}
+
+function createNewConfig() {
+	if (!gApp || !gApp.isValid()) {
+		addMessage("system-error", "⚠️ Not connected to server");
+		return;
+	}
+	
+	const confirmed = confirm(
+		"⚠️ Creating a new config will stop the current application.\n" +
+		"This will create a minimal default configuration.\n" +
+		"Continue?"
+	);
+	
+	if (!confirmed) {
+		return;
+	}
+	
+	// Create minimal config
+	const newConfig = {
+		"port": 8000,
+		"info": {
+			"version": "1.0.0",
+			"name": "Numel Playground",
+			"author": "user@numel.app",
+			"description": "New Numel AI Configuration"
+		},
+		"options": {
+			"seed": null,
+			"reload": true
+		},
+		"backends": [
+			{
+				"type": "agno",
+				"version": ""
+			}
+		],
+		"models": [
+			{
+				"type": "openai",
+				"id": "gpt-4"
+			}
+		],
+		"embeddings": [
+			{
+				"type": "openai",
+				"id": ""
+			}
+		],
+		"prompts": [
+			{
+				"model": 0,
+				"embedding": 0,
+				"description": "Numel AI Assistant",
+				"instructions": [
+					"Be helpful and informative"
+				]
+			}
+		],
+		"content_dbs": [],
+		"index_dbs": [],
+		"memory_mgrs": [],
+		"session_mgrs": [],
+		"knowledge_mgrs": [],
+		"tools": [],
+		"agent_options": [
+			{
+				"markdown": true
+			}
+		],
+		"agents": [
+			{
+				"info": {
+					"version": "1.0.0",
+					"name": "Default Agent",
+					"author": "user@numel.app"
+				},
+				"options": 0,
+				"backend": 0,
+				"prompt": 0,
+				"content_db": null,
+				"memory_mgr": null,
+				"session_mgr": null,
+				"knowledge_mgr": null,
+				"tools": []
+			}
+		]
+	};
+	
+	// Download as template
+	const json = JSON.stringify(newConfig, null, 2);
+	const blob = new Blob([json], { type: 'application/json' });
+	const url = URL.createObjectURL(blob);
+	
+	const a = document.createElement('a');
+	a.href = url;
+	a.download = `config_new_${new Date().toISOString().slice(0,10)}.json`;
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+	URL.revokeObjectURL(url);
+	
+	addMessage("system", "📄 New config template downloaded");
+	addMessage("system", "ℹ️ Edit the file and upload it to apply");
+}
+
+// ========================================================================
+// TOOLBAR COLLAPSE/EXPAND
+// ========================================================================
+
+function initToolbarCollapse() {
+	// Load saved state
+	const isCollapsed = localStorage.getItem('toolbarCollapsed') === 'true';
+	if (isCollapsed) {
+		mainToolbar.classList.add('collapsed');
+	}
+	
+	// Toggle on button click
+	toolbarToggle.addEventListener('click', toggleToolbar);
+	
+	// Toggle on keyboard (Space/Enter when focused)
+	toolbarToggle.addEventListener('keydown', (e) => {
+		if (e.key === ' ' || e.key === 'Enter') {
+			e.preventDefault();
+			toggleToolbar();
+		}
+	});
+}
+
+function toggleToolbar() {
+	mainToolbar.classList.toggle('collapsed');
+	const isCollapsed = mainToolbar.classList.contains('collapsed');
+	
+	// Save state
+	localStorage.setItem('toolbarCollapsed', isCollapsed);
+	
+	// Update button title
+	toolbarToggle.title = isCollapsed ? 'Expand toolbar' : 'Collapse toolbar';
 }
 
 // ========================================================================

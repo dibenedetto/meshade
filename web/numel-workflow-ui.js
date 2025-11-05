@@ -14,7 +14,7 @@ let executionTimer = null;
 // ... DOM elements (same as before) ...
 let chatModeBtn, workflowModeBtn;
 let chatMode, workflowMode;
-let workflowSelect, loadWorkflowBtn, saveWorkflowBtn, newWorkflowBtn;
+let workflowSelect, downloadWorkflowBtn, uploadWorkflowBtn, newWorkflowBtn;
 let startWorkflowBtn, pauseWorkflowBtn, stopWorkflowBtn;
 let workflowStatus, executionInfo, executionId, executionProgress;
 let currentNode, executionTime;
@@ -35,12 +35,12 @@ function initWorkflowUI() {
 	workflowModeBtn = document.getElementById('workflowModeBtn');
 	chatMode = document.getElementById('chatMode');
 	workflowMode = document.getElementById('workflowMode');
-	
+
 	workflowSelect = document.getElementById('workflowSelect');
-	loadWorkflowBtn = document.getElementById('loadWorkflowBtn');
-	saveWorkflowBtn = document.getElementById('saveWorkflowBtn');
+	downloadWorkflowBtn = document.getElementById('downloadWorkflowBtn');  // RENAMED
+	uploadWorkflowBtn = document.getElementById('uploadWorkflowBtn');      // RENAMED
 	newWorkflowBtn = document.getElementById('newWorkflowBtn');
-	
+
 	startWorkflowBtn = document.getElementById('startWorkflowBtn');
 	pauseWorkflowBtn = document.getElementById('pauseWorkflowBtn');
 	stopWorkflowBtn = document.getElementById('stopWorkflowBtn');
@@ -83,10 +83,10 @@ function setupWorkflowUIListeners() {
 	chatModeBtn.addEventListener('click', () => switchMode('chat'));
 	workflowModeBtn.addEventListener('click', () => switchMode('workflow'));
 	
-	// Workflow selection
+	// Workflow selection - UPDATE THESE LISTENERS
 	workflowSelect.addEventListener('change', onWorkflowSelected);
-	loadWorkflowBtn.addEventListener('click', loadWorkflowFromFile);
-	saveWorkflowBtn.addEventListener('click', saveWorkflowToFile);
+	downloadWorkflowBtn.addEventListener('click', downloadWorkflowToFile);  // RENAMED
+	uploadWorkflowBtn.addEventListener('click', uploadWorkflowFromFile);    // RENAMED
 	newWorkflowBtn.addEventListener('click', createNewWorkflow);
 	
 	// Workflow controls
@@ -354,9 +354,10 @@ function onWorkflowSelected() {
 	
 	currentWorkflow = workflowLibrary.get(key);
 	if (currentWorkflow && workflowVisualizer) {
-		// 🔧 FIX: Always apply layout when explicitly selecting a workflow
+		// Always apply layout when explicitly selecting a workflow
 		workflowVisualizer.loadWorkflow(currentWorkflow, true);
 		startWorkflowBtn.disabled = false;
+		downloadWorkflowBtn.disabled = false;  // ENABLE download button
 		updateWorkflowStatus('idle', 'Ready');
 		addEventLogItem('system', `📂 Loaded workflow: ${currentWorkflow.info?.name || key}`);
 		
@@ -371,41 +372,12 @@ function onWorkflowSelected() {
 	}
 }
 
-function loadWorkflowFromFile() {
+function uploadWorkflowFromFile() {
 	workflowFileInput.click();
 }
 
-function handleWorkflowFileUpload(event) {
-	const file = event.target.files[0];
-	if (!file) return;
-	
-	const reader = new FileReader();
-	reader.onload = (e) => {
-		try {
-			const workflow = JSON.parse(e.target.result);
-			const key = workflow.info?.name || `workflow_${Date.now()}`;
-			workflowLibrary.set(key, workflow);
-			updateWorkflowSelect();
-			workflowSelect.value = key;
-			
-			// 🔧 FIX: Apply layout when loading a new workflow file
-			currentWorkflow = workflow;
-			if (workflowVisualizer) {
-				workflowVisualizer.loadWorkflow(currentWorkflow, true);
-			}
-			
-			addEventLogItem('system', `📂 Imported workflow: ${key}`);
-		} catch (error) {
-			addEventLogItem('workflow-failed', `❌ Failed to load workflow: ${error.message}`);
-		}
-	};
-	reader.readAsText(file);
-	
-	// Reset input
-	event.target.value = '';
-}
-
-function saveWorkflowToFile() {
+// RENAME: saveWorkflowToFile -> downloadWorkflowToFile
+function downloadWorkflowToFile() {
 	if (!currentWorkflow) {
 		alert('No workflow selected');
 		return;
@@ -423,7 +395,37 @@ function saveWorkflowToFile() {
 	a.click();
 	
 	URL.revokeObjectURL(url);
-	addEventLogItem('system', `💾 Saved workflow`);
+	addEventLogItem('system', `💾 Workflow downloaded`);
+}
+
+function handleWorkflowFileUpload(event) {
+	const file = event.target.files[0];
+	if (!file) return;
+	
+	const reader = new FileReader();
+	reader.onload = (e) => {
+		try {
+			const workflow = JSON.parse(e.target.result);
+			const key = workflow.info?.name || `workflow_${Date.now()}`;
+			workflowLibrary.set(key, workflow);
+			updateWorkflowSelect();
+			workflowSelect.value = key;
+			
+			// Apply layout when loading a new workflow file
+			currentWorkflow = workflow;
+			if (workflowVisualizer) {
+				workflowVisualizer.loadWorkflow(currentWorkflow, true);
+			}
+			
+			addEventLogItem('system', `📂 Workflow uploaded: ${key}`);
+		} catch (error) {
+			addEventLogItem('workflow-failed', `❌ Failed to upload workflow: ${error.message}`);
+		}
+	};
+	reader.readAsText(file);
+	
+	// Reset input
+	event.target.value = '';
 }
 
 function createNewWorkflow() {
@@ -442,6 +444,8 @@ function createNewWorkflow() {
 	updateWorkflowSelect();
 	workflowSelect.value = key;
 	onWorkflowSelected();
+	
+	addEventLogItem('system', `📄 New workflow created: ${name}`);
 }
 
 // ========================================================================
@@ -493,11 +497,17 @@ function updateWorkflowControls(state) {
 		startWorkflowBtn.disabled = true;
 		pauseWorkflowBtn.disabled = false;
 		stopWorkflowBtn.disabled = false;
+		downloadWorkflowBtn.disabled = true;  // UPDATED
+		uploadWorkflowBtn.disabled = true;    // UPDATED
+		newWorkflowBtn.disabled = true;
 		executionInfo.style.display = 'block';
 	} else {
 		startWorkflowBtn.disabled = !currentWorkflow;
 		pauseWorkflowBtn.disabled = true;
 		stopWorkflowBtn.disabled = true;
+		downloadWorkflowBtn.disabled = !currentWorkflow;  // UPDATED
+		uploadWorkflowBtn.disabled = false;               // UPDATED
+		newWorkflowBtn.disabled = false;
 		if (state !== 'running') {
 			setTimeout(() => {
 				if (startWorkflowBtn.disabled === false) {

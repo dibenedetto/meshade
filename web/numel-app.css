@@ -28,7 +28,9 @@ body {
 	border-radius: 6px;
 	padding: 20px;
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-	flex: 0 0 400px;
+	flex: 1 1 0;  /* KEY CHANGE: Equal flex */
+	min-width: 320px;
+	max-width: 600px;
 	display: flex;
 	flex-direction: column;
 	min-height: 0;
@@ -351,7 +353,7 @@ body {
 
 /* Graph Panel */
 .numel-graph-panel {
-	flex: 1;
+	flex: 1 1 0;  /* KEY CHANGE: Equal flex */
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
@@ -419,4 +421,298 @@ body {
 		flex: 1;
 		min-height: 400px;
 	}
+}
+
+* Config Management Buttons */
+#sg-exportConfigBtn,
+#sg-importConfigBtn {
+	background: var(--sg-accent-blue);
+	color: #ffffff;
+	font-weight: 600;
+	transition: all 0.2s ease;
+}
+
+#sg-exportConfigBtn:hover,
+#sg-importConfigBtn:hover {
+	background: var(--sg-accent-blue-light);
+	transform: translateY(-1px);
+	box-shadow: 0 3px 8px rgba(70, 162, 218, 0.3);
+}
+
+#sg-exportConfigBtn:active,
+#sg-importConfigBtn:active {
+	transform: translateY(0);
+}
+
+/* Highlight on first load */
+@keyframes pulseGlow {
+	0%, 100% {
+		box-shadow: 0 0 0 0 rgba(70, 162, 218, 0.4);
+	}
+	50% {
+		box-shadow: 0 0 0 8px rgba(70, 162, 218, 0);
+	}
+}
+
+.sg-toolbar-highlight {
+	animation: pulseGlow 2s ease-in-out 3;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1400px) {
+	#sg-exportConfigBtn,
+	#sg-importConfigBtn {
+		padding: 8px 12px;
+		font-size: 12px;
+	}
+	
+	#sg-exportConfigBtn::before {
+		content: "📥 ";
+	}
+	
+	#sg-importConfigBtn::before {
+		content: "📤 ";
+	}
+	
+	#sg-exportConfigBtn {
+		/* Hide text on smaller screens, keep icon */
+	}
+}
+
+@media (max-width: 1200px) {
+	#sg-exportConfigBtn span,
+	#sg-importConfigBtn span {
+		display: none;
+	}
+}
+
+/* ========================================================================
+   COLLAPSIBLE TOOLBAR
+   ======================================================================== */
+
+.numel-toolbar {
+	position: relative;
+	transition: all 0.3s ease;
+}
+
+.numel-toolbar.collapsed {
+	height: 40px;
+	overflow: hidden;
+}
+
+.numel-toolbar.collapsed .numel-toolbar-content {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.numel-toolbar-toggle {
+	position: absolute;
+	left: 50%;
+	top: 8px;
+	transform: translateX(-50%);
+	background: var(--sg-bg-secondary);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 4px;
+	padding: 4px 12px;
+	cursor: pointer;
+	font-size: 12px;
+	color: var(--sg-text-secondary);
+	transition: all 0.2s ease;
+	z-index: 10;
+}
+
+.numel-toolbar-toggle:hover {
+	background: var(--sg-bg-tertiary);
+	color: var(--sg-text-primary);
+	border-color: var(--sg-border-highlight);
+}
+
+.numel-toolbar-toggle-icon {
+	display: inline-block;
+	transition: transform 0.3s ease;
+}
+
+.numel-toolbar.collapsed .numel-toolbar-toggle-icon {
+	transform: rotate(-180deg);
+}
+
+.numel-toolbar-content {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding-top: 28px;
+	transition: opacity 0.3s ease;
+	flex-wrap: wrap;
+}
+
+/* When collapsed, only show toggle button */
+.numel-toolbar.collapsed .numel-toolbar-toggle {
+	top: 8px;
+}
+
+/* Ensure toolbar has proper spacing */
+.sg-canvas-container {
+	position: relative;
+}
+
+/* ========================================================================
+   CONFIG SECTION ENHANCEMENTS
+   ======================================================================== */
+
+/* Make config and workflow sections more consistent */
+.numel-config-section .numel-section-header {
+	margin-bottom: 8px;
+}
+
+.numel-section-title {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--sg-text-secondary);
+	text-transform: uppercase;
+	letter-spacing: 0.8px;
+	margin: 0;
+}
+
+/* Config/Workflow button rows - equal width buttons */
+.numel-config-row button {
+	flex: 1;
+	min-width: 0; /* Allow buttons to shrink equally */
+}
+
+/* Highlight config section when first connected */
+.numel-config-section.highlight {
+	animation: sectionPulse 0.5s ease-in-out;
+	border-left: 3px solid var(--sg-accent-blue);
+}
+
+@keyframes sectionPulse {
+	0%, 100% {
+		background: var(--sg-bg-tertiary);
+	}
+	50% {
+		background: rgba(70, 162, 218, 0.1);
+	}
+}
+
+/* ========================================================================
+   RESPONSIVE ADJUSTMENTS
+   ======================================================================== */
+
+@media (max-width: 1400px) {
+	.numel-toolbar-content {
+		font-size: 11px;
+	}
+	
+	.sg-action-btn,
+	.sg-drawing-style-select,
+	.sg-layout-select {
+		padding: 6px 10px;
+		font-size: 11px;
+	}
+}
+
+@media (max-width: 1200px) {
+	/* Always show toolbar as collapsed on smaller screens */
+	.numel-toolbar {
+		height: 40px;
+	}
+	
+	.numel-toolbar-content {
+		display: none;
+	}
+	
+	.numel-toolbar.collapsed .numel-toolbar-content {
+		display: flex;
+	}
+	
+	/* Stack config buttons vertically on small screens */
+	.numel-config-row {
+		flex-direction: column;
+		gap: 6px;
+	}
+	
+	.numel-config-row button {
+		width: 100%;
+	}
+}
+
+/* ========================================================================
+   TOOLBAR ANIMATION POLISH
+   ======================================================================== */
+
+.numel-toolbar {
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.numel-toolbar.collapsed {
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Smooth transitions for all toolbar elements */
+.numel-toolbar * {
+	transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* Keep dividers subtle */
+.sg-divider {
+	opacity: 0.3;
+}
+
+/* ========================================================================
+   ACCESSIBILITY
+   ======================================================================== */
+
+.numel-toolbar-toggle:focus {
+	outline: 2px solid var(--sg-accent-blue);
+	outline-offset: 2px;
+}
+
+/* Keyboard navigation hint */
+.numel-toolbar-toggle[data-keyboard-hint]::after {
+	content: " (Space/Enter)";
+	font-size: 9px;
+	opacity: 0.6;
+}
+
+
+
+
+
+
+
+
+
+.numel-toolbar-content {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	gap: 12px 16px;
+	padding-top: 36px;
+	transition: opacity 0.3s ease, max-height 0.3s ease;
+	max-height: 1000px;
+}
+
+.numel-toolbar-section {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	padding: 8px 12px;
+	background: var(--sg-bg-tertiary);
+	border-radius: 4px;
+	border: 1px solid var(--sg-border-color);
+}
+
+.numel-toolbar-section-title {
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	color: var(--sg-text-tertiary);
+	letter-spacing: 0.5px;
+	margin-right: 8px;
+	min-width: fit-content;
+}
+
+/* Hide old dividers */
+.sg-divider {
+	display: none;
 }
