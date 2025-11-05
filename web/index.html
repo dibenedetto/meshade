@@ -27,7 +27,7 @@
 				<button id="workflowModeBtn" class="numel-mode-btn">🔄 Workflow</button>
 			</div>
 
-			<!-- Chat Mode (existing) -->
+			<!-- Chat Mode -->
 			<div id="chatMode" class="numel-mode-content">
 				<!-- Connection Config -->
 				<div class="numel-config-section">
@@ -89,11 +89,13 @@
 
 			<!-- Workflow Mode -->
 			<div id="workflowMode" class="numel-mode-content" style="display: none;">
-				<!-- Workflow Selection -->
+				<!-- Combined Workflow Selection & Controls -->
 				<div class="numel-config-section">
 					<div class="numel-section-header">
 						<h3 class="numel-section-title">Workflow</h3>
 					</div>
+					
+					<!-- Selection -->
 					<div class="numel-config-row">
 						<label for="workflowSelect">Select:</label>
 						<select id="workflowSelect">
@@ -105,10 +107,8 @@
 						<button id="uploadWorkflowBtn" class="numel-btn numel-btn-secondary">📤 Upload</button>
 						<button id="newWorkflowBtn" class="numel-btn numel-btn-secondary">➕ New</button>
 					</div>
-				</div>
-
-				<!-- Workflow Controls -->
-				<div class="numel-config-section">
+					
+					<!-- Execution Controls -->
 					<div class="numel-workflow-controls">
 						<button id="startWorkflowBtn" class="numel-btn numel-btn-accent" disabled>
 							▶️ Start
@@ -120,6 +120,8 @@
 							⏹️ Stop
 						</button>
 					</div>
+					
+					<!-- Status -->
 					<div class="numel-config-row">
 						<label for="workflowStatus">Status:</label>
 						<div id="workflowStatus" class="numel-status numel-status-idle">No workflow</div>
@@ -208,7 +210,7 @@
 				<div id="sg-contextMenu" class="sg-context-menu"></div>
 				<input type="text" id="sg-nodeInput" class="sg-node-input-overlay" />
 
-				<!-- Collapsible Toolbar with Better Layout -->
+				<!-- Collapsible Toolbar -->
 				<div class="sg-zoom-indicator numel-toolbar" id="mainToolbar">
 					<button id="toolbarToggle" class="numel-toolbar-toggle" title="Toggle toolbar">
 						<span class="numel-toolbar-toggle-icon">▼</span>
@@ -221,26 +223,6 @@
 							<div class="sg-status">
 								<span class="sg-status-value" id="sg-modeDisplay">Chat</span>
 							</div>
-						</div>
-						
-						<!-- Workflow Tools Section -->
-						<div id="workflowTools" class="numel-toolbar-section toolbar-section-workflow" style="display: none;">
-							<span class="numel-toolbar-section-title">Node</span>
-							<select id="nodeTypeSelect" class="sg-drawing-style-select">
-								<option value="">Select type...</option>
-								<option value="start">🎬 Start</option>
-								<option value="end">🏁 End</option>
-								<option value="agent">🤖 Agent</option>
-								<option value="prompt">💭 Prompt</option>
-								<option value="tool">🔧 Tool</option>
-								<option value="transform">🔄 Transform</option>
-								<option value="decision">🔀 Decision</option>
-								<option value="merge">🔗 Merge</option>
-								<option value="parallel">⚡ Parallel</option>
-								<option value="loop">🔁 Loop</option>
-								<option value="user_input">👤 User Input</option>
-							</select>
-							<button id="addNodeBtn" class="sg-action-btn">➕ Add</button>
 						</div>
 						
 						<!-- Voice Section -->

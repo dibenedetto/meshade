@@ -28,16 +28,18 @@ body {
 	border-radius: 6px;
 	padding: 20px;
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-	flex: 1 1 0;  /* KEY CHANGE: Equal flex */
+	flex: 1 1 0;
 	min-width: 320px;
 	max-width: 600px;
 	display: flex;
 	flex-direction: column;
 	min-height: 0;
+	overflow: hidden;
 	transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .numel-title {
+	flex-shrink: 0;
 	margin: 0 0 20px 0;
 	font-size: 24px;
 	font-weight: 600;
@@ -50,14 +52,110 @@ body {
 	font-weight: 700;
 }
 
+/* Mode Switcher */
+.numel-mode-switcher {
+	flex-shrink: 0;
+	display: flex;
+	gap: 8px;
+	margin-bottom: 15px;
+	background: var(--sg-bg-tertiary);
+	padding: 4px;
+	border-radius: 6px;
+}
+
+.numel-mode-btn {
+	flex: 1;
+	padding: 8px 12px;
+	background: transparent;
+	border: none;
+	border-radius: 4px;
+	color: var(--sg-text-secondary);
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.numel-mode-btn:hover {
+	background: var(--sg-bg-quaternary);
+	color: var(--sg-text-primary);
+}
+
+.numel-mode-btn.active {
+	background: var(--sg-accent-blue);
+	color: #ffffff;
+}
+
+/* Mode Content - FIXED: Allow scrolling */
+.numel-mode-content {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
+	gap: 15px;
+}
+
+.numel-mode-content::-webkit-scrollbar {
+	width: 8px;
+}
+
+.numel-mode-content::-webkit-scrollbar-track {
+	background: var(--sg-bg-tertiary);
+}
+
+.numel-mode-content::-webkit-scrollbar-thumb {
+	background: var(--sg-bg-quaternary);
+	border-radius: 4px;
+}
+
+.numel-mode-content::-webkit-scrollbar-thumb:hover {
+	background: var(--sg-text-tertiary);
+}
+
 /* Config Sections */
 .numel-config-section {
-	margin-bottom: 15px;
+	flex-shrink: 0;
 	padding: 12px;
 	background: var(--sg-bg-tertiary);
 	border: 1px solid var(--sg-border-color);
 	border-radius: 6px;
 	transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.numel-config-section .numel-section-header {
+	margin-bottom: 8px;
+}
+
+.numel-section-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.numel-section-title {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--sg-text-secondary);
+	text-transform: uppercase;
+	letter-spacing: 0.8px;
+	margin: 0;
+}
+
+.numel-btn-icon {
+	background: transparent;
+	border: none;
+	padding: 4px 8px;
+	cursor: pointer;
+	font-size: 14px;
+	border-radius: 4px;
+	transition: background 0.15s ease;
+}
+
+.numel-btn-icon:hover {
+	background: var(--sg-bg-quaternary);
 }
 
 .numel-config-row {
@@ -129,6 +227,25 @@ body {
 	cursor: pointer;
 }
 
+.numel-config-row button {
+	flex: 1;
+	min-width: 0;
+}
+
+.numel-config-section.highlight {
+	animation: sectionPulse 0.5s ease-in-out;
+	border-left: 3px solid var(--sg-accent-blue);
+}
+
+@keyframes sectionPulse {
+	0%, 100% {
+		background: var(--sg-bg-tertiary);
+	}
+	50% {
+		background: rgba(70, 162, 218, 0.1);
+	}
+}
+
 /* Status */
 .numel-status {
 	flex: 1;
@@ -159,6 +276,17 @@ body {
 	background: rgba(220, 100, 100, 0.1);
 }
 
+/* Workflow Controls */
+.numel-workflow-controls {
+	display: flex;
+	gap: 8px;
+	margin: 8px 0;
+}
+
+.numel-workflow-controls button {
+	flex: 1;
+}
+
 /* Chat Container */
 .numel-chat-container {
 	flex: 1;
@@ -167,7 +295,6 @@ body {
 	overflow-y: auto;
 	padding: 15px;
 	background: var(--sg-bg-quaternary);
-	margin-bottom: 15px;
 	min-height: 200px;
 	transition: background-color 0.3s ease, border-color 0.3s ease;
 }
@@ -249,6 +376,7 @@ body {
 .numel-input-group {
 	display: flex;
 	gap: 8px;
+	flex-shrink: 0;
 }
 
 .numel-input-group input[type="text"] {
@@ -343,6 +471,7 @@ body {
 
 /* Loading */
 .numel-loading {
+	flex-shrink: 0;
 	display: none;
 	color: var(--sg-text-tertiary);
 	font-style: italic;
@@ -353,183 +482,106 @@ body {
 
 /* Graph Panel */
 .numel-graph-panel {
-	flex: 1 1 0;  /* KEY CHANGE: Equal flex */
+	flex: 1 1 0;
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
 }
 
-/* Canvas Container - Match panel shadow */
-.numel-graph-panel .sg-canvas-container {
+/* Canvas Container */
+.sg-canvas-container {
+	position: relative;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
 	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 	border: 1px solid var(--sg-border-color);
 	background: var(--sg-canvas-bg);
+	border-radius: 6px;
+	overflow: hidden;
 	transition: box-shadow 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
+}
+
+#sg-main-canvas {
+	flex: 1;
+	width: 100%;
+	height: 100%;
 }
 
 .numel-hidden-elements {
 	display: none;
 }
 
-/* Toolbar Adjustments */
-.numel-toolbar {
-	flex-wrap: wrap;
-	padding: 8px 12px;
-	gap: 8px;
-}
-
-/* Footer */
-.numel-footer {
-	position: fixed;
-	bottom: 10px;
-	left: 50%;
-	transform: translateX(-50%);
-	text-align: center;
-	font-size: 11px;
-	color: var(--sg-text-tertiary);
-	padding: 8px 16px;
-	background: var(--sg-bg-secondary);
-	border: 1px solid var(--sg-border-color);
-	border-radius: 4px;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.numel-footer a {
-	color: var(--sg-accent-blue);
-	text-decoration: none;
-	transition: color 0.15s ease;
-}
-
-.numel-footer a:hover {
-	color: var(--sg-accent-blue-light);
-	text-decoration: underline;
-}
-
-/* Responsive */
-@media (max-width: 1200px) {
-	body {
-		flex-direction: column;
-		padding: 15px 15px 50px 15px;
-	}
-
-	.numel-panel {
-		flex: 0 0 auto;
-		max-height: 50vh;
-	}
-
-	.numel-graph-panel {
-		flex: 1;
-		min-height: 400px;
-	}
-}
-
-* Config Management Buttons */
-#sg-exportConfigBtn,
-#sg-importConfigBtn {
-	background: var(--sg-accent-blue);
-	color: #ffffff;
-	font-weight: 600;
-	transition: all 0.2s ease;
-}
-
-#sg-exportConfigBtn:hover,
-#sg-importConfigBtn:hover {
-	background: var(--sg-accent-blue-light);
-	transform: translateY(-1px);
-	box-shadow: 0 3px 8px rgba(70, 162, 218, 0.3);
-}
-
-#sg-exportConfigBtn:active,
-#sg-importConfigBtn:active {
-	transform: translateY(0);
-}
-
-/* Highlight on first load */
-@keyframes pulseGlow {
-	0%, 100% {
-		box-shadow: 0 0 0 0 rgba(70, 162, 218, 0.4);
-	}
-	50% {
-		box-shadow: 0 0 0 8px rgba(70, 162, 218, 0);
-	}
-}
-
-.sg-toolbar-highlight {
-	animation: pulseGlow 2s ease-in-out 3;
-}
-
-/* Responsive adjustments */
-@media (max-width: 1400px) {
-	#sg-exportConfigBtn,
-	#sg-importConfigBtn {
-		padding: 8px 12px;
-		font-size: 12px;
-	}
-	
-	#sg-exportConfigBtn::before {
-		content: "📥 ";
-	}
-	
-	#sg-importConfigBtn::before {
-		content: "📤 ";
-	}
-	
-	#sg-exportConfigBtn {
-		/* Hide text on smaller screens, keep icon */
-	}
-}
-
-@media (max-width: 1200px) {
-	#sg-exportConfigBtn span,
-	#sg-importConfigBtn span {
-		display: none;
-	}
-}
-
 /* ========================================================================
-   COLLAPSIBLE TOOLBAR
+   TOOLBAR - Bottom Right Positioning
    ======================================================================== */
 
 .numel-toolbar {
-	position: relative;
+	position: absolute;
+	bottom: 16px;
+	right: 16px;
+	max-width: calc(100% - 32px);
+	z-index: 100;
+	padding: 12px 16px;
+	background: rgba(30, 30, 30, 0.95);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 6px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+	backdrop-filter: blur(10px);
 	transition: all 0.3s ease;
 }
 
 .numel-toolbar.collapsed {
-	height: 40px;
+	height: 44px;
 	overflow: hidden;
+	padding: 6px 16px;
 }
 
 .numel-toolbar.collapsed .numel-toolbar-content {
 	opacity: 0;
 	pointer-events: none;
+	max-height: 0;
 }
 
 .numel-toolbar-toggle {
 	position: absolute;
 	left: 50%;
-	top: 8px;
+	top: 10px;
 	transform: translateX(-50%);
-	background: var(--sg-bg-secondary);
+	background: var(--sg-bg-tertiary);
 	border: 1px solid var(--sg-border-color);
-	border-radius: 4px;
-	padding: 4px 12px;
+	border-radius: 6px;
+	padding: 6px 16px;
 	cursor: pointer;
-	font-size: 12px;
-	color: var(--sg-text-secondary);
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--sg-text-primary);
 	transition: all 0.2s ease;
 	z-index: 10;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .numel-toolbar-toggle:hover {
-	background: var(--sg-bg-tertiary);
-	color: var(--sg-text-primary);
-	border-color: var(--sg-border-highlight);
+	background: var(--sg-bg-quaternary);
+	border-color: var(--sg-accent-blue);
+	transform: translateX(-50%) translateY(-1px);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.numel-toolbar-toggle:active {
+	transform: translateX(-50%) translateY(0);
+}
+
+.numel-toolbar-toggle:focus {
+	outline: 2px solid var(--sg-accent-blue);
+	outline-offset: 2px;
 }
 
 .numel-toolbar-toggle-icon {
 	display: inline-block;
 	transition: transform 0.3s ease;
+	font-size: 10px;
+	margin-left: 4px;
 }
 
 .numel-toolbar.collapsed .numel-toolbar-toggle-icon {
@@ -537,158 +589,36 @@ body {
 }
 
 .numel-toolbar-content {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	padding-top: 28px;
-	transition: opacity 0.3s ease;
-	flex-wrap: wrap;
-}
-
-/* When collapsed, only show toggle button */
-.numel-toolbar.collapsed .numel-toolbar-toggle {
-	top: 8px;
-}
-
-/* Ensure toolbar has proper spacing */
-.sg-canvas-container {
-	position: relative;
-}
-
-/* ========================================================================
-   CONFIG SECTION ENHANCEMENTS
-   ======================================================================== */
-
-/* Make config and workflow sections more consistent */
-.numel-config-section .numel-section-header {
-	margin-bottom: 8px;
-}
-
-.numel-section-title {
-	font-size: 11px;
-	font-weight: 700;
-	color: var(--sg-text-secondary);
-	text-transform: uppercase;
-	letter-spacing: 0.8px;
-	margin: 0;
-}
-
-/* Config/Workflow button rows - equal width buttons */
-.numel-config-row button {
-	flex: 1;
-	min-width: 0; /* Allow buttons to shrink equally */
-}
-
-/* Highlight config section when first connected */
-.numel-config-section.highlight {
-	animation: sectionPulse 0.5s ease-in-out;
-	border-left: 3px solid var(--sg-accent-blue);
-}
-
-@keyframes sectionPulse {
-	0%, 100% {
-		background: var(--sg-bg-tertiary);
-	}
-	50% {
-		background: rgba(70, 162, 218, 0.1);
-	}
-}
-
-/* ========================================================================
-   RESPONSIVE ADJUSTMENTS
-   ======================================================================== */
-
-@media (max-width: 1400px) {
-	.numel-toolbar-content {
-		font-size: 11px;
-	}
-	
-	.sg-action-btn,
-	.sg-drawing-style-select,
-	.sg-layout-select {
-		padding: 6px 10px;
-		font-size: 11px;
-	}
-}
-
-@media (max-width: 1200px) {
-	/* Always show toolbar as collapsed on smaller screens */
-	.numel-toolbar {
-		height: 40px;
-	}
-	
-	.numel-toolbar-content {
-		display: none;
-	}
-	
-	.numel-toolbar.collapsed .numel-toolbar-content {
-		display: flex;
-	}
-	
-	/* Stack config buttons vertically on small screens */
-	.numel-config-row {
-		flex-direction: column;
-		gap: 6px;
-	}
-	
-	.numel-config-row button {
-		width: 100%;
-	}
-}
-
-/* ========================================================================
-   TOOLBAR ANIMATION POLISH
-   ======================================================================== */
-
-.numel-toolbar {
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.numel-toolbar.collapsed {
-	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-}
-
-/* Smooth transitions for all toolbar elements */
-.numel-toolbar * {
-	transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-/* Keep dividers subtle */
-.sg-divider {
-	opacity: 0.3;
-}
-
-/* ========================================================================
-   ACCESSIBILITY
-   ======================================================================== */
-
-.numel-toolbar-toggle:focus {
-	outline: 2px solid var(--sg-accent-blue);
-	outline-offset: 2px;
-}
-
-/* Keyboard navigation hint */
-.numel-toolbar-toggle[data-keyboard-hint]::after {
-	content: " (Space/Enter)";
-	font-size: 9px;
-	opacity: 0.6;
-}
-
-
-
-
-
-
-
-
-
-.numel-toolbar-content {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-	gap: 12px 16px;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 10px 12px;
 	padding-top: 36px;
 	transition: opacity 0.3s ease, max-height 0.3s ease;
-	max-height: 1000px;
+	max-height: 600px;
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+.numel-toolbar.collapsed .numel-toolbar-content {
+	padding-top: 0;
+}
+
+.numel-toolbar-content::-webkit-scrollbar {
+	width: 8px;
+}
+
+.numel-toolbar-content::-webkit-scrollbar-track {
+	background: var(--sg-bg-tertiary);
+	border-radius: 4px;
+}
+
+.numel-toolbar-content::-webkit-scrollbar-thumb {
+	background: var(--sg-bg-quaternary);
+	border-radius: 4px;
+}
+
+.numel-toolbar-content::-webkit-scrollbar-thumb:hover {
+	background: var(--sg-text-tertiary);
 }
 
 .numel-toolbar-section {
@@ -712,7 +642,273 @@ body {
 	min-width: fit-content;
 }
 
-/* Hide old dividers */
+.sg-voice-controls {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: nowrap;
+}
+
+.sg-status {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--sg-text-secondary);
+	padding: 6px 10px;
+	background: var(--sg-bg-tertiary);
+	border-radius: 4px;
+	border: 1px solid var(--sg-border-color);
+}
+
+.sg-status-value {
+	color: var(--sg-accent-blue);
+	font-weight: 700;
+}
+
+.sg-zoom-display {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	color: var(--sg-text-secondary);
+}
+
+.sg-zoom-value {
+	font-weight: 700;
+	color: var(--sg-text-primary);
+	min-width: 45px;
+	text-align: right;
+}
+
 .sg-divider {
 	display: none;
+}
+
+.sg-action-btn,
+.sg-theme-btn,
+.sg-zoom-reset-btn,
+.sg-voice-btn {
+	padding: 6px 12px;
+	font-size: 11px;
+	font-weight: 600;
+	border-radius: 4px;
+	border: 1px solid var(--sg-border-color);
+	background: var(--sg-bg-quaternary);
+	color: var(--sg-text-primary);
+	cursor: pointer;
+	transition: all 0.15s ease;
+	white-space: nowrap;
+}
+
+.sg-action-btn:hover,
+.sg-theme-btn:hover,
+.sg-zoom-reset-btn:hover,
+.sg-voice-btn:hover {
+	background: var(--sg-bg-tertiary);
+	border-color: var(--sg-accent-blue);
+	transform: translateY(-1px);
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.sg-action-btn:active,
+.sg-theme-btn:active,
+.sg-zoom-reset-btn:active,
+.sg-voice-btn:active {
+	transform: translateY(0);
+}
+
+.sg-action-btn:focus,
+.sg-theme-btn:focus,
+.sg-zoom-reset-btn:focus,
+.sg-voice-btn:focus {
+	outline: 2px solid var(--sg-accent-blue);
+	outline-offset: 2px;
+}
+
+.sg-drawing-style-select,
+.sg-layout-select {
+	padding: 6px 10px;
+	font-size: 11px;
+	border-radius: 4px;
+	border: 1px solid var(--sg-border-color);
+	background: var(--sg-bg-quaternary);
+	color: var(--sg-text-primary);
+	cursor: pointer;
+	transition: all 0.15s ease;
+	min-width: 140px;
+}
+
+.sg-drawing-style-select:hover,
+.sg-layout-select:hover {
+	border-color: var(--sg-accent-blue);
+	background: var(--sg-bg-tertiary);
+}
+
+.sg-drawing-style-select:focus,
+.sg-layout-select:focus {
+	outline: none;
+	border-color: var(--sg-accent-blue);
+	box-shadow: 0 0 0 2px rgba(70, 162, 218, 0.2);
+}
+
+/* Footer */
+.numel-footer {
+	position: fixed;
+	bottom: 10px;
+	left: 50%;
+	transform: translateX(-50%);
+	text-align: center;
+	font-size: 11px;
+	color: var(--sg-text-tertiary);
+	padding: 8px 16px;
+	background: var(--sg-bg-secondary);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 4px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+	z-index: 50;
+}
+
+.numel-footer a {
+	color: var(--sg-accent-blue);
+	text-decoration: none;
+	transition: color 0.15s ease;
+}
+
+.numel-footer a:hover {
+	color: var(--sg-accent-blue-light);
+	text-decoration: underline;
+}
+
+/* ========================================================================
+   RESPONSIVE ADJUSTMENTS
+   ======================================================================== */
+
+@media (min-width: 1800px) {
+	.numel-toolbar {
+		max-width: 900px;
+	}
+	
+	.numel-toolbar-content {
+		grid-template-columns: repeat(3, 1fr);
+	}
+}
+
+@media (min-width: 1400px) and (max-width: 1799px) {
+	.numel-toolbar {
+		max-width: 700px;
+	}
+	
+	.numel-toolbar-content {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (max-width: 1399px) {
+	.numel-toolbar {
+		max-width: 400px;
+	}
+	
+	.numel-toolbar-content {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 1200px) {
+	body {
+		flex-direction: column;
+		padding: 15px 15px 50px 15px;
+	}
+
+	.numel-panel {
+		flex: 0 0 auto;
+		max-width: none;
+		max-height: 50vh;
+	}
+
+	.numel-graph-panel {
+		flex: 1;
+		min-height: 400px;
+	}
+	
+	.numel-toolbar {
+		position: fixed;
+		bottom: 60px;
+		right: 10px;
+		left: 10px;
+		max-width: none;
+	}
+	
+	.numel-toolbar.collapsed {
+		height: 44px;
+	}
+	
+	.numel-toolbar-content {
+		max-height: 50vh;
+	}
+	
+	.numel-config-row {
+		flex-direction: column;
+		gap: 6px;
+	}
+	
+	.numel-config-row button {
+		width: 100%;
+	}
+}
+
+@media (max-width: 768px) {
+	.numel-toolbar {
+		bottom: 55px;
+		right: 5px;
+		left: 5px;
+		padding: 8px 12px;
+	}
+	
+	.numel-toolbar-toggle {
+		padding: 4px 12px;
+		font-size: 10px;
+	}
+	
+	.numel-toolbar-content {
+		gap: 8px;
+		max-height: 40vh;
+	}
+	
+	.numel-toolbar-section {
+		padding: 6px 8px;
+		flex-direction: column;
+		align-items: stretch;
+	}
+	
+	.sg-action-btn,
+	.sg-drawing-style-select,
+	.sg-layout-select {
+		width: 100%;
+	}
+}
+
+/* ========================================================================
+   BACKDROP FILTER FALLBACK
+   ======================================================================== */
+
+@supports not (backdrop-filter: blur(10px)) {
+	.numel-toolbar {
+		background: var(--sg-bg-secondary);
+		opacity: 0.98;
+	}
+}
+
+@media (prefers-color-scheme: dark) {
+	.numel-toolbar {
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+	}
+}
+
+@media (prefers-color-scheme: light) {
+	.numel-toolbar {
+		background: rgba(255, 255, 255, 0.95);
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+	}
 }

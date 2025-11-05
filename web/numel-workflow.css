@@ -602,3 +602,113 @@
 		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
 	}
 }
+
+/* ========================================================================
+   WORKFLOW CONTEXT MENU STYLES
+   Add these to your numel-workflow.css file
+   ======================================================================== */
+
+.sg-context-menu {
+	position: fixed;
+	background: var(--sg-bg-secondary);
+	border: 1px solid var(--sg-border-color);
+	border-radius: 8px;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+	padding: 8px 0;
+	min-width: 280px;
+	max-width: 320px;
+	z-index: 10000;
+	display: none;
+	backdrop-filter: blur(10px);
+}
+
+.sg-context-menu-title {
+	padding: 10px 16px 8px;
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--sg-text-secondary);
+	text-transform: uppercase;
+	letter-spacing: 0.8px;
+	border-bottom: 1px solid var(--sg-border-color);
+	margin-bottom: 4px;
+}
+
+.sg-context-menu-item {
+	padding: 10px 16px;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	transition: background-color 0.15s ease;
+}
+
+.sg-context-menu-item:hover {
+	background: var(--sg-bg-tertiary);
+}
+
+.sg-context-menu-item:active {
+	background: var(--sg-bg-quaternary);
+}
+
+.sg-context-menu-label {
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--sg-text-primary);
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.sg-context-menu-desc {
+	font-size: 11px;
+	color: var(--sg-text-tertiary);
+	font-style: italic;
+	margin-left: 24px;
+}
+
+/* Divider */
+.sg-context-menu-divider {
+	height: 1px;
+	background: var(--sg-border-color);
+	margin: 4px 0;
+}
+
+/* Animation */
+@keyframes contextMenuFadeIn {
+	from {
+		opacity: 0;
+		transform: scale(0.95);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+.sg-context-menu[style*="display: block"] {
+	animation: contextMenuFadeIn 0.15s ease;
+}
+
+/* Dark theme specific */
+@media (prefers-color-scheme: dark) {
+	.sg-context-menu {
+		background: rgba(30, 30, 30, 0.95);
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+	}
+}
+
+/* Light theme specific */
+@media (prefers-color-scheme: light) {
+	.sg-context-menu {
+		background: rgba(255, 255, 255, 0.95);
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+	}
+}
+
+/* Backdrop filter fallback */
+@supports not (backdrop-filter: blur(10px)) {
+	.sg-context-menu {
+		background: var(--sg-bg-secondary);
+		opacity: 0.98;
+	}
+}
