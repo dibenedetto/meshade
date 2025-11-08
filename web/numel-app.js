@@ -68,6 +68,15 @@ function initializeApp() {
 	// Initialize SchemaGraph
 	gGraph = new SchemaGraphApp("sg-main-canvas");
 
+	// Register workflow node creation callback for SchemaGraph context menu
+	gGraph.onAddWorkflowNode = function(nodeType, wx, wy) {
+		if (typeof addWorkflowNodeAtPosition === 'function') {
+			addWorkflowNodeAtPosition(nodeType, wx, wy);
+		} else {
+			console.error('addWorkflowNodeAtPosition not defined yet');
+		}
+	};
+
 	// Setup event listeners
 	setupEventListeners();
 }

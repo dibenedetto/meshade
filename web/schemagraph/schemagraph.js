@@ -317,6 +317,7 @@ class SchemaGraph extends Graph {
     this.eventBus = eventBus;
     this.schemas = {};
     this.nodeTypes = {};
+    this.enabledSchemas = new Set();
   }
 
   registerSchema(schemaName, schemaCode, indexType = 'int', rootType = null) {
@@ -335,6 +336,8 @@ class SchemaGraph extends Graph {
       };
       this._generateNodes(schemaName, parsed, indexType);
       
+      this.enabledSchemas.add(schemaName); // ✨ NEW: Auto-enable on registration
+      
       this.eventBus.emit('schema:registered', { schemaName, rootType });
       return true;
     } catch (e) {
@@ -342,6 +345,40 @@ class SchemaGraph extends Graph {
       this.eventBus.emit('error', { type: 'schema:register', error: e.message });
       return false;
     }
+  }
+
+  enableSchema(schemaName) {
+    if (this.schemas[schemaName]) {
+      this.enabledSchemas.add(schemaName);
+      this.eventBus.emit('schema:enabled', { schemaName });
+      return true;
+    }
+    return false;
+  }
+
+  disableSchema(schemaName) {
+    if (this.schemas[schemaName]) {
+      this.enabledSchemas.delete(schemaName);
+      this.eventBus.emit('schema:disabled', { schemaName });
+      return true;
+    }
+    return false;
+  }
+
+  toggleSchema(schemaName) {
+    if (this.enabledSchemas.has(schemaName)) {
+      return this.disableSchema(schemaName);
+    } else {
+      return this.enableSchema(schemaName);
+    }
+  }
+
+  isSchemaEnabled(schemaName) {
+    return this.enabledSchemas.has(schemaName);
+  }
+
+  getEnabledSchemas() {
+    return Array.from(this.enabledSchemas);
   }
 
   _createFieldMappingFromSchema(schemaCode, parsedModels, rootType) {
@@ -1392,6 +1429,7 @@ class SchemaGraphApp {
     this.spacePressed = false;
     this.editingNode = null;
     this.pendingSchemaCode = null;
+    this.customContextMenuHandler = null;
     
     this.themes = ['dark', 'light', 'ocean'];
     this.currentThemeIndex = 0;
@@ -2234,6 +2272,12 @@ class SchemaGraphApp {
       }
     }
     
+    // Check for custom context menu handler
+    if (this.customContextMenuHandler) {
+      const handled = this.customContextMenuHandler(clickedNode, wx, wy, data.coords);
+      if (handled) return; // Custom handler took over
+    }
+    
     this.showContextMenu(clickedNode, wx, wy, data.coords);
   }
 
@@ -2306,7 +2350,7 @@ class SchemaGraphApp {
         }
       }
     } else {
-      // Canvas context menu (rest remains the same)
+      // Canvas context menu - show ONLY ENABLED schemas
       html += '<div class="sg-context-menu-category">Native Types</div>';
       const natives = ['Native.String', 'Native.Integer', 'Native.Boolean', 'Native.Float', 'Native.List', 'Native.Dict'];
       for (const nativeType of natives) {
@@ -2314,8 +2358,15 @@ class SchemaGraphApp {
         html += '<div class="sg-context-menu-item" data-type="' + nativeType + '">' + name + '</div>';
       }
       
+      // ✨ CHANGED: Only show enabled schemas
       const registeredSchemas = Object.keys(this.graph.schemas);
       for (const schemaName of registeredSchemas) {
+        // Skip if schema is disabled
+        if (!this.graph.isSchemaEnabled(schemaName)) {
+          console.log('Skipping disabled schema in context menu:', schemaName);
+          continue;
+        }
+        
         const schemaTypes = [];
         const schemaInfo = this.graph.schemas[schemaName];
         let rootNodeType = null;
@@ -3838,16 +3889,42 @@ class SchemaGraphApp {
         if (type.indexOf(schemaName + '.') === 0) typeCount++;
       }
       
+      const isEnabled = this.graph.isSchemaEnabled(schemaName);
+      
       html += '<div class="sg-schema-item">';
       html += '<div><span class="sg-schema-item-name">' + schemaName + '</span>';
       html += '<span class="sg-schema-item-count">(' + typeCount + ' types, ' + nodeCount + ' nodes)</span></div>';
+      html += '<div style="display: flex; gap: 4px;">';
+      // ✨ NEW: Enable/Disable toggle button
+      html += '<button class="sg-schema-toggle-btn ' + (isEnabled ? 'enabled' : 'disabled') + '" data-schema="' + schemaName + '" title="' + (isEnabled ? 'Disable schema' : 'Enable schema') + '">';
+      html += (isEnabled ? '👁️ Enabled' : '🚫 Disabled');
+      html += '</button>';
       html += '<button class="sg-schema-remove-btn" data-schema="' + schemaName + '">Remove</button>';
+      html += '</div>';
       html += '</div>';
     }
     
     listEl.innerHTML = html;
     
-    const removeButtons = listEl.querySelectorAll('.schema-remove-btn');
+    // Setup toggle buttons
+    const toggleButtons = listEl.querySelectorAll('.sg-schema-toggle-btn');
+    for (const button of toggleButtons) {
+      button.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const schemaName = button.getAttribute('data-schema');
+        this.graph.toggleSchema(schemaName);
+        this.updateSchemaList(); // Refresh the list
+        this.eventBus.emit('ui:update', { 
+          id: 'status', 
+          content: `Schema "${schemaName}" ${this.graph.isSchemaEnabled(schemaName) ? 'enabled' : 'disabled'}` 
+        });
+        setTimeout(() => {
+          this.eventBus.emit('ui:update', { id: 'status', content: 'Right-click to add nodes.' });
+        }, 2000);
+      });
+    }
+    
+    const removeButtons = listEl.querySelectorAll('.sg-schema-remove-btn');
     for (const button of removeButtons) {
       button.addEventListener('click', () => {
         this.openSchemaRemovalDialog();
@@ -5013,6 +5090,60 @@ class SchemaGraphApp {
          */
         info: (name) => {
           return this.graph.getSchemaInfo(name);
+        },
+
+        /**
+         * Enable a schema (show in context menu)
+         * @param {string} name - Schema name
+         * @returns {boolean} Success status
+         */
+        enable: (name) => {
+          const success = this.graph.enableSchema(name);
+          if (success) {
+            this.updateSchemaList();
+          }
+          return success;
+        },
+
+        /**
+         * Disable a schema (hide from context menu)
+         * @param {string} name - Schema name
+         * @returns {boolean} Success status
+         */
+        disable: (name) => {
+          const success = this.graph.disableSchema(name);
+          if (success) {
+            this.updateSchemaList();
+          }
+          return success;
+        },
+
+        /**
+         * Toggle schema enabled/disabled state
+         * @param {string} name - Schema name
+         * @returns {boolean} New enabled state
+         */
+        toggle: (name) => {
+          this.graph.toggleSchema(name);
+          this.updateSchemaList();
+          return this.graph.isSchemaEnabled(name);
+        },
+
+        /**
+         * Check if schema is enabled
+         * @param {string} name - Schema name
+         * @returns {boolean} Enabled status
+         */
+        isEnabled: (name) => {
+          return this.graph.isSchemaEnabled(name);
+        },
+
+        /**
+         * Get list of enabled schemas
+         * @returns {string[]} Array of enabled schema names
+         */
+        listEnabled: () => {
+          return this.graph.getEnabledSchemas();
         }
       },
 
@@ -5897,6 +6028,23 @@ class SchemaGraphApp {
          */
         getEventBus: () => {
           return this.eventBus;
+        },
+
+        /**
+         * Set custom context menu handler
+         * @param {Function} handler - Handler function (clickedNode, wx, wy, coords) => boolean
+         * @returns {void}
+         */
+        setContextMenuHandler: (handler) => {
+          this.customContextMenuHandler = handler;
+        },
+        
+        /**
+         * Clear custom context menu handler
+         * @returns {void}
+         */
+        clearContextMenuHandler: () => {
+          this.customContextMenuHandler = null;
         }
       },
 

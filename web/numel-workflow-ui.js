@@ -1,5 +1,5 @@
 /* ========================================================================
-   NUMEL WORKFLOW UI - With Context Menu Node Creation
+   NUMEL WORKFLOW UI - COMPLETE REWRITE WITH FIXES
    ======================================================================== */
 
 // Global workflow state
@@ -67,7 +67,6 @@ function initWorkflowUI() {
 	modeDisplay = document.getElementById('sg-modeDisplay');
 	
 	setupWorkflowUIListeners();
-	setupContextMenuIntegration();
 	loadSampleWorkflows();
 }
 
@@ -95,236 +94,91 @@ function setupWorkflowUIListeners() {
 }
 
 // ========================================================================
-// CONTEXT MENU INTEGRATION
+// SYNCHRONIZATION HELPER
 // ========================================================================
 
-let lastContextMenuPos = { canvasX: 0, canvasY: 0 };
-let workflowContextMenuHandler = null;
+function syncPositionsToCurrentWorkflow() {
+	if (!workflowVisualizer || !currentWorkflow) return 0;
+	
+	let syncedCount = 0;
+	workflowVisualizer.workflowNodes.forEach((graphNode, index) => {
+		if (graphNode && graphNode.pos && currentWorkflow.nodes[index]) {
+			currentWorkflow.nodes[index].position = {
+				x: Math.round(graphNode.pos[0]),
+				y: Math.round(graphNode.pos[1])
+			};
+			syncedCount++;
+		}
+	});
+	
+	// Keep visualizer reference in sync
+	workflowVisualizer.currentWorkflow = currentWorkflow;
 
-function setupContextMenuIntegration() {
-	const canvas = document.getElementById('sg-main-canvas');
-	
-	// Create the handler function
-	workflowContextMenuHandler = (e) => {
-		// Only handle in workflow mode
-		if (!workflowModeBtn.classList.contains('active')) {
-			return; // Let event propagate normally in chat mode
-		}
-		
-		// Check if click is on a node - if so, don't show custom menu
-		const rect = canvas.getBoundingClientRect();
-		const canvasX = e.clientX - rect.left;
-		const canvasY = e.clientY - rect.top;
-		
-		// Check if we clicked on a node using SchemaGraph's nodeAtPoint method
-		let clickedNode = null;
-		if (gGraph && gGraph.canvas && gGraph.canvas.nodeAtPoint) {
-			clickedNode = gGraph.canvas.nodeAtPoint(canvasX, canvasY);
-		} else if (workflowVisualizer && workflowVisualizer.schemaGraph && 
-		           workflowVisualizer.schemaGraph.canvas && 
-		           workflowVisualizer.schemaGraph.canvas.nodeAtPoint) {
-			clickedNode = workflowVisualizer.schemaGraph.canvas.nodeAtPoint(canvasX, canvasY);
-		}
-		
-		if (clickedNode) {
-			// Clicked on a node - let SchemaGraph handle it (show its context menu)
-			console.log('Clicked on node, showing SchemaGraph context menu');
-			return;
-		}
-		
-		// Clicked on empty space - show our custom menu
-		console.log('Clicked on empty space, showing workflow node menu');
-		e.preventDefault();
-		e.stopPropagation();
-		
-		lastContextMenuPos.canvasX = canvasX;
-		lastContextMenuPos.canvasY = canvasY;
-		
-		showWorkflowContextMenu(e.clientX, e.clientY);
-	};
-	
-	// Add listener in capture phase
-	canvas.addEventListener('contextmenu', workflowContextMenuHandler, true);
-	
-	// Close context menu on any click outside of it
-	document.addEventListener('click', (e) => {
-		const contextMenu = document.getElementById('sg-contextMenu');
-		if (contextMenu && contextMenu.style.display === 'block') {
-			const rect = contextMenu.getBoundingClientRect();
-			const isInside = (
-				e.clientX >= rect.left &&
-				e.clientX <= rect.right &&
-				e.clientY >= rect.top &&
-				e.clientY <= rect.bottom
-			);
-			
-			if (!isInside) {
-				contextMenu.style.display = 'none';
-			}
-		}
-	});
-	
-	// Close on Escape key
-	document.addEventListener('keydown', (e) => {
-		if (e.key === 'Escape') {
-			const contextMenu = document.getElementById('sg-contextMenu');
-			if (contextMenu) {
-				contextMenu.style.display = 'none';
-			}
-		}
-	});
+	// CRITICAL: Update workflow library
+	const selectedKey = workflowSelect.value;
+	if (selectedKey) {
+		workflowLibrary.set(selectedKey, currentWorkflow);
+	}
+
+	return syncedCount;
 }
 
-function showWorkflowContextMenu(screenX, screenY) {
-	const contextMenu = document.getElementById('sg-contextMenu');
-	if (!contextMenu) return;
-	
-	const nodeTypes = [
-		{ value: 'start', label: '🎬 Start Node', desc: 'Entry point' },
-		{ value: 'end', label: '🏁 End Node', desc: 'Exit point' },
-		{ value: 'agent', label: '🤖 Agent Node', desc: 'AI agent execution' },
-		{ value: 'prompt', label: '💭 Prompt Node', desc: 'Template prompt' },
-		{ value: 'tool', label: '🔧 Tool Node', desc: 'External tool call' },
-		{ value: 'transform', label: '🔄 Transform Node', desc: 'Data transformation' },
-		{ value: 'decision', label: '🔀 Decision Node', desc: 'Conditional branching' },
-		{ value: 'merge', label: '🔗 Merge Node', desc: 'Combine branches' },
-		{ value: 'parallel', label: '⚡ Parallel Node', desc: 'Parallel execution' },
-		{ value: 'loop', label: '🔁 Loop Node', desc: 'Iteration loop' },
-		{ value: 'user_input', label: '👤 User Input Node', desc: 'Request user input' }
-	];
-	
-	let menuHTML = '<div class="sg-context-menu-title">Add Workflow Node</div>';
-	
-	nodeTypes.forEach(nodeType => {
-		menuHTML += `
-			<div class="sg-context-menu-item" data-node-type="${nodeType.value}">
-				<span class="sg-context-menu-label">${nodeType.label}</span>
-				<span class="sg-context-menu-desc">${nodeType.desc}</span>
-			</div>
-		`;
-	});
-	
-	contextMenu.innerHTML = menuHTML;
-	
-	// Position the menu
-	contextMenu.style.display = 'block';
-	contextMenu.style.left = `${screenX}px`;
-	contextMenu.style.top = `${screenY}px`;
-	
-	// Make sure menu stays on screen
-	setTimeout(() => {
-		const rect = contextMenu.getBoundingClientRect();
-		if (rect.right > window.innerWidth) {
-			contextMenu.style.left = `${screenX - rect.width}px`;
-		}
-		if (rect.bottom > window.innerHeight) {
-			contextMenu.style.top = `${screenY - rect.height}px`;
-		}
-	}, 0);
-	
-	// Add click handlers to menu items (must be after innerHTML is set)
-	const menuItems = contextMenu.querySelectorAll('.sg-context-menu-item');
-	menuItems.forEach(item => {
-		item.addEventListener('click', (e) => {
-			e.stopPropagation();
-			const nodeType = item.getAttribute('data-node-type');
-			console.log('Context menu clicked:', nodeType);
-			addWorkflowNodeAtPosition(nodeType);
-			contextMenu.style.display = 'none';
-		});
-	});
-}
+// ========================================================================
+// CUSTOM CONTEXT MENU HANDLER
+// ========================================================================
 
-function addWorkflowNodeAtPosition(nodeType) {
+function addWorkflowNodeAtPosition(nodeType, wx, wy) {
+	console.log('=== ADD NODE DEBUG START ===');
+	console.log('currentWorkflow before add:', currentWorkflow);
+	console.log('nodes.length before add:', currentWorkflow?.nodes.length);
+	
 	if (!currentWorkflow || !workflowVisualizer) {
 		alert('Please load a workflow first');
 		return;
 	}
-	
-	console.log('Adding node at canvas position:', lastContextMenuPos);
-	
-	// Use canvas coordinates directly
-	const graphPos = {
-		x: lastContextMenuPos.canvasX,
-		y: lastContextMenuPos.canvasY
-	};
-	
-	console.log('Using position:', graphPos);
 	
 	const nodeId = `${nodeType}_${Date.now()}`;
 	const node = {
 		id: nodeId,
 		type: nodeType,
 		label: nodeType.charAt(0).toUpperCase() + nodeType.slice(1).replace('_', ' '),
-		position: { x: graphPos.x, y: graphPos.y }
+		position: { x: Math.round(wx), y: Math.round(wy) }
 	};
 	
-	// Add node configuration based on type
 	switch(nodeType) {
-		case 'agent':
-			node.agent_index = 0;
-			break;
-		case 'prompt':
-			node.template = 'Enter your prompt template here';
-			break;
-		case 'tool':
-			node.tool_index = 0;
-			break;
-		case 'transform':
-			node.operation = 'pass_through';
-			break;
-		case 'decision':
-			node.conditions = [];
-			break;
-		case 'loop':
-			node.max_iterations = 10;
-			break;
-		case 'user_input':
-			node.prompt = 'Please provide input:';
-			break;
+		case 'agent': node.agent_index = 0; break;
+		case 'prompt': node.template = 'Enter your prompt template here'; break;
+		case 'tool': node.tool_index = 0; break;
+		case 'transform': node.operation = 'pass_through'; break;
+		case 'decision': node.conditions = []; break;
+		case 'loop': node.max_iterations = 10; break;
+		case 'user_input': node.prompt = 'Please provide input:'; break;
 	}
 	
-	// Add to workflow
-	const nodeIndex = currentWorkflow.nodes.length;
+	syncPositionsToCurrentWorkflow();
+	
 	currentWorkflow.nodes.push(node);
 	
-	console.log('Node added to workflow:', node);
-	console.log('Total nodes:', currentWorkflow.nodes.length);
+	console.log('nodes.length after add:', currentWorkflow.nodes.length);
+	console.log('workflowLibrary has key:', workflowSelect.value, '?', workflowLibrary.has(workflowSelect.value));
+	console.log('library workflow nodes.length:', workflowLibrary.get(workflowSelect.value)?.nodes.length);
 	
-	// Add node directly to the visualizer without reloading entire workflow
-	if (workflowVisualizer && workflowVisualizer.addNode) {
-		// If visualizer has an addNode method, use it
-		workflowVisualizer.addNode(node, nodeIndex);
-	} else if (workflowVisualizer) {
-		// Otherwise, just update the current workflow and redraw without layout
-		// First, export current positions to preserve them
-		const exported = workflowVisualizer.exportWorkflow();
-		if (exported && exported.nodes) {
-			// Update positions in currentWorkflow
-			currentWorkflow.nodes.forEach((n, idx) => {
-				if (exported.nodes[idx]) {
-					n.position = exported.nodes[idx].position;
-				}
-			});
-		}
-		// Now reload with the new node
-		workflowVisualizer.loadWorkflow(currentWorkflow, false);
-	}
+	workflowVisualizer.savedWorkflowViewState = null;
+	workflowVisualizer.loadWorkflow(currentWorkflow, false, false);
 	
-	addEventLogItem('system', `➕ Added ${nodeType} node at (${Math.round(graphPos.x)}, ${Math.round(graphPos.y)})`);
+	if (gGraph?.api?.util) gGraph.api.util.redraw();
+	
+	addEventLogItem('system', `➕ Added ${nodeType} node [${currentWorkflow.nodes.length - 1}]`);
+	console.log('=== ADD NODE DEBUG END ===');
 }
 
 // ========================================================================
 // MODE SWITCHING
 // ========================================================================
 
-function switchMode(mode) {
-	// Clear any open context menu when switching modes
-	const contextMenu = document.getElementById('sg-contextMenu');
-	if (contextMenu) {
-		contextMenu.style.display = 'none';
-		// Don't clear innerHTML - SchemaGraph might need it in chat mode
-	}
+async function switchMode(mode) {
+	console.log('=== SWITCHING MODE TO:', mode, '===');
+	console.log('Current workflow:', currentWorkflow ? `${currentWorkflow.nodes.length} nodes` : 'none');
 	
 	if (mode === 'chat') {
 		chatModeBtn.classList.add('active');
@@ -333,41 +187,93 @@ function switchMode(mode) {
 		workflowMode.style.display = 'none';
 		modeDisplay.textContent = 'Chat';
 		
+		// Sync positions before exiting
+		if (workflowVisualizer && workflowVisualizer.isInWorkflowMode() && currentWorkflow) {
+			// CRITICAL: Sync positions
+			workflowVisualizer.workflowNodes.forEach((graphNode, index) => {
+				if (graphNode && graphNode.pos && currentWorkflow.nodes[index]) {
+					currentWorkflow.nodes[index].position = {
+						x: Math.round(graphNode.pos[0]),
+						y: Math.round(graphNode.pos[1])
+					};
+				}
+			});
+			
+			// CRITICAL: Keep both references pointing to same object
+			workflowVisualizer.currentWorkflow = currentWorkflow;
+			
+			console.log(`💾 Synced ${currentWorkflow.nodes.length} nodes (${workflowVisualizer.workflowNodes.length} in visualizer)`);
+		}
+
+		// Disable workflow schema, enable chat schemas
+		if (gGraph && gGraph.api && gGraph.api.schema) {
+			const schemas = gGraph.api.schema.list();
+			schemas.forEach(schemaName => {
+				if (schemaName === WORKFLOW_SCHEMA_NAME) {
+					gGraph.api.schema.disable(WORKFLOW_SCHEMA_NAME);
+				} else {
+					gGraph.api.schema.enable(schemaName);
+				}
+			});
+		}
+		
+		// Exit workflow mode
 		if (workflowVisualizer && workflowVisualizer.isInWorkflowMode()) {
-			if (currentWorkflow) {
-				currentWorkflow = workflowVisualizer.exportWorkflow() || currentWorkflow;
-			}
 			workflowVisualizer.exitWorkflowMode();
 		}
 		
-		// Force a small delay to allow SchemaGraph to reinitialize its context menu
-		setTimeout(() => {
-			if (gGraph && gGraph.canvas) {
-				gGraph.canvas.draw();
-			}
-		}, 100);
-		
+		// Redraw canvas
+		if (gGraph && gGraph.api && gGraph.api.util) {
+			setTimeout(() => {
+				gGraph.api.util.redraw();
+			}, 100);
+		}
 	} else {
+		console.log('=== SWITCH TO WORKFLOW DEBUG ===');
+		console.log('currentWorkflow at start:', currentWorkflow);
+		console.log('nodes.length at start:', currentWorkflow?.nodes.length);
+		console.log('workflowSelect.value:', workflowSelect.value);
+		console.log('library workflow nodes.length:', workflowLibrary.get(workflowSelect.value)?.nodes.length);
+		
 		chatModeBtn.classList.remove('active');
 		workflowModeBtn.classList.add('active');
 		chatMode.style.display = 'none';
 		workflowMode.style.display = 'flex';
 		modeDisplay.textContent = 'Workflow';
 		
-		if (!workflowClient && gApp) {
-			initWorkflowClient();
+		if (!workflowClient && gGraph) {
+			await initWorkflowClient();
 		}
-
-		if (workflowVisualizer) {
-			if (!workflowVisualizer.isInWorkflowMode()) {
-				workflowVisualizer.enterWorkflowMode();
-			}
-			
-			if (currentWorkflow) {
-				workflowVisualizer.loadWorkflow(currentWorkflow, false);
-			}
+		
+		if (gGraph && gGraph.api && gGraph.api.schema) {
+			const schemas = gGraph.api.schema.list();
+			schemas.forEach(schemaName => {
+				if (schemaName === WORKFLOW_SCHEMA_NAME) {
+					gGraph.api.schema.enable(WORKFLOW_SCHEMA_NAME);
+				} else {
+					gGraph.api.schema.disable(schemaName);
+				}
+			});
+		}
+		
+		if (workflowVisualizer && !workflowVisualizer.isInWorkflowMode()) {
+			workflowVisualizer.enterWorkflowMode();
+		}
+		
+		// CRITICAL FIX: Restore dropdown selection if currentWorkflow exists
+		if (currentWorkflow && window.currentWorkflowKey) {
+			workflowSelect.value = window.currentWorkflowKey;
+			console.log('Restored dropdown to:', window.currentWorkflowKey);
+		}
+		
+		if (currentWorkflow && workflowVisualizer) {
+			console.log('📋 Reloading workflow with', currentWorkflow.nodes.length, 'nodes');
+			workflowVisualizer.loadWorkflow(currentWorkflow, false, true);
+			console.log('✅ Loaded', workflowVisualizer.workflowNodes.length, 'nodes into visualizer');
 		}
 	}
+
+	console.log('=== MODE SWITCH COMPLETE ===');
 }
 
 // ========================================================================
@@ -384,11 +290,181 @@ async function initWorkflowClient() {
 		await loadWorkflowSchema();
 	} catch (error) {
 		console.error('Failed to load workflow schema:', error);
-		addEventLogItem('workflow-failed', '⚠️ Warning: Workflow schema not loaded - using basic visualization');
+		addEventLogItem('workflow-failed', '⚠️ Warning: Workflow schema not loaded');
 	}
 	
 	workflowClient.connectWebSocket();
 	setupWorkflowEventHandlers();
+	
+	// CRITICAL: Track if we're loading workflow to avoid duplicate interception
+	let isLoadingWorkflow = false;
+	
+	// Override loadWorkflow to set flag
+	const originalLoadWorkflow = workflowVisualizer.loadWorkflow.bind(workflowVisualizer);
+	workflowVisualizer.loadWorkflow = function(workflow, applyLayout, restoreView) {
+		isLoadingWorkflow = true;
+		const result = originalLoadWorkflow(workflow, applyLayout, restoreView);
+		isLoadingWorkflow = false;
+		return result;
+	};
+	
+	// CRITICAL: Intercept at LiteGraph level for node creation
+	const originalGraphAdd = gGraph.graph.add;
+	gGraph.graph.add = function(node, skipComputeOrder) {
+		const result = originalGraphAdd.call(this, node, skipComputeOrder);
+		
+		// If manually added in workflow mode (not during loadWorkflow)
+		if (node && !isLoadingWorkflow && workflowVisualizer?.isInWorkflowMode() && currentWorkflow) {
+			const nodeTitle = node.title;
+			
+			if (nodeTitle && nodeTitle.startsWith('workflow.')) {
+				console.log('🔧 Manual workflow node added:', nodeTitle);
+				
+				const workflowType = nodeTitle.split('.')[1]?.replace('NodeConfig', '').toLowerCase();
+				
+				const workflowNode = {
+					id: `${workflowType}_${Date.now()}`,
+					type: workflowType,
+					label: workflowType.charAt(0).toUpperCase() + workflowType.slice(1),
+					position: { x: Math.round(node.pos[0]), y: Math.round(node.pos[1]) }
+				};
+				
+				currentWorkflow.nodes.push(workflowNode);
+				workflowVisualizer.currentWorkflow = currentWorkflow;
+				
+				node.workflowData = {
+					index: currentWorkflow.nodes.length - 1,
+					id: workflowNode.id,
+					type: workflowNode.type,
+					label: workflowNode.label,
+					status: 'pending',
+					nodeConfig: workflowNode
+				};
+				
+				node.color = workflowVisualizer.getNodeColor(workflowType);
+				workflowVisualizer.workflowNodes[currentWorkflow.nodes.length - 1] = node;
+				
+				console.log('✅ Added to currentWorkflow, total:', currentWorkflow.nodes.length);
+			}
+		}
+		
+		return result;
+	};
+
+	// CRITICAL: Intercept node removal at SchemaGraphApp level (FIXED)
+	const originalRemoveNode = gGraph.removeNode.bind(gGraph);
+	gGraph.removeNode = function(node) {
+		// If removing in workflow mode (not during loadWorkflow)
+		if (node && !isLoadingWorkflow && workflowVisualizer?.isInWorkflowMode() && currentWorkflow) {
+			const nodeIndex = workflowVisualizer.workflowNodes.indexOf(node);
+			
+			if (nodeIndex >= 0) {
+				console.log('🗑️ Removing workflow node at index:', nodeIndex);
+				
+				// Remove from currentWorkflow.nodes
+				currentWorkflow.nodes.splice(nodeIndex, 1);
+				
+				// Remove from workflowVisualizer.workflowNodes
+				workflowVisualizer.workflowNodes.splice(nodeIndex, 1);
+				
+				// Update indices in remaining nodes
+				for (let i = nodeIndex; i < workflowVisualizer.workflowNodes.length; i++) {
+					const graphNode = workflowVisualizer.workflowNodes[i];
+					if (graphNode && graphNode.workflowData) {
+						graphNode.workflowData.index = i;
+					}
+				}
+				
+				// Update edges - shift indices
+				currentWorkflow.edges = currentWorkflow.edges
+					.filter(e => e.source !== nodeIndex && e.target !== nodeIndex)
+					.map(e => ({
+						...e,
+						source: e.source > nodeIndex ? e.source - 1 : e.source,
+						target: e.target > nodeIndex ? e.target - 1 : e.target
+					}));
+				
+				workflowVisualizer.currentWorkflow = currentWorkflow;
+				console.log('✅ Removed from workflow, remaining:', currentWorkflow.nodes.length);
+			}
+		}
+		
+		return originalRemoveNode(node);
+	};
+
+	// CRITICAL: Intercept link creation
+	const originalConnect = gGraph.graph.connect;
+	gGraph.graph.connect = function(node1, slot1, node2, slot2, type) {
+		const linkId = originalConnect.call(this, node1, slot1, node2, slot2, type);
+		
+		if (linkId && !isLoadingWorkflow && workflowVisualizer?.isInWorkflowMode() && currentWorkflow) {
+			const sourceIndex = workflowVisualizer.workflowNodes.indexOf(node1);
+			const targetIndex = workflowVisualizer.workflowNodes.indexOf(node2);
+			
+			if (sourceIndex >= 0 && targetIndex >= 0) {
+				const edge = { source: sourceIndex, target: targetIndex };
+				currentWorkflow.edges.push(edge);
+				workflowVisualizer.currentWorkflow = currentWorkflow;
+				console.log('✅ Added edge to workflow:', edge);
+			}
+		}
+		
+		return linkId;
+	};
+
+	// CRITICAL: Intercept link removal - BOTH methods
+	const originalRemoveLink = gGraph.removeLink.bind(gGraph);
+	gGraph.removeLink = function(linkId, targetNode, targetSlot) {
+		if (!isLoadingWorkflow && workflowVisualizer?.isInWorkflowMode() && currentWorkflow) {
+			const link = gGraph.graph.links[linkId];
+			
+			if (link) {
+				const sourceNode = gGraph.graph.getNodeById(link.origin_id);
+				const targetNode = gGraph.graph.getNodeById(link.target_id);
+				
+				const sourceIndex = workflowVisualizer.workflowNodes.indexOf(sourceNode);
+				const targetIndex = workflowVisualizer.workflowNodes.indexOf(targetNode);
+				
+				if (sourceIndex >= 0 && targetIndex >= 0) {
+					// Remove from currentWorkflow.edges
+					currentWorkflow.edges = currentWorkflow.edges.filter(e => 
+						!(e.source === sourceIndex && e.target === targetIndex)
+					);
+					workflowVisualizer.currentWorkflow = currentWorkflow;
+					console.log('✅ Removed edge from workflow (removeLink):', sourceIndex, '->', targetIndex);
+				}
+			}
+		}
+		
+		return originalRemoveLink(linkId, targetNode, targetSlot);
+	};
+
+	const originalDisconnectLink = gGraph.disconnectLink.bind(gGraph);
+	gGraph.disconnectLink = function(linkId) {
+		if (!isLoadingWorkflow && workflowVisualizer?.isInWorkflowMode() && currentWorkflow) {
+			const link = gGraph.graph.links[linkId];
+			
+			if (link) {
+				const sourceNode = gGraph.graph.getNodeById(link.origin_id);
+				const targetNode = gGraph.graph.getNodeById(link.target_id);
+				
+				const sourceIndex = workflowVisualizer.workflowNodes.indexOf(sourceNode);
+				const targetIndex = workflowVisualizer.workflowNodes.indexOf(targetNode);
+				
+				if (sourceIndex >= 0 && targetIndex >= 0) {
+					// Remove from currentWorkflow.edges
+					currentWorkflow.edges = currentWorkflow.edges.filter(e => 
+						!(e.source === sourceIndex && e.target === targetIndex)
+					);
+					workflowVisualizer.currentWorkflow = currentWorkflow;
+					console.log('✅ Removed edge from workflow (disconnectLink):', sourceIndex, '->', targetIndex);
+				}
+			}
+		}
+		
+		return originalDisconnectLink(linkId);
+	};
+
 	addEventLogItem('system', 'Workflow client initialized');
 }
 
@@ -406,7 +482,12 @@ async function loadWorkflowSchema() {
 	workflowSchemaCode = schemaData.schema;
 	workflowVisualizer.registerWorkflowSchema(workflowSchemaCode);
 	
-	console.log('✅ Workflow schema loaded and registered');
+	// Disable workflow schema by default
+	if (gGraph && gGraph.api && gGraph.api.schema) {
+		gGraph.api.schema.disable(WORKFLOW_SCHEMA_NAME);
+	}
+	
+	console.log('✅ Workflow schema loaded');
 }
 
 function setupWorkflowEventHandlers() {
@@ -446,7 +527,7 @@ function setupWorkflowEventHandlers() {
 	});
 	
 	workflowClient.on('workflow.cancelled', (event) => {
-		addEventLogItem('workflow-failed', `⏹️ Workflow cancelled`);
+		addEventLogItem('workflow-failed', `ℹ️ Workflow cancelled`);
 		stopExecutionTimer();
 		updateWorkflowControls('idle');
 		refreshExecutionsList();
@@ -465,7 +546,7 @@ function setupWorkflowEventHandlers() {
 	workflowClient.on('node.completed', (event) => {
 		const nodeIndex = parseInt(event.node_id);
 		const nodeLabel = event.data?.node_label || `Node ${nodeIndex}`;
-		addEventLogItem('node-completed', `✔ [${nodeIndex}] ${nodeLabel} completed`);
+		addEventLogItem('node-completed', `✓ [${nodeIndex}] ${nodeLabel} completed`);
 		if (workflowVisualizer) {
 			workflowVisualizer.updateNodeState(nodeIndex, { 
 				status: 'completed',
@@ -503,7 +584,7 @@ function setupWorkflowEventHandlers() {
 	});
 	
 	workflowClient.on('user_input.received', (event) => {
-		addEventLogItem('user-input-requested', `✔ User input received`);
+		addEventLogItem('user-input-requested', `✓ User input received`);
 	});
 }
 
@@ -546,19 +627,19 @@ function onWorkflowSelected() {
 	
 	currentWorkflow = workflowLibrary.get(key);
 	if (currentWorkflow && workflowVisualizer) {
-		workflowVisualizer.loadWorkflow(currentWorkflow, true);
+		console.log('📂 Loading selected workflow:', key);
+		console.log('Workflow has', currentWorkflow.nodes.length, 'nodes');
+		
+		// CRITICAL: Store the selected key globally
+		window.currentWorkflowKey = key;
+		
+		workflowVisualizer.savedWorkflowViewState = null;
+		workflowVisualizer.loadWorkflow(currentWorkflow, true, false);
+		
 		startWorkflowBtn.disabled = false;
 		downloadWorkflowBtn.disabled = false;
 		updateWorkflowStatus('idle', 'Ready');
 		addEventLogItem('system', `📂 Loaded workflow: ${currentWorkflow.info?.name || key}`);
-		
-		if (currentWorkflow.edges) {
-			currentWorkflow.edges.forEach((edge, idx) => {
-				if (edge.condition) {
-					console.log(`Edge ${idx}: [${edge.source}] -> [${edge.target}]`, edge.condition);
-				}
-			});
-		}
 	}
 }
 
@@ -572,8 +653,10 @@ function downloadWorkflowToFile() {
 		return;
 	}
 	
-	const exportedWorkflow = workflowVisualizer.exportWorkflow();
-	const json = JSON.stringify(exportedWorkflow || currentWorkflow, null, 2);
+	// Sync positions from graph before download
+	syncPositionsToCurrentWorkflow();
+	
+	const json = JSON.stringify(currentWorkflow, null, 2);
 	const blob = new Blob([json], { type: 'application/json' });
 	const url = URL.createObjectURL(blob);
 	
@@ -601,7 +684,8 @@ function handleWorkflowFileUpload(event) {
 			
 			currentWorkflow = workflow;
 			if (workflowVisualizer) {
-				workflowVisualizer.loadWorkflow(currentWorkflow, true);
+				workflowVisualizer.savedWorkflowViewState = null;
+				workflowVisualizer.loadWorkflow(currentWorkflow, true, false);
 			}
 			
 			addEventLogItem('system', `📂 Workflow uploaded: ${key}`);
@@ -670,7 +754,7 @@ async function stopWorkflow() {
 	try {
 		stopWorkflowBtn.disabled = true;
 		await workflowClient.cancelWorkflow(currentExecutionId);
-		addEventLogItem('system', '⏹️ Workflow stopped');
+		addEventLogItem('system', 'ℹ️ Workflow stopped');
 	} catch (error) {
 		addEventLogItem('workflow-failed', `❌ Failed to stop workflow: ${error.message}`);
 	} finally {
@@ -894,6 +978,14 @@ window.connect = async function() {
 		}
 	}, 500);
 };
+
+// Make function globally accessible for SchemaGraph context menu
+window.addWorkflowNodeAtPosition = addWorkflowNodeAtPosition;
+
+// Register with SchemaGraph if it exists
+if (typeof gGraph !== 'undefined' && gGraph) {
+	gGraph.onAddWorkflowNode = addWorkflowNodeAtPosition;
+}
 
 if (document.readyState === 'loading') {
 	document.addEventListener('DOMContentLoaded', initWorkflowUI);
