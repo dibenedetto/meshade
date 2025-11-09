@@ -42,8 +42,8 @@ def unroll_config(config: AppConfig) -> AppConfig:
 		if not config_copy.tools            : config_copy.tools            = []
 		if not config_copy.agent_options    : config_copy.agent_options    = []
 		if not config_copy.agents           : config_copy.agents           = []
-		if not config_copy.team_options     : config_copy.team_options     = []
-		if not config_copy.teams            : config_copy.teams            = []
+		# if not config_copy.team_options     : config_copy.team_options     = []
+		# if not config_copy.teams            : config_copy.teams            = []
 		# if not config_copy.workflow_options : config_copy.workflow_options = []
 		# if not config_copy.workflows        : config_copy.workflows        = []
 
@@ -322,15 +322,15 @@ def validate_config(config: AppConfig) -> bool:
 			# TODO: check agent
 			pass
 
-	if True:
-		for team_option in config.team_options:
-			# TODO: check team_option
-			pass
+	# if True:
+	# 	for team_option in config.team_options:
+	# 		# TODO: check team_option
+	# 		pass
 
-	if True:
-		for team in config.teams:
-			# TODO: check team
-			pass
+	# if True:
+	# 	for team in config.teams:
+	# 		# TODO: check team
+	# 		pass
 
 	# if True:
 	# 	for workflow_option in config.workflow_options:
@@ -371,8 +371,8 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 	extracted.tools            = []
 	extracted.agent_options    = []
 	extracted.agents           = []
-	extracted.team_options     = []
-	extracted.teams            = []
+	# extracted.team_options     = []
+	# extracted.teams            = []
 	# extracted.workflow_options = []
 	# extracted.workflows        = []
 

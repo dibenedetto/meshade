@@ -222,6 +222,8 @@ async function disconnect() {
 	uploadConfigBtn.disabled = true;
 	newConfigBtn.disabled = true;
 
+	enableInput(false);
+
 	gGraph.api.schema.remove(SCHEMA_NAME);
 
 	if (gApp) {
@@ -236,7 +238,6 @@ async function disconnect() {
 	messageInput.value = "";
 
 	updateStatus("disconnected", "Disconnected");
-	enableInput(false);
 	connectButton.textContent = "Connect";
 	connectButton.classList.remove("numel-btn-accent-red");
 	connectButton.classList.add("numel-btn-accent");

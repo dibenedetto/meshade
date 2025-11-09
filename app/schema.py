@@ -164,14 +164,14 @@ class AgentConfig(ConfigModel):
 	port          : int                                               = 0
 
 
-class TeamOptionsConfig(ConfigModel):
-	tag : int = 0
+# class TeamOptionsConfig(ConfigModel):
+# 	tag : int = 0
 
 
-class TeamConfig(ConfigModel):
-	info    : Optional[InfoConfig]                      = InfoConfig()
-	options : Optional[Union[TeamOptionsConfig, Index]] = TeamOptionsConfig()
-	agents  : List[Union[AgentConfig, Index]]           = []
+# class TeamConfig(ConfigModel):
+# 	info    : Optional[InfoConfig]                      = InfoConfig()
+# 	options : Optional[Union[TeamOptionsConfig, Index]] = TeamOptionsConfig()
+# 	agents  : List[Union[AgentConfig, Index]]           = []
 
 
 class AppOptionsConfig(ConfigModel):
@@ -196,8 +196,8 @@ class AppConfig(ConfigModel):
 	tools            : Optional[List[ToolConfig              ]] = []
 	agent_options    : Optional[List[AgentOptionsConfig      ]] = []
 	agents           : Optional[List[AgentConfig             ]] = []
-	team_options     : Optional[List[TeamOptionsConfig       ]] = []
-	teams            : Optional[List[TeamConfig              ]] = []
+	# team_options     : Optional[List[TeamOptionsConfig       ]] = []
+	# teams            : Optional[List[TeamConfig              ]] = []
 	# workflow_options : Optional[List[WorkflowOptionsConfig   ]] = []
 	# workflows        : Optional[List[WorkflowConfig          ]] = []
 	port             : int                                      = DEFAULT_APP_PORT

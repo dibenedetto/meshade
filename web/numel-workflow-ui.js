@@ -67,7 +67,7 @@ function initWorkflowUI() {
 	modeDisplay = document.getElementById('sg-modeDisplay');
 	
 	setupWorkflowUIListeners();
-	loadSampleWorkflows();
+	//loadSampleWorkflows();
 }
 
 function setupWorkflowUIListeners() {
