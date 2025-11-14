@@ -4521,7 +4521,7 @@ class SchemaGraphApp {
       this.ctx.fill();
     }
     
-// Show preview selection with dashed border
+    // Show preview selection with dashed border
     if (isPreviewSelected && !isSelected) {
       this.ctx.strokeStyle = colors.accentGreen;
       this.ctx.lineWidth = 2 / this.camera.scale;
@@ -4630,11 +4630,15 @@ class SchemaGraphApp {
     
     // Slots
     const worldMouse = this.screenToWorld(this.mousePos[0], this.mousePos[1]);
-    for (let j = 0; j < node.inputs.length; j++) {
-      this.drawInputSlot(node, j, x, y, w, worldMouse, colors);
+    if (node.inputs) {
+        for (let j = 0; j < node.inputs.length; j++) {
+          this.drawInputSlot(node, j, x, y, w, worldMouse, colors);
+        }
     }
-    for (let j = 0; j < node.outputs.length; j++) {
-      this.drawOutputSlot(node, j, x, y, w, worldMouse, colors);
+    if (node.inputs) {
+        for (let j = 0; j < node.outputs.length; j++) {
+            this.drawOutputSlot(node, j, x, y, w, worldMouse, colors);
+        }
     }
     
     // Native value display with rounded corners
@@ -4702,6 +4706,12 @@ class SchemaGraphApp {
   drawInputSlot(node, j, x, y, w, worldMouse, colors) {
     const style = this.drawingStyleManager.getStyle();
     const textScale = this.getTextScale();
+    
+    // 🔧 FIX: Guard against undefined inputs
+    if (!node.inputs || !node.inputs[j]) {
+        return;
+    }
+    
     const inp = node.inputs[j];
     const sy = y + 38 + j * 25;
     const hovered = this.connecting && !this.connecting.isOutput && 
@@ -4759,7 +4769,7 @@ class SchemaGraphApp {
     this.ctx.fillText(inp.name, x + 10, sy);
     
     // Field type with text scaling and rounded box
-    if (!node.isNative || node.nativeInputs[j] === undefined) {
+    if (!node.isNative || (!!node.nativeInputs && node.nativeInputs[j] === undefined)) {
       const compactType = this.graph.compactType(inp.type);
       let typeText = compactType.length > 20 ? compactType.substring(0, 20) + '...' : compactType;
       
@@ -4904,6 +4914,12 @@ class SchemaGraphApp {
   drawOutputSlot(node, j, x, y, w, worldMouse, colors) {
     const style = this.drawingStyleManager.getStyle();
     const textScale = this.getTextScale();
+    
+    // 🔧 FIX: Guard against undefined outputs
+    if (!node.outputs || !node.outputs[j]) {
+        return;
+    }
+    
     const out = node.outputs[j];
     const sy = y + 38 + j * 25;  // Start slots 5px lower
     const hovered = this.connecting && this.connecting.isOutput && 

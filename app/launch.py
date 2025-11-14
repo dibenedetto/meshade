@@ -7,17 +7,16 @@ import uvicorn
 
 
 from   dotenv                  import load_dotenv
-from   fastapi                 import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from   fastapi                 import FastAPI, HTTPException
 from   fastapi.middleware.cors import CORSMiddleware
-from   pydantic                import BaseModel
-from   typing                  import Any, Dict, List, Optional
+from   typing                  import Any
 
 
 from   event_bus               import (
-	EventType,
 	get_event_bus,
 )
 from   numel                   import (
+	AgentApp,
 	compact_config,
 	extract_config,
 	get_backends,
@@ -38,6 +37,7 @@ from   workflow_api            import (
 	setup_workflow_api,
 )
 from   workflow_engine         import (
+	WorkflowContext,
 	WorkflowEngine,
 )
 from   workflow_manager        import (
@@ -107,9 +107,8 @@ if True:
 			"schema": workflow_schema_text,
 		}
 	except Exception as e:
-		log_print(f"Warning: Could not load workflow schema: {e}")
-		workflow_schema = {"schema": ""}
-
+		log_print(f"Error reading workflow schema: {e}")
+		raise HTTPException(status_code=500, detail=str(e))
 
 if True:
 	config = load_config(args.config_path) or AppConfig()
@@ -121,8 +120,10 @@ if True:
 
 
 if True:
+	event_bus        = get_event_bus()
+	workflow_eng     = None
 	workflow_manager = WorkflowManager(config, storage_dir="workflows")
-	workflow_manager.load_all_from_directory()
+	workflow_manager .load_all_from_directory()
 
 
 if True:
@@ -141,13 +142,8 @@ if True:
 		"config" : None,
 		"status" : "waiting",
 	}
-
 	apps            = None
 	running_servers = []
-
-	event_bus       = get_event_bus()
-	workflow_eng    = None
-
 	ctrl_app        = FastAPI(title="Control")
 	add_middleware(ctrl_app)
 
@@ -175,9 +171,61 @@ async def export_schema():
 
 @ctrl_app.post("/workflow/schema")
 async def export_workflow_schema():
-	"""Export workflow schema - NEW ENDPOINT"""
+	"""Export workflow schema with node type definitions from Pydantic"""
 	global workflow_schema
-	return workflow_schema
+	
+	# Import the Pydantic enum to get valid node types
+	from workflow_schema import WorkflowNodeType
+	
+	# Build node type metadata from the Pydantic schema
+	node_types = {}
+	for node_type in WorkflowNodeType:
+		type_name = node_type.value
+		
+		# Define slot configurations based on node type
+		if type_name == "start":
+			node_types[type_name] = {
+				"inputs": [],
+				"outputs": ["output"],
+				"description": "Start node - outputs initial workflow variables"
+			}
+		elif type_name == "end":
+			node_types[type_name] = {
+				"inputs": ["input"],
+				"outputs": [],
+				"description": "End node - collects final outputs"
+			}
+		elif type_name in ["agent", "prompt", "tool", "transform"]:
+			node_types[type_name] = {
+				"inputs": ["input"],
+				"outputs": ["output"],
+				"description": f"{type_name.title()} node - processes input data"
+			}
+		elif type_name == "decision":
+			node_types[type_name] = {
+				"inputs": ["input"],
+				"outputs": ["dynamic"],  # Outputs determined by branches config
+				"description": "Decision node - routes data based on conditions"
+			}
+		elif type_name == "merge":
+			node_types[type_name] = {
+				"inputs": ["dynamic"],  # Multiple inputs
+				"outputs": ["output"],
+				"description": "Merge node - combines multiple inputs"
+			}
+		elif type_name == "user_input":
+			node_types[type_name] = {
+				"inputs": [],
+				"outputs": ["output"],
+				"description": "User input node - waits for user input"
+			}
+	
+	# Return both the schema text and node type metadata
+	return {
+		"schema": workflow_schema["schema"],
+		"node_types": node_types,
+		"valid_types": [t.value for t in WorkflowNodeType]
+	}
 
 
 @ctrl_app.post("/import")
@@ -215,13 +263,20 @@ async def start_app():
 		backends      = get_backends()
 		apps          = []
 
-		agent_index = 0
+		agent_index   = 0
+		agent_remap   = {}
+		tool_remap    = {}
+
 		for backend, ctor in backends.values():
-			bkd_cfg = extract_config(config, backend, active_agents)
-			if not bkd_cfg.agents:
+			bkd_cfg, agent_rmp, tool_rmp = extract_config(config, backend, active_agents)
+			if not bkd_cfg or not bkd_cfg.agents:
 				continue
 
-			app = ctor(bkd_cfg)
+			app     = ctor(bkd_cfg)
+			app_idx = len(apps)
+			rmp     = { global_idx : (app_idx, local_idx) for global_idx, local_idx in agent_rmp.items() }
+			agent_remap.update(rmp)
+
 			apps.append(app)
 
 			for i in range(len(app.config.agents)):
@@ -241,20 +296,20 @@ async def start_app():
 				agent_index += 1
 				agent_port  += 1
 
-		# Initialize workflow engine ONCE
-		workflow_eng = WorkflowEngine(config, event_bus)
-		workflow_eng.set_workflow_manager(workflow_manager)
-		
-		# Setup workflow API endpoints ONCE
+		# Initialize workflow engine
+		workflow_ctx = WorkflowContext (apps, agent_remap, tool_remap)
+		workflow_eng = WorkflowEngine  (workflow_ctx, event_bus)
 		setup_workflow_api(ctrl_app, workflow_eng, event_bus)
-		
-		log_print("Workflow engine initialized")
+
+		log_print("✅ Workflow engine initialized")
 
 		ctrl_status["config"] = config
 		ctrl_status["status"] = "running"
+
 	except Exception as e:
 		log_print(f"Error starting app: {e}")
 		return {"error": str(e)}
+
 	return ctrl_status
 
 

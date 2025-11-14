@@ -92,33 +92,3 @@ class WorkflowManager:
 		"""Delete workflow from memory"""
 		if name in self.workflows:
 			del self.workflows[name]
-
-
-# ========================================================================
-# Updated workflow_engine.py - Use WorkflowManager
-# ========================================================================
-
-"""
-class WorkflowEngine:
-	def __init__(self, app_config: AppConfig, event_bus: Optional[EventBus] = None):
-		self.app_config = app_config
-		self.event_bus = event_bus or get_event_bus()
-		self.workflow_manager: Optional[WorkflowManager] = None
-		# ... rest of init
-	
-	def set_workflow_manager(self, workflow_manager: WorkflowManager):
-		'''Set the workflow manager for accessing workflows'''
-		self.workflow_manager = workflow_manager
-	
-	async def start_workflow_by_name(self, workflow_name: str, 
-	                                  initial_data: Optional[Dict[str, Any]] = None) -> str:
-		'''Start a workflow by name from the workflow manager'''
-		if not self.workflow_manager:
-			raise ValueError("Workflow manager not set")
-		
-		workflow = self.workflow_manager.get_workflow(workflow_name)
-		if not workflow:
-			raise ValueError(f"Workflow not found: {workflow_name}")
-		
-		return await self.start_workflow(workflow, initial_data)
-"""

@@ -305,6 +305,20 @@ class _AgnoAgentApp(AgentApp):
 		return app
 
 
+	async def run_agent(self, agent_index: int, *args, **kwargs) -> Any:
+		agent  = self.config_impl.agents[agent_index]
+		raw    = await agent.arun(*args, **kwargs)
+		result = dict(
+			content_type = raw.content_type,
+			content      = raw.content,
+		)
+		return result
+
+
+	async def run_tool(self, tool_index: int, *args, **kwargs) -> Any:
+		return None
+
+
 	def close(self) -> bool:
 		self.config_impl = None
 		return True

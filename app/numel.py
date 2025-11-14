@@ -351,9 +351,9 @@ def compact_config(config: AppConfig) -> AppConfig:
 	return config_copy
 
 
-def extract_config(config: AppConfig, backend: BackendConfig, active_agents: List[bool]) -> AppConfig:
+def extract_config(config: AppConfig, backend: BackendConfig, active_agents: List[bool]) -> Tuple[AppConfig, dict, dict]:
 	if config is None or backend is None or len(active_agents) != len(config.agents):
-		return None
+		return (None, None, None)
 
 	extracted = AppConfig()
 
@@ -636,7 +636,7 @@ def extract_config(config: AppConfig, backend: BackendConfig, active_agents: Lis
 				dst_item.tools.append(dst_tool)
 		extracted.agents[dst] = dst_item
 
-	return extracted
+	return (extracted, agent_remap, tool_remap)
 
 
 def load_config(file_path: str) -> AppConfig:
@@ -674,6 +674,14 @@ class AgentApp:
 
 	def generate_app(self, agent_index: int) -> FastAPI:
 		raise NotImplementedError("Subclasses must implement the generate_app method")
+
+
+	async def run_agent(self, agent_index: int, *args, **kwargs) -> Any:
+		raise NotImplementedError("Subclasses must implement the run_agent method")
+
+
+	async def run_tool(self, tool_index: int, *args, **kwargs) -> Any:
+		raise NotImplementedError("Subclasses must implement the run_tool method")
 
 
 	def close(self) -> bool:

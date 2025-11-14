@@ -60,6 +60,7 @@ body {
 	margin-bottom: 15px;
 	background: var(--sg-bg-tertiary);
 	padding: 4px;
+	border: 1px solid var(--sg-border-color);
 	border-radius: 6px;
 }
 

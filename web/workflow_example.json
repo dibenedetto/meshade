@@ -3,180 +3,166 @@
 		"name": "Customer Support Workflow",
 		"version": "1.0.0",
 		"author": "marco@numel.app",
-		"description": "Automated customer support workflow with decision branches using index-based references"
+		"description": "Simple customer support workflow with decision routing"
 	},
-	"options": {},
 	"nodes": [
 		{
-			"id": "start_1",
+			"id": "start",
 			"type": "start",
 			"label": "Start",
-			"initial_data": {
-				"customer_query": "",
-				"priority": "normal"
-			}
+			"position": {"x": 100, "y": 100}
 		},
 		{
-			"id": "input_1",
+			"id": "get_input",
 			"type": "user_input",
-			"label": "Get Customer Query",
-			"prompt_text": "Please describe your issue:",
-			"timeout": 300
-		},
-		{
-			"id": "agent_1",
-			"type": "agent",
-			"label": "Analyze Query",
-			"agent": 0,
-			"input_mapping": {
-				"query": "variables.customer_query"
+			"label": "Get Query",
+			"config": {
+				"prompt": "Please describe your issue:",
+				"timeout": 300
 			},
-			"output_mapping": {
-				"category": "$2.response.category",
-				"sentiment": "$2.response.sentiment"
-			}
+			"position": {"x": 100, "y": 250}
 		},
 		{
-			"id": "decision_1",
+			"id": "analyze",
+			"type": "transform",
+			"label": "Analyze Query",
+			"config": {
+				"type": "python",
+				"script": "category = 'general'\nif 'password' in str(input).lower():\n    category = 'technical'\nelif 'payment' in str(input).lower():\n    category = 'billing'\noutput = {'query': input, 'category': category}"
+			},
+			"position": {"x": 100, "y": 400}
+		},
+		{
+			"id": "route",
 			"type": "decision",
 			"label": "Route by Category",
-			"condition_field": "category",
-			"branches": {
-				"technical": 4,
-				"billing": 5,
-				"general": 6
-			}
+			"config": {
+				"condition_field": "category",
+				"branches": {
+					"technical": 4,
+					"billing": 5,
+					"general": 6
+				}
+			},
+			"position": {"x": 100, "y": 550}
 		},
 		{
-			"id": "agent_tech",
+			"id": "tech_agent",
 			"type": "agent",
 			"label": "Technical Support",
-			"agent": 0,
-			"input_mapping": {
-				"query": "variables.customer_query",
-				"category": "variables.category"
-			}
+			"config": {
+				"agent": 0
+			},
+			"position": {"x": -150, "y": 700}
 		},
 		{
-			"id": "agent_billing",
+			"id": "billing_agent",
 			"type": "agent",
 			"label": "Billing Support",
-			"agent": 0,
-			"input_mapping": {
-				"query": "variables.customer_query",
-				"category": "variables.category"
-			}
+			"config": {
+				"agent": 0
+			},
+			"position": {"x": 100, "y": 700}
 		},
 		{
-			"id": "agent_general",
+			"id": "general_agent",
 			"type": "agent",
 			"label": "General Support",
-			"agent": 0,
-			"input_mapping": {
-				"query": "variables.customer_query",
-				"category": "variables.category"
-			}
+			"config": {
+				"agent": 0
+			},
+			"position": {"x": 350, "y": 700}
 		},
 		{
-			"id": "merge_1",
+			"id": "merge",
 			"type": "merge",
 			"label": "Merge Responses",
-			"strategy": "first",
-			"wait_for": [4, 5, 6]
+			"config": {
+				"strategy": "first"
+			},
+			"position": {"x": 100, "y": 850}
 		},
 		{
-			"id": "transform_1",
-			"type": "transform",
-			"label": "Format Response",
-			"transform_type": "python",
-			"transform_script": "output = f\"Response: {input.get('merged', 'No response')}\\nCategory: {context.variables.get('category', 'unknown')}\"",
-			"input_mapping": {
-				"merged": "$7.merged"
-			}
-		},
-		{
-			"id": "end_1",
+			"id": "end",
 			"type": "end",
 			"label": "End",
-			"output_mapping": {
-				"final_response": "variables.transform_output"
-			}
+			"position": {"x": 100, "y": 1000}
 		}
 	],
 	"edges": [
 		{
 			"source": 0,
 			"target": 1,
+			"source_slot": "output",
+			"target_slot": "input",
 			"label": "Initialize"
 		},
 		{
 			"source": 1,
 			"target": 2,
+			"source_slot": "output",
+			"target_slot": "input",
 			"label": "Query received"
 		},
 		{
 			"source": 2,
 			"target": 3,
+			"source_slot": "output",
+			"target_slot": "input",
 			"label": "Analyzed"
 		},
 		{
 			"source": 3,
 			"target": 4,
-			"condition": {
-				"type": "equals",
-				"field": "category",
-				"value": "technical"
-			},
+			"source_slot": "technical",
+			"target_slot": "input",
+			"filter": "data.get('matched') == True",
 			"label": "Technical"
 		},
 		{
 			"source": 3,
 			"target": 5,
-			"condition": {
-				"type": "equals",
-				"field": "category",
-				"value": "billing"
-			},
+			"source_slot": "billing",
+			"target_slot": "input",
+			"filter": "data.get('matched') == True",
 			"label": "Billing"
 		},
 		{
 			"source": 3,
 			"target": 6,
-			"condition": {
-				"type": "equals",
-				"field": "category",
-				"value": "general"
-			},
+			"source_slot": "general",
+			"target_slot": "input",
+			"filter": "data.get('matched') == True",
 			"label": "General"
 		},
 		{
 			"source": 4,
 			"target": 7,
+			"source_slot": "output",
+			"target_slot": "input_0",
 			"label": "Tech response"
 		},
 		{
 			"source": 5,
 			"target": 7,
+			"source_slot": "output",
+			"target_slot": "input_1",
 			"label": "Billing response"
 		},
 		{
 			"source": 6,
 			"target": 7,
+			"source_slot": "output",
+			"target_slot": "input_2",
 			"label": "General response"
 		},
 		{
 			"source": 7,
 			"target": 8,
+			"source_slot": "output",
+			"target_slot": "input",
 			"label": "Merged"
-		},
-		{
-			"source": 8,
-			"target": 9,
-			"label": "Formatted"
 		}
 	],
-	"variables": {
-		"max_retries": 3,
-		"timeout": 300
-	}
+	"variables": {}
 }
