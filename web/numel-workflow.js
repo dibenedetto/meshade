@@ -37,6 +37,7 @@ function registerWorkflowNodeTypes(schemaGraph) {
 			constructor() {
 				// CRITICAL: Set type FIRST before anything else for SchemaGraph serialization
 				this.type = nodeTypeName;
+				this.isNative = false;
 				
 				// Initialize basic node properties
 				this.id = Math.random().toString(36).substr(2, 9);
@@ -59,39 +60,40 @@ function registerWorkflowNodeTypes(schemaGraph) {
 			setupSlots(type) {
 				switch (type) {
 					case 'start':
-						this.addOutput('output', 'any');
+						this.addOutput('output', 'Any');
 						break;
 					
 					case 'end':
-						this.addInput('input', 'any');
+						this.addInput('input', 'Any');
 						break;
 					
 					case 'agent':
 					case 'prompt':
 					case 'tool':
 					case 'transform':
-						this.addInput('input', 'any');
-						this.addOutput('output', 'any');
+						this.addInput('input', 'Any');
+						this.addOutput('output', 'Any');
 						break;
 					
 					case 'decision':
-						this.addInput('input', 'any');
-						this.addOutput('default', 'any');
+						this.addInput('input', 'Any');
+						this.addOutput('default', 'Any');
 						break;
 					
 					case 'merge':
-						this.addInput('input_0', 'any');
-						this.addInput('input_1', 'any');
-						this.addOutput('output', 'any');
+						this.addInput('input_0', 'Any');
+						this.addInput('input_1', 'Any');
+						this.addOutput('output', 'Any');
 						break;
 					
 					case 'user_input':
-						this.addOutput('output', 'any');
+						this.addInput('input', 'Any');
+						this.addOutput('output', 'Any');
 						break;
 					
 					default:
-						this.addInput('input', 'any');
-						this.addOutput('output', 'any');
+						this.addInput('input', 'Any');
+						this.addOutput('output', 'Any');
 				}
 			}
 			
@@ -418,7 +420,7 @@ class WorkflowVisualizer {
 		// Validate node types
 		for (let i = 0; i < workflow.nodes.length; i++) {
 			const node = workflow.nodes[i];
-			if (!node.type || !isValidWorkflowType(node.type)) {
+			if (!node.type || (!node.isNative && !isValidWorkflowType(node.type))) {
 				console.error(`❌ Invalid node type at index ${i}: ${node.type}`);
 				return false;
 			}
@@ -445,16 +447,15 @@ class WorkflowVisualizer {
 	
 	createNode(workflowNode, index) {
 		// Validate node type
-		if (!isValidWorkflowType(workflowNode.type)) {
+		if (!workflowNode.isNative && !isValidWorkflowType(workflowNode.type)) {
 			console.error('❌ Invalid workflow node type:', workflowNode.type);
 			return null;
 		}
-		
+
+		const nodeType = `${workflowNode.isNative ? "Native" : WORKFLOW_SCHEMA_NAME}.${workflowNode.type}`;
 		const pos = workflowNode.position || this.calculatePosition(index);
 		
 		try {
-			// Create node using SchemaGraph's API
-			const nodeType = `${WORKFLOW_SCHEMA_NAME}.${workflowNode.type}`;
 			const graphNode = this.schemaGraph.api.node.create(nodeType, pos.x, pos.y);
 			
 			if (!graphNode) {
@@ -462,48 +463,68 @@ class WorkflowVisualizer {
 				return null;
 			}
 			
+			// Mark as workflow node
+			graphNode.isWorkflowNode = true;
+			graphNode.isNative = !!workflowNode.isNative;
+
+			// Handle native nodes
+			if (workflowNode.isNative) {
+				graphNode.workflowData = {
+					index: index,
+					id: workflowNode.id,
+					type: workflowNode.type,
+					nodeType: nodeType,
+					isNative: true,
+					status: 'pending'
+				};
+				
+				this.graphNodes[index] = graphNode;
+				return graphNode;
+			}
+			
+			// Handle workflow nodes
+			const workflowType = workflowNode.type;
+			graphNode.workflowType = workflowType;
+			
+			// Set schemaName and modelName for proper serialization
+			graphNode.schemaName = 'Workflow';
+			graphNode.modelName = workflowType;
+			
 			// Customize label with emoji and index
-			const emoji = this.getNodeEmoji(workflowNode.type);
-			const label = workflowNode.label || workflowNode.type;
+			const emoji = this.getNodeEmoji(workflowType);
+			const label = workflowNode.label || workflowType;
 			graphNode.title = `${emoji} [${index}] ${label}`;
+			graphNode.color = this.getNodeColor(workflowType);
 			
 			// Handle special cases - decision node branches
-			if (workflowNode.type === 'decision' && workflowNode.config?.branches) {
-				// Clear default output
+			if (workflowType === 'decision' && workflowNode.config?.branches) {
 				graphNode.outputs = [];
 				Object.keys(workflowNode.config.branches).forEach(branchName => {
-					graphNode.addOutput(branchName, 'any');
+					graphNode.addOutput(branchName, 'Any');
 				});
 			}
 			
 			// Handle merge node - multiple inputs
-			if (workflowNode.type === 'merge') {
+			if (workflowType === 'merge') {
+				// Count incoming edges to this node
 				const incomingCount = this.currentWorkflow.edges.filter(e => e.target === index).length;
-				if (incomingCount > 2) {
-					// Add more inputs if needed
-					graphNode.inputs = [];
-					for (let i = 0; i < incomingCount; i++) {
-						graphNode.addInput(`input_${i}`, 'any');
-					}
+				graphNode.inputs = [];
+				for (let i = 0; i < Math.max(incomingCount, 2); i++) {
+					graphNode.addInput(`input_${i}`, 'Any');
 				}
 			}
 			
 			// Store workflow metadata
 			graphNode.workflowData = {
 				index: index,
-				id: workflowNode.id || createWorkflowNodeId(workflowNode.type, index),
-				type: workflowNode.type,
-				config: workflowNode.config || {},
-				label: workflowNode.label,
+				id: workflowNode.id,
+				type: workflowType,
+				nodeType: nodeType,
+				config: workflowNode.config,
 				status: 'pending'
 			};
 			
-			// Set node color for visual distinction
-			graphNode.color = '#4a5568'; // Gray-blue for workflow nodes
-			
 			this.graphNodes[index] = graphNode;
-			
-			console.log('✅ Created workflow node:', index, workflowNode.type);
 			return graphNode;
 			
 		} catch (e) {
@@ -646,36 +667,49 @@ class WorkflowVisualizer {
 		const nodeIndexMap = new Map(); // graphNode.id -> new index
 		
 		graphNodes.forEach((graphNode) => {
-			// STRICT: Only include nodes that pass all checks
-			if (!isWorkflowGraphNode(graphNode)) {
-				return; // Skip non-workflow nodes
-			}
-			
-			const workflowData = graphNode.workflowData || {};
-			const nodeType = graphNode.workflowType;
-			
-			// STRICT: Validate type
-			if (!isValidWorkflowType(nodeType)) {
-				console.warn('⚠️ Skipping node with invalid type:', nodeType);
-				return;
+			// Include both workflow and native nodes
+			if (!isWorkflowGraphNode(graphNode) && !graphNode.isNative) {
+				return; // Skip non-workflow and non-native nodes
 			}
 			
 			const newIndex = newNodes.length;
+			let nodeType, label, nodeId, config;
 			
-			// Extract label (remove emoji and index prefix)
-			let label = graphNode.title || nodeType;
-			label = label.replace(/^[^\]]*\]\s*/, '').replace(/^[^\s]+\s+/, '');
-			
-			// Build node for backend schema
+			if (graphNode.isNative) {
+				// Handle native nodes
+				nodeType = graphNode.title || 'native';
+				label = graphNode.title;
+				nodeId = graphNode.id || `native_${newIndex}`;
+				config = graphNode.properties || {};
+			} else {
+				// Handle workflow nodes
+				const workflowData = graphNode.workflowData || {};
+				nodeType = graphNode.workflowType;
+				
+				// STRICT: Validate type
+				if (!isValidWorkflowType(nodeType)) {
+					console.warn('⚠️ Skipping node with invalid type:', nodeType);
+					return;
+				}
+				
+				// Extract label (remove emoji and index prefix)
+				label = graphNode.title || nodeType;
+				label = label.replace(/^[^\]]*\]\s*/, '').replace(/^[^\s]+\s+/, '');
+
+				nodeId = workflowData.id || createWorkflowNodeId(nodeType, newIndex);
+				config = workflowData.config || {};
+			}
+
 			const node = {
-				id: workflowData.id || createWorkflowNodeId(nodeType, newIndex),
+				id: nodeId,
 				type: nodeType,
-				label: label || nodeType,
+				label: label,
 				position: {
 					x: Math.round(graphNode.pos[0]),
 					y: Math.round(graphNode.pos[1])
 				},
-				config: workflowData.config || {}
+				config: config,
+				isNative: !!graphNode.isNative
 			};
 			
 			newNodes.push(node);
@@ -694,8 +728,9 @@ class WorkflowVisualizer {
 			
 			if (!sourceNode || !targetNode) continue;
 			
-			// STRICT: Both nodes must be workflow nodes
-			if (!isWorkflowGraphNode(sourceNode) || !isWorkflowGraphNode(targetNode)) {
+			// Include edges between workflow nodes and/or native nodes
+			if ((!sourceNode.isNative && !isWorkflowGraphNode(sourceNode)) ||
+			    (!targetNode.isNative && !isWorkflowGraphNode(targetNode))) {
 				continue;
 			}
 			
@@ -754,19 +789,44 @@ class WorkflowVisualizer {
 	// Helpers
 	// ====================================================================
 	
+	getNodeColor(type) {
+		const map = {
+			'start'      : '#4ade80',
+			'end'        : '#f87171',
+			'agent'      : '#60a5fa',
+			'prompt'     : '#a78bfa',
+			'tool'       : '#fb923c',
+			'transform'  : '#fbbf24',
+			'decision'   : '#ec4899',
+			'merge'      : '#14b8a6',
+			'user_input' : '#f472b6'
+		};
+		return map[type] || '#94a3b8';
+	}
+
 	getNodeEmoji(type) {
 		const map = {
-			'start': '🎬', 'end': '🏁', 'agent': '🤖', 'prompt': '💭',
-			'tool': '🔧', 'transform': '🔄', 'decision': '🔀', 
-			'merge': '🔗', 'user_input': '👤'
+			'start'      : '🎬',
+			'end'        : '🏁',
+			'agent'      : '🤖',
+			'prompt'     : '💭',
+			'tool'       : '🔧',
+			'transform'  : '🔄',
+			'decision'   : '🔀', 
+			'merge'      : '🔗',
+			'user_input' : '👤'
 		};
 		return map[type] || '⚪';
 	}
 	
 	getStatusEmoji(status) {
 		const map = {
-			'pending': '⏳', 'ready': '▶️', 'running': '▶️',
-			'completed': '✅', 'failed': '❌', 'skipped': '⭕'
+			'pending'   : '⏳',
+			'ready'     : '▶️',
+			'running'   : '▶️',
+			'completed' : '✅',
+			'failed'    : '❌',
+			'skipped'   : '⭕'
 		};
 		return map[status] || '⚪';
 	}

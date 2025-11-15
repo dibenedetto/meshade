@@ -184,6 +184,14 @@ async function initWorkflowSystem() {
 	// Step 4: Setup event handlers
 	setupWorkflowEvents();
 	
+	// Step 5: Refresh SchemaGraph context menu to include workflow nodes
+	// SchemaGraph should automatically pick up registered node types
+	if (gGraph && gGraph.graph) {
+		// Force a context menu refresh if there's an API for it
+		// The context menu should now show workflow.start, workflow.end, etc.
+		console.log('✅ Workflow nodes available in context menu');
+	}
+	
 	addEventLog('system', '✅ Workflow system initialized');
 	return true;
 }
