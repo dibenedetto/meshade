@@ -1,13 +1,14 @@
-# workflow_api.py - Simplified Workflow API
+# workflow_api
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from typing import Any, Dict, Optional
-from pydantic import BaseModel
+from fastapi         import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from pydantic        import BaseModel
+from typing          import Any, Dict, Optional
 
+
+from event_bus       import EventBus
+from utils           import log_print
 from workflow_engine import WorkflowEngine
 from workflow_schema import WorkflowConfig
-from event_bus import EventBus
-from utils import log_print
 
 
 class WorkflowStartRequest(BaseModel):

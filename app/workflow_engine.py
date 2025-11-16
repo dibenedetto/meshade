@@ -1,7 +1,6 @@
-# workflow_engine.py - Simplified Frontier-Based Execution
+# workflow_engine
 
 import asyncio
-import copy
 import uuid
 
 
@@ -11,8 +10,8 @@ from   functools       import partial
 from   pydantic        import BaseModel
 from   typing          import Any, Callable, Dict, List, Optional, Set, Tuple
 
+from   core            import AgentApp
 from   event_bus       import EventBus, EventType, get_event_bus
-from   numel           import AgentApp
 from   workflow_nodes  import create_node, NodeExecutionContext, NodeExecutionResult
 from   workflow_schema import WorkflowConfig, WorkflowNodeStatus
 

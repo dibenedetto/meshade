@@ -1,4 +1,4 @@
-# workflow_nodes.py - Simplified Node Implementations
+# workflow_nodes
 
 from typing import Any, Dict, List, Optional
 from jinja2 import Template

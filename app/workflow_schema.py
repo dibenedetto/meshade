@@ -1,9 +1,11 @@
-# workflow_schema.py - Simplified Data-Flow Schema
+# workflow_schema
 
-from enum import Enum
+from enum     import Enum
 from pydantic import BaseModel, field_validator
-from typing import Any, Dict, List, Optional
-from schema import InfoConfig
+from typing   import Any, Dict, List, Optional
+
+
+from schema   import InfoConfig
 
 
 class WorkflowNodeType(str, Enum):

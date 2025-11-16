@@ -12,17 +12,16 @@ from   fastapi.middleware.cors import CORSMiddleware
 from   typing                  import Any
 
 
-from   event_bus               import (
-	get_event_bus,
-)
-from   numel                   import (
-	AgentApp,
+from   core                    import (
 	compact_config,
 	extract_config,
 	get_backends,
 	load_config,
 	unroll_config,
 	validate_config,
+)
+from   event_bus               import (
+	get_event_bus,
 )
 from   schema                  import (
 	DEFAULT_APP_PORT,
@@ -110,6 +109,7 @@ if True:
 		log_print(f"Error reading workflow schema: {e}")
 		raise HTTPException(status_code=500, detail=str(e))
 
+
 if True:
 	config = load_config(args.config_path) or AppConfig()
 	config.port = args.port
@@ -127,7 +127,7 @@ if True:
 
 
 if True:
-	impl_modules = [os.path.splitext(f)[0] for f in os.listdir(current_dir) if f.endswith("_impl.py")]
+	impl_modules = [os.path.splitext(f)[0] for f in os.listdir(current_dir) if (f.startswith("impl_") and f.endswith(".py"))]
 	for module_name in impl_modules:
 		try:
 			impl_module = __import__(module_name)

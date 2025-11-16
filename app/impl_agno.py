@@ -1,4 +1,4 @@
-# agno_impl
+# impl_agno
 
 import copy
 
@@ -24,7 +24,7 @@ from   agno.vectordb.lancedb           import LanceDb
 from   agno.vectordb.search            import SearchType
 
 
-from   numel                           import (
+from   core                            import (
 	AgentApp,
 	register_backend
 )
