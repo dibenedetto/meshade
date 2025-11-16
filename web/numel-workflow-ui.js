@@ -200,7 +200,8 @@ function setupWorkflowEvents() {
 	// Connection events
 	workflowClient.on('connected', () => {
 		addEventLog('system', '✅ WebSocket connected');
-		updateWorkflowStatus('connected', 'Connected');
+		// updateWorkflowStatus('connected', 'Connected');
+		updateWorkflowStatus('idle', 'Ready');
 	});
 	
 	workflowClient.on('disconnected', () => {
