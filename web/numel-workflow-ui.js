@@ -219,11 +219,13 @@ function setupWorkflowEvents() {
 	workflowClient.on('workflow.completed', (event) => {
 		addEventLog('workflow-completed', `✅ Workflow completed`);
 		updateWorkflowControls('idle');
+		updateWorkflowStatus('idle', 'Ready');
 	});
 	
 	workflowClient.on('workflow.failed', (event) => {
 		addEventLog('workflow-failed', `❌ Workflow failed: ${event.error || 'Unknown'}`);
 		updateWorkflowControls('idle');
+		updateWorkflowStatus('idle', 'Failed');
 	});
 	
 	// Node events

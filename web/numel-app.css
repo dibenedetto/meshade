@@ -277,6 +277,16 @@ body {
 	background: rgba(220, 100, 100, 0.1);
 }
 
+.numel-status-running {
+	color: var(--sg-accent-green);
+	background: rgba(146, 208, 80, 0.1);
+}
+
+.numel-status-failed {
+	color: var(--sg-accent-red);
+	background: rgba(220, 100, 100, 0.1);
+}
+
 /* Workflow Controls */
 .numel-workflow-controls {
 	display: flex;

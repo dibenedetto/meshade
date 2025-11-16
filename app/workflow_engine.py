@@ -149,6 +149,8 @@ class WorkflowEngine:
 			
 			# Main execution loop
 			while ready or running:
+				await asyncio.sleep(1)  # Yield control
+
 				# Update state
 				state.pending_nodes = list(pending)
 				state.ready_nodes = list(ready)
@@ -163,10 +165,10 @@ class WorkflowEngine:
 						ready.discard(node_idx)
 						running.add(node_idx)
 						
-						task = self._execute_node(
+						task = asyncio.create_task(self._execute_node(
 							workflow, node_idx, node_instances[node_idx],
 							node_outputs, dependencies, variables, state
-						)
+						))
 						tasks.append(task)
 					
 					# Wait for at least one completion
