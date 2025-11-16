@@ -57,6 +57,7 @@ body {
 	flex-shrink: 0;
 	display: flex;
 	gap: 8px;
+	margin-top: 15px;
 	margin-bottom: 15px;
 	background: var(--sg-bg-tertiary);
 	padding: 4px;
@@ -259,31 +260,37 @@ body {
 
 .numel-status-idle {
 	color: var(--sg-accent-purple);
+	border: 1px solid var(--sg-accent-purple);
 	background: rgba(147, 112, 219, 0.1);
 }
 
 .numel-status-connecting {
 	color: var(--sg-accent-yellow);
+	border: 1px solid var(--sg-accent-yellow);
 	background: rgba(255, 215, 0, 0.1);
 }
 
 .numel-status-connected {
 	color: var(--sg-accent-green);
+	border: 1px solid var(--sg-accent-green);
 	background: rgba(146, 208, 80, 0.1);
 }
 
 .numel-status-disconnected {
 	color: var(--sg-accent-red);
+	border: 1px solid var(--sg-accent-red);
 	background: rgba(220, 100, 100, 0.1);
 }
 
 .numel-status-running {
 	color: var(--sg-accent-green);
+	border: 1px solid var(--sg-accent-green);
 	background: rgba(146, 208, 80, 0.1);
 }
 
 .numel-status-failed {
 	color: var(--sg-accent-red);
+	border: 1px solid var(--sg-accent-red);
 	background: rgba(220, 100, 100, 0.1);
 }
 

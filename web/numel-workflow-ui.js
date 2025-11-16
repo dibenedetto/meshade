@@ -210,7 +210,28 @@ function setupWorkflowEvents() {
 	
 	// Workflow events
 	workflowClient.on('workflow.started', (event) => {
-		addEventLog('workflow-started', `🚀 Workflow started`);
+		addEventLog('workflow-started', `▶️ Workflow started`);
+		currentExecutionId = event.execution_id;
+		updateWorkflowControls('running');
+		workflowVisualizer.clearState();
+	});
+	
+	// workflowClient.on('workflow.paused', (event) => {
+	// 	addEventLog('workflow-paused', `⏸️ Workflow paused`);
+	// 	currentExecutionId = event.execution_id;
+	// 	updateWorkflowControls('running');
+	// 	workflowVisualizer.clearState();
+	// });
+	
+	// workflowClient.on('workflow.resumed', (event) => {
+	// 	addEventLog('workflow-resumed', `▶️ Workflow resumed`);
+	// 	currentExecutionId = event.execution_id;
+	// 	updateWorkflowControls('running');
+	// 	workflowVisualizer.clearState();
+	// });
+	
+	workflowClient.on('workflow.cancelled', (event) => {
+		addEventLog('workflow-cancelled', `⏹️ Workflow cancelled`);
 		currentExecutionId = event.execution_id;
 		updateWorkflowControls('running');
 		workflowVisualizer.clearState();

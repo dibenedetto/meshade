@@ -258,6 +258,7 @@ function toggleConnection() {
 	} else {
 		connect();
 	}
+	chatModeBtn.click();
 }
 
 async function setAppStatus() {
